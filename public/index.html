@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BBQuality The Pitboard</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+  <!-- Login Screen -->
+  <div id="login-screen" class="login-screen">
+    <div class="login-card">
+      <div class="login-logo">
+        <img src="/img/logo.png" alt="BBQuality" class="login-logo-img" onerror="this.style.display='none'">
+        <h1>The Pitboard</h1>
+        <p>Plan, organiseer en werk samen</p>
+      </div>
+      <form id="login-form">
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="login-email" required placeholder="je@email.nl">
+        </div>
+        <div class="form-group">
+          <label>Wachtwoord</label>
+          <input type="password" id="login-password" required placeholder="••••••••">
+        </div>
+        <button type="submit" class="btn btn-primary btn-full">Inloggen</button>
+        <p id="login-error" class="error-msg"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <div id="app" class="app hidden">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <img src="/img/logo.png" alt="BBQ" class="sidebar-logo" onerror="this.style.display='none'">
+        <span>The Pitboard</span>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#" data-view="dashboard" class="nav-item active">
+          <i class="fas fa-th-large"></i><span>Dashboard</span>
+        </a>
+        <a href="#" data-view="projects" class="nav-item">
+          <i class="fas fa-folder"></i><span>Projecten</span>
+        </a>
+        <a href="#" data-view="tasks" class="nav-item">
+          <i class="fas fa-tasks"></i><span>Taken</span>
+        </a>
+        <a href="#" data-view="calendar" class="nav-item">
+          <i class="fas fa-calendar-alt"></i><span>Kalender</span>
+        </a>
+        <a href="#" data-view="notes" class="nav-item">
+          <i class="fas fa-sticky-note"></i><span>Notities</span>
+        </a>
+        <a href="#" data-view="chat" class="nav-item">
+          <i class="fas fa-comments"></i><span>Berichten</span>
+          <span class="notification-badge" id="chat-notification-badge" style="display:none">0</span>
+        </a>
+        <a href="#" data-view="converter" class="nav-item">
+          <i class="fas fa-image"></i><span>Converter</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <a href="#" data-view="settings" class="nav-item" id="nav-settings">
+          <i class="fas fa-cog"></i><span>Instellingen</span>
+        </a>
+        <div class="user-info">
+          <div class="user-avatar" id="user-avatar">A</div>
+          <div class="user-details">
+            <span id="user-name">Admin</span>
+            <span id="user-role" class="user-role">admin</span>
+          </div>
+          <button id="logout-btn" class="btn-icon" title="Uitloggen"><i class="fas fa-sign-out-alt"></i></button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <div id="view-dashboard" class="view"></div>
+      <div id="view-projects" class="view hidden"></div>
+      <div id="view-tasks" class="view hidden"></div>
+      <div id="view-calendar" class="view hidden"></div>
+      <div id="view-notes" class="view hidden"></div>
+      <div id="view-chat" class="view hidden"></div>
+      <div id="view-converter" class="view hidden"></div>
+      <div id="view-settings" class="view hidden"></div>
+    </main>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal" id="modal">
+      <div class="modal-header">
+        <h3 id="modal-title"></h3>
+        <button class="btn-icon modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-footer" id="modal-footer"></div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.js"></script>
+  <script src="/js/app.js"></script>
+  <script src="/js/dashboard.js"></script>
+  <script src="/js/projects.js"></script>
+  <script src="/js/tasks.js"></script>
+  <script src="/js/calendar.js"></script>
+  <script src="/js/notes.js"></script>
+  <script src="/js/chat.js"></script>
+  <script src="/js/converter.js"></script>
+  <script src="/js/settings.js"></script>
+</body>
+</html>
