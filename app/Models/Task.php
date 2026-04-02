@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Task extends Model
 {
@@ -13,7 +12,7 @@ class Task extends Model
 
     protected $fillable = [
         'project_id', 'titel', 'beschrijving', 'status', 'prioriteit',
-        'deadline', 'kleur', 'link', 'positie',
+        'toegewezen_aan', 'deadline', 'kleur', 'link', 'positie',
     ];
 
     public function project(): BelongsTo
@@ -21,9 +20,8 @@ class Task extends Model
         return $this->belongsTo(Project::class, 'project_id');
     }
 
-    public function toegewezenen(): BelongsToMany
+    public function assignee(): BelongsTo
     {
-        return $this->belongsToMany(User::class, 'taak_gebruiker', 'task_id', 'user_id')
-                    ->withTimestamps();
+        return $this->belongsTo(User::class, 'toegewezen_aan');
     }
 }
