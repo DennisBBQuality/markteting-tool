@@ -6,21 +6,28 @@ use App\Http\Controllers\Controller;
 use App\Models\Task;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class TaskController extends Controller
 {
     public function index(Request $request)
     {
         $query = Task::select('tasks.*',
-                'u.naam as toegewezen_naam', 'u.kleur as user_kleur',
                 'p.naam as project_naam', 'p.kleur as project_kleur')
-            ->leftJoin('users as u', 'tasks.toegewezen_aan', '=', 'u.id')
             ->leftJoin('projects as p', 'tasks.project_id', '=', 'p.id');
 
         if ($request->filled('project_id')) $query->where('tasks.project_id', $request->project_id);
         if ($request->filled('status')) $query->where('tasks.status', $request->status);
         if ($request->filled('prioriteit')) $query->where('tasks.prioriteit', $request->prioriteit);
-        if ($request->filled('toegewezen_aan')) $query->where('tasks.toegewezen_aan', $request->toegewezen_aan);
+        if ($request->filled('toegewezen_aan')) {
+            $userId = $request->toegewezen_aan;
+            $query->whereExists(function ($q) use ($userId) {
+                $q->select(DB::raw(1))
+                  ->from('taak_gebruiker')
+                  ->whereColumn('taak_gebruiker.task_id', 'tasks.id')
+                  ->where('taak_gebruiker.user_id', $userId);
+            });
+        }
         if ($request->filled('deadline_van')) $query->where('tasks.deadline', '>=', $request->deadline_van);
         if ($request->filled('deadline_tot')) $query->where('tasks.deadline', '<=', $request->deadline_tot);
         if ($request->filled('search')) {
@@ -31,9 +38,9 @@ class TaskController extends Controller
             });
         }
 
-        return response()->json(
-            $query->orderBy('tasks.positie')->orderByDesc('tasks.created_at')->get()
-        );
+        $tasks = $query->orderBy('tasks.positie')->orderByDesc('tasks.created_at')->get();
+
+        return response()->json($this->appendToegewezenen($tasks));
     }
 
     public function store(Request $request)
@@ -44,57 +51,53 @@ class TaskController extends Controller
         $maxPos = DB::table('tasks')->where('status', $status)->max('positie') ?? 0;
 
         $task = Task::create([
-            'project_id' => $request->project_id,
-            'titel' => $request->titel,
-            'beschrijving' => $request->beschrijving ?? '',
-            'status' => $status,
-            'prioriteit' => $request->prioriteit ?? 'normaal',
-            'toegewezen_aan' => $request->toegewezen_aan,
-            'deadline' => $request->deadline,
-            'kleur' => $request->kleur,
-            'positie' => $maxPos + 1,
+            'project_id'  => $request->project_id,
+            'titel'       => $request->titel,
+            'beschrijving'=> $request->beschrijving ?? '',
+            'status'      => $status,
+            'prioriteit'  => $request->prioriteit ?? 'normaal',
+            'deadline'    => $request->deadline,
+            'kleur'       => $request->kleur,
+            'positie'     => $maxPos + 1,
         ]);
 
-        return response()->json(
-            Task::select('tasks.*',
-                'u.naam as toegewezen_naam', 'u.kleur as user_kleur',
-                'p.naam as project_naam', 'p.kleur as project_kleur')
-            ->leftJoin('users as u', 'tasks.toegewezen_aan', '=', 'u.id')
+        $this->syncToegewezenen($task->id, $request);
+
+        $result = Task::select('tasks.*', 'p.naam as project_naam', 'p.kleur as project_kleur')
             ->leftJoin('projects as p', 'tasks.project_id', '=', 'p.id')
-            ->where('tasks.id', $task->id)->first()
-        );
+            ->where('tasks.id', $task->id)->get();
+
+        return response()->json($this->appendToegewezenen($result)->first());
     }
 
     public function update(Request $request, string $id)
     {
         $task = Task::findOrFail($id);
         $task->update([
-            'titel' => $request->titel,
+            'titel'        => $request->titel,
             'beschrijving' => $request->beschrijving,
-            'status' => $request->status,
-            'prioriteit' => $request->prioriteit,
-            'toegewezen_aan' => $request->toegewezen_aan,
-            'deadline' => $request->deadline,
-            'kleur' => $request->kleur,
-            'positie' => $request->positie ?? 0,
-            'project_id' => $request->project_id,
+            'status'       => $request->status,
+            'prioriteit'   => $request->prioriteit,
+            'deadline'     => $request->deadline,
+            'kleur'        => $request->kleur,
+            'positie'      => $request->positie ?? 0,
+            'project_id'   => $request->project_id,
         ]);
 
-        return response()->json(
-            Task::select('tasks.*',
-                'u.naam as toegewezen_naam', 'u.kleur as user_kleur',
-                'p.naam as project_naam', 'p.kleur as project_kleur')
-            ->leftJoin('users as u', 'tasks.toegewezen_aan', '=', 'u.id')
+        $this->syncToegewezenen($id, $request);
+
+        $result = Task::select('tasks.*', 'p.naam as project_naam', 'p.kleur as project_kleur')
             ->leftJoin('projects as p', 'tasks.project_id', '=', 'p.id')
-            ->where('tasks.id', $id)->first()
-        );
+            ->where('tasks.id', $id)->get();
+
+        return response()->json($this->appendToegewezenen($result)->first());
     }
 
     public function reorderBatch(Request $request)
     {
         foreach ($request->tasks as $item) {
             Task::where('id', $item['id'])->update([
-                'status' => $item['status'],
+                'status'  => $item['status'],
                 'positie' => $item['positie'],
             ]);
         }
@@ -105,5 +108,45 @@ class TaskController extends Controller
     {
         Task::destroy($id);
         return response()->json(['ok' => true]);
+    }
+
+    private function appendToegewezenen($tasks)
+    {
+        $taskIds = $tasks->pluck('id');
+
+        $pivotData = DB::table('taak_gebruiker')
+            ->join('users', 'taak_gebruiker.user_id', '=', 'users.id')
+            ->whereIn('taak_gebruiker.task_id', $taskIds)
+            ->select('taak_gebruiker.task_id', 'users.id', 'users.naam', 'users.kleur')
+            ->get()
+            ->groupBy('task_id');
+
+        return $tasks->map(function ($task) use ($pivotData) {
+            $task->toegewezenen = ($pivotData->get($task->id) ?? collect())
+                ->map(fn($u) => ['id' => $u->id, 'naam' => $u->naam, 'kleur' => $u->kleur])
+                ->values();
+            return $task;
+        });
+    }
+
+    private function syncToegewezenen(string $taskId, Request $request): void
+    {
+        $value = $request->toegewezen_aan;
+        $ids = match (true) {
+            is_array($value) => array_filter($value),
+            is_string($value) && $value !== '' => [$value],
+            default => [],
+        };
+
+        DB::table('taak_gebruiker')->where('task_id', $taskId)->delete();
+        foreach ($ids as $userId) {
+            DB::table('taak_gebruiker')->insert([
+                'id'         => (string) Str::uuid(),
+                'task_id'    => $taskId,
+                'user_id'    => $userId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
     }
 }

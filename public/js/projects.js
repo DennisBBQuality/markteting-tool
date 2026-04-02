@@ -54,6 +54,7 @@ function renderProjectGrid() {
 
   grid.innerHTML = filtered.map(p => {
     const progress = p.aantal_taken > 0 ? Math.round((p.taken_klaar / p.aantal_taken) * 100) : 0;
+    const medewerkers = p.medewerkers || [];
     return `
       <div class="project-card" style="border-top-color:${p.kleur || '#3B82F6'}" onclick="openProjectDetail('${p.id}')">
         <div class="project-card-header">
@@ -68,6 +69,7 @@ function renderProjectGrid() {
           </div>
           <span class="tag priority-${p.prioriteit}">${p.prioriteit}</span>
           ${p.deadline ? `<span><i class="fas fa-clock"></i> ${formatDate(p.deadline)}</span>` : ''}
+          ${medewerkers.length > 0 ? `<span class="kanban-card-assignees">${medewerkers.map(u=>`<span class="kanban-card-assignee" style="background:${u.kleur||'#3B82F6'}" title="${escHtml(u.naam)}">${u.naam.charAt(0)}</span>`).join('')}</span>` : ''}
         </div>
       </div>`;
   }).join('');
@@ -116,6 +118,10 @@ function openProjectModal(project) {
       <input type="date" id="proj-deadline" value="${toInputDate(p.deadline)}">
     </div>
     <div class="form-group">
+      <label>Teamleden</label>
+      <div id="proj-medewerkers">${userCheckboxGroup((p.medewerkers||[]).map(u=>u.id))}</div>
+    </div>
+    <div class="form-group">
       <label>Kleur</label>
       ${colorPickerHtml(p.kleur || '#3B82F6', App.colors)}
     </div>
@@ -139,6 +145,7 @@ async function saveProject(id) {
     prioriteit: document.getElementById('proj-prioriteit').value,
     deadline: document.getElementById('proj-deadline').value || null,
     kleur,
+    medewerkers: getSelectedUserIds('proj-medewerkers'),
   };
   const result = id
     ? await api(`/api/projects/${id}`, { method: 'PUT', body })

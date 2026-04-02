@@ -143,7 +143,7 @@ async function openEditTaskModal(id) {
       </div>
       <div class="form-group">
         <label>Toegewezen aan</label>
-        <select id="et-user">${userSelectOptions(t.toegewezen_aan)}</select>
+        <div id="et-users">${userCheckboxGroup((t.toegewezenen||[]).map(u=>u.id))}</div>
       </div>
     </div>
     <div class="form-group">
@@ -173,7 +173,7 @@ async function saveEditTask(id) {
     project_id: document.getElementById('et-project').value || null,
     status: document.getElementById('et-status').value,
     prioriteit: document.getElementById('et-prioriteit').value,
-    toegewezen_aan: document.getElementById('et-user').value || null,
+    toegewezen_aan: getSelectedUserIds('et-users'),
     deadline: document.getElementById('et-deadline').value || null,
     kleur,
   }});

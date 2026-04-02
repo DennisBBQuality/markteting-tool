@@ -94,7 +94,7 @@ async function renderDashboard() {
                 <div class="dash-task-meta">
                   <span class="tag priority-${t.prioriteit}">${t.prioriteit}</span>
                   ${t.project_naam ? `<span style="color:${t.project_kleur || '#64748B'}"><i class="fas fa-folder"></i> ${escHtml(t.project_naam)}</span>` : ''}
-                  ${t.toegewezen_naam ? `<span class="kanban-card-assignee" style="background:${t.user_kleur || '#3B82F6'}" title="${escHtml(t.toegewezen_naam)}">${t.toegewezen_naam.charAt(0)}</span>` : ''}
+                  ${(t.toegewezenen||[]).length > 0 ? `<span class="kanban-card-assignees">${(t.toegewezenen||[]).map(u=>`<span class="kanban-card-assignee" style="background:${u.kleur||'#3B82F6'}" title="${escHtml(u.naam)}">${u.naam.charAt(0)}</span>`).join('')}</span>` : ''}
                 </div>
               </div>
             `).join('')}
@@ -177,7 +177,7 @@ function filterDashboardTasks() {
 
   let filtered = App.dashboardTasks || [];
   if (projectId) filtered = filtered.filter(t => t.project_id === projectId);
-  if (userId) filtered = filtered.filter(t => t.toegewezen_aan === userId);
+  if (userId) filtered = filtered.filter(t => (t.toegewezenen||[]).some(u => u.id === userId));
 
   renderDashboardKanban(filtered);
 }
@@ -225,6 +225,7 @@ function kanbanCardHtml(t) {
   const borderColor = t.kleur || t.project_kleur || '#E2E8F0';
   const deadline = t.deadline ? formatDate(t.deadline) : '';
   const isOverdue = t.deadline && t.deadline.split('T')[0] < todayStr() && t.status !== 'klaar';
+  const assignees = t.toegewezenen || [];
 
   return `
     <div class="kanban-card" data-id="${t.id}" style="border-left-color:${borderColor}">
@@ -233,7 +234,7 @@ function kanbanCardHtml(t) {
         <span class="tag priority-${t.prioriteit}">${t.prioriteit}</span>
         ${t.project_naam ? `<span style="color:${t.project_kleur || '#64748B'}"><i class="fas fa-folder"></i> ${escHtml(t.project_naam)}</span>` : ''}
         ${deadline ? `<span style="${isOverdue ? 'color:var(--danger);font-weight:600' : ''}"><i class="fas fa-clock"></i> ${deadline}</span>` : ''}
-        ${t.toegewezen_naam ? `<span class="kanban-card-assignee" style="background:${t.user_kleur || '#3B82F6'}" title="${escHtml(t.toegewezen_naam)}">${t.toegewezen_naam.charAt(0)}</span>` : ''}
+        ${assignees.length > 0 ? `<span class="kanban-card-assignees">${assignees.map(u=>`<span class="kanban-card-assignee" style="background:${u.kleur||'#3B82F6'}" title="${escHtml(u.naam)}">${u.naam.charAt(0)}</span>`).join('')}</span>` : ''}
         <span class="kanban-card-actions">
           <button class="btn-icon" onclick="openEditTaskModal('${t.id}')"><i class="fas fa-pen"></i></button>
           <button class="btn-icon" onclick="deleteTask('${t.id}')"><i class="fas fa-trash"></i></button>
@@ -285,7 +286,7 @@ function openQuickTaskModal() {
     <div class="form-row">
       <div class="form-group">
         <label>Toegewezen aan</label>
-        <select id="qt-user">${userSelectOptions()}</select>
+        <div id="qt-users">${userCheckboxGroup()}</div>
       </div>
       <div class="form-group">
         <label>Deadline</label>
@@ -318,7 +319,7 @@ async function saveQuickTask() {
     titel,
     project_id: document.getElementById('qt-project').value || null,
     prioriteit: document.getElementById('qt-prioriteit').value,
-    toegewezen_aan: document.getElementById('qt-user').value || null,
+    toegewezen_aan: getSelectedUserIds('qt-users'),
     deadline: document.getElementById('qt-deadline').value || null,
     beschrijving: document.getElementById('qt-beschrijving').value,
     kleur,
