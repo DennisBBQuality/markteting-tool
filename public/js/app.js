@@ -261,6 +261,20 @@ function userSelectOptions(selected) {
   ).join('')}`;
 }
 
+function userCheckboxGroup(selectedIds = []) {
+  return `<div class="user-checkbox-group">${App.users.map(u =>
+    `<label class="user-checkbox-label">
+      <input type="checkbox" value="${u.id}" ${selectedIds.includes(u.id) ? 'checked' : ''}>
+      <span class="user-checkbox-badge" style="background:${u.kleur || '#3B82F6'}">${u.naam.charAt(0)}</span>
+      ${escHtml(u.naam)}
+    </label>`
+  ).join('')}</div>`;
+}
+
+function getSelectedUserIds(containerId) {
+  return [...document.querySelectorAll(`#${containerId} .user-checkbox-group input:checked`)].map(cb => cb.value);
+}
+
 // ========== Emoji Picker ==========
 const emojiCategories = {
   'Smileys': ['😀','😃','😄','😁','😅','😂','🤣','😊','😇','🙂','😉','😌','😍','🥰','😘','😗','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','🤐','🤨','😐','😑','😶','😏','😒','🙄','😬','😮‍💨','🤥','😌','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤮','🤧','🥵','🥶','🥴','😵','🤯','🤠','🥳','🥸','😎','🤓','🧐','😕','😟','🙁','☹️','😮','😯','😲','😳','🥺','😦','😧','😨','😰','😥','😢','😭','😱','😖','😣','😞','😓','😩','😫','🥱','😤','😡','😠','🤬','😈','👿','💀','☠️','💩','🤡','👹','👺','👻','👽','👾','🤖'],

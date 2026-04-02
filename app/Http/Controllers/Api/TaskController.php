@@ -11,28 +11,26 @@ class TaskController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Task::select('tasks.*',
-                'u.naam as toegewezen_naam', 'u.kleur as user_kleur',
-                'p.naam as project_naam', 'p.kleur as project_kleur')
-            ->leftJoin('users as u', 'tasks.toegewezen_aan', '=', 'u.id')
-            ->leftJoin('projects as p', 'tasks.project_id', '=', 'p.id');
+        $query = Task::with(['toegewezenen:id,naam,kleur', 'project:id,naam,kleur']);
 
-        if ($request->filled('project_id')) $query->where('tasks.project_id', $request->project_id);
-        if ($request->filled('status')) $query->where('tasks.status', $request->status);
-        if ($request->filled('prioriteit')) $query->where('tasks.prioriteit', $request->prioriteit);
-        if ($request->filled('toegewezen_aan')) $query->where('tasks.toegewezen_aan', $request->toegewezen_aan);
-        if ($request->filled('deadline_van')) $query->where('tasks.deadline', '>=', $request->deadline_van);
-        if ($request->filled('deadline_tot')) $query->where('tasks.deadline', '<=', $request->deadline_tot);
+        if ($request->filled('project_id')) $query->where('project_id', $request->project_id);
+        if ($request->filled('status')) $query->where('status', $request->status);
+        if ($request->filled('prioriteit')) $query->where('prioriteit', $request->prioriteit);
+        if ($request->filled('toegewezen_aan')) {
+            $query->whereHas('toegewezenen', fn($q) => $q->where('users.id', $request->toegewezen_aan));
+        }
+        if ($request->filled('deadline_van')) $query->where('deadline', '>=', $request->deadline_van);
+        if ($request->filled('deadline_tot')) $query->where('deadline', '<=', $request->deadline_tot);
         if ($request->filled('search')) {
             $search = '%' . $request->search . '%';
             $query->where(function ($q) use ($search) {
-                $q->where('tasks.titel', 'like', $search)
-                  ->orWhere('tasks.beschrijving', 'like', $search);
+                $q->where('titel', 'like', $search)
+                  ->orWhere('beschrijving', 'like', $search);
             });
         }
 
         return response()->json(
-            $query->orderBy('tasks.positie')->orderByDesc('tasks.created_at')->get()
+            $query->orderBy('positie')->orderByDesc('created_at')->get()
         );
     }
 
@@ -49,19 +47,15 @@ class TaskController extends Controller
             'beschrijving' => $request->beschrijving ?? '',
             'status' => $status,
             'prioriteit' => $request->prioriteit ?? 'normaal',
-            'toegewezen_aan' => $request->toegewezen_aan,
             'deadline' => $request->deadline,
             'kleur' => $request->kleur,
             'positie' => $maxPos + 1,
         ]);
 
+        $task->toegewezenen()->sync($this->parseAssignees($request));
+
         return response()->json(
-            Task::select('tasks.*',
-                'u.naam as toegewezen_naam', 'u.kleur as user_kleur',
-                'p.naam as project_naam', 'p.kleur as project_kleur')
-            ->leftJoin('users as u', 'tasks.toegewezen_aan', '=', 'u.id')
-            ->leftJoin('projects as p', 'tasks.project_id', '=', 'p.id')
-            ->where('tasks.id', $task->id)->first()
+            $task->load(['toegewezenen:id,naam,kleur', 'project:id,naam,kleur'])
         );
     }
 
@@ -73,20 +67,16 @@ class TaskController extends Controller
             'beschrijving' => $request->beschrijving,
             'status' => $request->status,
             'prioriteit' => $request->prioriteit,
-            'toegewezen_aan' => $request->toegewezen_aan,
             'deadline' => $request->deadline,
             'kleur' => $request->kleur,
             'positie' => $request->positie ?? 0,
             'project_id' => $request->project_id,
         ]);
 
+        $task->toegewezenen()->sync($this->parseAssignees($request));
+
         return response()->json(
-            Task::select('tasks.*',
-                'u.naam as toegewezen_naam', 'u.kleur as user_kleur',
-                'p.naam as project_naam', 'p.kleur as project_kleur')
-            ->leftJoin('users as u', 'tasks.toegewezen_aan', '=', 'u.id')
-            ->leftJoin('projects as p', 'tasks.project_id', '=', 'p.id')
-            ->where('tasks.id', $id)->first()
+            $task->load(['toegewezenen:id,naam,kleur', 'project:id,naam,kleur'])
         );
     }
 
@@ -105,5 +95,20 @@ class TaskController extends Controller
     {
         Task::destroy($id);
         return response()->json(['ok' => true]);
+    }
+
+    private function parseAssignees(Request $request): array
+    {
+        $value = $request->toegewezen_aan;
+
+        if (is_array($value)) {
+            return array_filter($value);
+        }
+
+        if (is_string($value) && $value !== '') {
+            return [$value];
+        }
+
+        return [];
     }
 }

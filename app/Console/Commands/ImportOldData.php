@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class ImportOldData extends Command
 {
@@ -76,7 +77,6 @@ class ImportOldData extends Command
                     'beschrijving' => $t['beschrijving'] ?? '',
                     'status' => $t['status'] ?? 'todo',
                     'prioriteit' => $t['prioriteit'] ?? 'normaal',
-                    'toegewezen_aan' => $t['toegewezen_aan'] ?? null,
                     'deadline' => $t['deadline'] ?? null,
                     'kleur' => $t['kleur'] ?? null,
                     'link' => $t['link'] ?? null,
@@ -85,6 +85,18 @@ class ImportOldData extends Command
                     'updated_at' => now(),
                 ]
             );
+
+            // Assign user via pivot table
+            if (!empty($t['toegewezen_aan'])) {
+                DB::table('taak_gebruiker')->updateOrInsert(
+                    ['task_id' => $t['id'], 'user_id' => $t['toegewezen_aan']],
+                    [
+                        'id' => Str::uuid(),
+                        'created_at' => $t['created_at'] ?? now(),
+                        'updated_at' => now(),
+                    ]
+                );
+            }
         }
         $this->info("  Imported " . count($tasks) . " tasks");
 
