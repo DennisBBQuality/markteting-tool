@@ -261,20 +261,53 @@ function userSelectOptions(selected) {
   ).join('')}`;
 }
 
-function userCheckboxGroup(selectedIds = [], inputName = 'user-cb') {
-  if (!App.users || App.users.length === 0) return '<div class="user-checkbox-group"><span style="color:var(--text-light);font-size:13px">Geen gebruikers beschikbaar</span></div>';
-  return `<div class="user-checkbox-group">${App.users.map(u =>
-    `<label class="user-checkbox-label">
-      <input type="checkbox" class="${inputName}" value="${u.id}" ${selectedIds.includes(u.id) ? 'checked' : ''}>
-      <span class="user-checkbox-badge" style="background:${u.kleur || '#3B82F6'}">${u.naam.charAt(0)}</span>
-      ${escHtml(u.naam)}
-    </label>`
-  ).join('')}</div>`;
+function userCheckboxGroup(selectedIds = []) {
+  if (!App.users || App.users.length === 0) return '<div class="user-multiselect"><div class="ums-trigger" onclick="toggleUserMultiselect(this)"><span class="ums-placeholder">Geen gebruikers</span></div></div>';
+  const selectedUsers = App.users.filter(u => selectedIds.includes(u.id));
+  const preview = selectedUsers.length === 0
+    ? '<span class="ums-placeholder">Selecteer personen...</span>'
+    : `<span class="ums-badges">${selectedUsers.map(u => `<span class="ums-badge" style="background:${u.kleur || '#3B82F6'}" title="${escHtml(u.naam)}">${u.naam.charAt(0)}</span>`).join('')}</span><span class="ums-count">${selectedUsers.length} geselecteerd</span>`;
+  return `<div class="user-multiselect">
+    <div class="ums-trigger" onclick="toggleUserMultiselect(this)">${preview}<i class="fas fa-chevron-down ums-arrow"></i></div>
+    <div class="ums-dropdown">${App.users.map(u =>
+      `<label class="ums-option" onclick="event.stopPropagation()"><input type="checkbox" value="${u.id}" ${selectedIds.includes(u.id) ? 'checked' : ''} onchange="updateUserMultiselect(this)"><span class="ums-option-badge" style="background:${u.kleur || '#3B82F6'}">${u.naam.charAt(0)}</span><span class="ums-option-name">${escHtml(u.naam)}</span></label>`
+    ).join('')}</div>
+  </div>`;
+}
+
+function toggleUserMultiselect(trigger) {
+  const dropdown = trigger.nextElementSibling;
+  const isOpen = dropdown.classList.contains('open');
+  document.querySelectorAll('.ums-dropdown.open').forEach(d => d.classList.remove('open'));
+  if (!isOpen) dropdown.classList.add('open');
+}
+
+function updateUserMultiselect(checkbox) {
+  const container = checkbox.closest('.user-multiselect');
+  const checked = [...container.querySelectorAll('.ums-dropdown input:checked')];
+  const trigger = container.querySelector('.ums-trigger');
+  const arrow = '<i class="fas fa-chevron-down ums-arrow"></i>';
+  if (checked.length === 0) {
+    trigger.innerHTML = '<span class="ums-placeholder">Selecteer personen...</span>' + arrow;
+  } else {
+    const badges = checked.map(cb => {
+      const u = App.users.find(u => u.id === cb.value);
+      return u ? `<span class="ums-badge" style="background:${u.kleur || '#3B82F6'}" title="${escHtml(u.naam)}">${u.naam.charAt(0)}</span>` : '';
+    }).join('');
+    trigger.innerHTML = `<span class="ums-badges">${badges}</span><span class="ums-count">${checked.length} geselecteerd</span>${arrow}`;
+  }
 }
 
 function getSelectedUserIds(containerId) {
-  return [...document.querySelectorAll(`#${containerId} .user-checkbox-group input:checked`)].map(cb => cb.value);
+  return [...document.querySelectorAll(`#${containerId} .ums-dropdown input:checked`)].map(cb => cb.value);
 }
+
+// Sluit dropdowns bij klik buiten
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.user-multiselect')) {
+    document.querySelectorAll('.ums-dropdown.open').forEach(d => d.classList.remove('open'));
+  }
+});
 
 // ========== Emoji Picker ==========
 const emojiCategories = {
