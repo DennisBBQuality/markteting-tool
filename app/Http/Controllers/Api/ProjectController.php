@@ -7,6 +7,7 @@ use App\Models\ChatChannel;
 use App\Models\Project;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class ProjectController extends Controller
@@ -24,12 +25,16 @@ class ProjectController extends Controller
 
         $projectIds = array_column($projects, 'id');
 
-        $medewerkerData = DB::table('project_gebruiker')
-            ->join('users', 'project_gebruiker.user_id', '=', 'users.id')
-            ->whereIn('project_gebruiker.project_id', $projectIds)
-            ->select('project_gebruiker.project_id', 'users.id', 'users.naam', 'users.kleur')
-            ->get()
-            ->groupBy('project_id');
+        if (Schema::hasTable('project_gebruiker')) {
+            $medewerkerData = DB::table('project_gebruiker')
+                ->join('users', 'project_gebruiker.user_id', '=', 'users.id')
+                ->whereIn('project_gebruiker.project_id', $projectIds)
+                ->select('project_gebruiker.project_id', 'users.id', 'users.naam', 'users.kleur')
+                ->get()
+                ->groupBy('project_id');
+        } else {
+            $medewerkerData = collect();
+        }
 
         foreach ($projects as $project) {
             $project->medewerkers = ($medewerkerData->get($project->id) ?? collect())
@@ -60,7 +65,9 @@ class ProjectController extends Controller
             'aangemaakt_door'=> $request->session()->get('userId'),
         ]);
 
-        $this->syncMedewerkers($project->id, $request);
+        if (Schema::hasTable('project_gebruiker')) {
+            $this->syncMedewerkers($project->id, $request);
+        }
 
         $project->medewerkers = $this->getMedewerkers($project->id);
         return response()->json($project);
@@ -78,7 +85,9 @@ class ProjectController extends Controller
             'deadline'    => $request->deadline,
         ]);
 
-        $this->syncMedewerkers($id, $request);
+        if (Schema::hasTable('project_gebruiker')) {
+            $this->syncMedewerkers($id, $request);
+        }
 
         $fresh = $project->fresh();
         $fresh->medewerkers = $this->getMedewerkers($id);
@@ -93,6 +102,8 @@ class ProjectController extends Controller
 
     private function getMedewerkers(string $projectId): array
     {
+        if (!Schema::hasTable('project_gebruiker')) return [];
+
         return DB::table('project_gebruiker')
             ->join('users', 'project_gebruiker.user_id', '=', 'users.id')
             ->where('project_gebruiker.project_id', $projectId)
@@ -105,6 +116,7 @@ class ProjectController extends Controller
 
     private function syncMedewerkers(string $projectId, Request $request): void
     {
+        if (!Schema::hasTable('project_gebruiker')) return;
         $value = $request->medewerkers;
         $ids = match (true) {
             is_array($value) => array_filter($value),

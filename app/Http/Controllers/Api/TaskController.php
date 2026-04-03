@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Task;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class TaskController extends Controller
@@ -19,7 +20,7 @@ class TaskController extends Controller
         if ($request->filled('project_id')) $query->where('tasks.project_id', $request->project_id);
         if ($request->filled('status')) $query->where('tasks.status', $request->status);
         if ($request->filled('prioriteit')) $query->where('tasks.prioriteit', $request->prioriteit);
-        if ($request->filled('toegewezen_aan')) {
+        if ($request->filled('toegewezen_aan') && Schema::hasTable('taak_gebruiker')) {
             $userId = $request->toegewezen_aan;
             $query->whereExists(function ($q) use ($userId) {
                 $q->select(DB::raw(1))
@@ -112,6 +113,13 @@ class TaskController extends Controller
 
     private function appendToegewezenen($tasks)
     {
+        if (!Schema::hasTable('taak_gebruiker')) {
+            return $tasks->map(function ($task) {
+                $task->toegewezenen = [];
+                return $task;
+            });
+        }
+
         $taskIds = $tasks->pluck('id');
 
         $pivotData = DB::table('taak_gebruiker')
@@ -131,6 +139,7 @@ class TaskController extends Controller
 
     private function syncToegewezenen(string $taskId, Request $request): void
     {
+        if (!Schema::hasTable('taak_gebruiker')) return;
         $value = $request->toegewezen_aan;
         $ids = match (true) {
             is_array($value) => array_filter($value),
