@@ -1,17 +1,24 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\AttachmentController;
 use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\CalendarController;
+use App\Http\Controllers\Api\ChatController;
+use App\Http\Controllers\Api\ConvertController;
+use App\Http\Controllers\Api\CustomerService\TicketActivityController;
+use App\Http\Controllers\Api\CustomerService\TicketClaimController;
+use App\Http\Controllers\Api\CustomerService\TicketController;
+use App\Http\Controllers\Api\CustomerService\TicketMessageController;
+use App\Http\Controllers\Api\CustomerService\TicketNoteController;
+use App\Http\Controllers\Api\CustomerService\TicketPriorityController;
+use App\Http\Controllers\Api\CustomerService\TicketStatusController;
+use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\NoteController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\TaskController;
-use App\Http\Controllers\Api\CalendarController;
-use App\Http\Controllers\Api\NoteController;
-use App\Http\Controllers\Api\AttachmentController;
-use App\Http\Controllers\Api\ConvertController;
-use App\Http\Controllers\Api\DashboardController;
-use App\Http\Controllers\Api\ChatController;
-use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\UserController;
+use Illuminate\Support\Facades\Route;
 
 // ========== AUTH (no middleware) ==========
 Route::post('/api/auth/login', [AuthController::class, 'login']);
@@ -22,6 +29,20 @@ Route::middleware('auth.custom')->group(function () {
 
     // Auth
     Route::get('/api/auth/me', [AuthController::class, 'me']);
+
+    // Customer Service
+    Route::get('/api/customer-service/tickets', [TicketController::class, 'index']);
+    Route::post('/api/customer-service/tickets', [TicketController::class, 'store']);
+    Route::get('/api/customer-service/tickets/{id}', [TicketController::class, 'show']);
+    Route::post('/api/customer-service/tickets/{id}/claim', [TicketClaimController::class, 'claim']);
+    Route::post('/api/customer-service/tickets/{id}/release', [TicketClaimController::class, 'release']);
+    Route::put('/api/customer-service/tickets/{id}/status', [TicketStatusController::class, 'update']);
+    Route::put('/api/customer-service/tickets/{id}/priority', [TicketPriorityController::class, 'update']);
+    Route::get('/api/customer-service/tickets/{id}/messages', [TicketMessageController::class, 'index']);
+    Route::post('/api/customer-service/tickets/{id}/messages', [TicketMessageController::class, 'store']);
+    Route::get('/api/customer-service/tickets/{id}/notes', [TicketNoteController::class, 'index']);
+    Route::post('/api/customer-service/tickets/{id}/notes', [TicketNoteController::class, 'store']);
+    Route::get('/api/customer-service/tickets/{id}/activities', [TicketActivityController::class, 'index']);
 
     // Users
     Route::get('/api/users', [UserController::class, 'index']);
@@ -98,8 +119,11 @@ Route::middleware('auth.custom')->group(function () {
 
     // Serve uploaded files
     Route::get('/uploads/{filename}', function (string $filename) {
-        $path = storage_path('app/public/uploads/' . basename($filename));
-        if (!file_exists($path)) abort(404);
+        $path = storage_path('app/public/uploads/'.basename($filename));
+        if (! file_exists($path)) {
+            abort(404);
+        }
+
         return response()->file($path);
     });
 });

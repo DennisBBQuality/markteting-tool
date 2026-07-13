@@ -1619,8 +1619,145 @@ input, select, textarea { font: inherit; }
 }
 
 /* ========== Responsive ========== */
+/* ========== Customer Service ========== */
+.main-content:has(#view-customer-service:not(.hidden)) { min-width: 0; }
+
+.cs-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.cs-page-header h1 { margin: 0 0 4px; }
+.cs-page-header p, .cs-muted { color: var(--text-light); font-size: 13px; margin: 0; }
+
+.cs-layout {
+  display: grid;
+  grid-template-columns: 210px 350px minmax(420px, 1fr);
+  width: 100%;
+  max-width: 100%;
+  height: calc(100vh - 150px);
+  min-height: 560px;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg-card);
+}
+
+.cs-filters, .cs-list-panel, .cs-detail { min-width: 0; min-height: 0; background: var(--bg-card); }
+.cs-filters, .cs-list-panel { border-right: 1px solid var(--border); }
+.cs-filters { padding: 18px; }
+.cs-list-panel { display: flex; flex-direction: column; }
+.cs-detail { overflow-y: auto; position: relative; }
+
+.cs-panel-heading {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cs-filters .cs-panel-heading { padding: 0 0 14px; margin-bottom: 14px; }
+.cs-panel-heading h2 { margin: 0; font-size: 16px; }
+.cs-count { background: var(--primary-light); color: var(--primary); border-radius: 999px; padding: 2px 8px; font-weight: 700; font-size: 12px; }
+.cs-filter-form { display: flex; flex-direction: column; gap: 13px; }
+.cs-filter-form label { display: flex; flex-direction: column; gap: 5px; color: var(--text-light); font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.cs-filter-form .form-control { width: 100%; min-width: 0; padding: 7px 8px; font-size: 12px; text-transform: none; }
+.cs-filter-search > div { position: relative; }
+.cs-filter-search i { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--text-light); font-size: 11px; }
+.cs-filter-search input { padding-left: 27px !important; }
+.cs-clear-filters { align-self: flex-start; }
+
+.cs-ticket-list { flex: 1; overflow-y: auto; }
+.cs-ticket-card { padding: 15px 16px; border-bottom: 1px solid var(--border); transition: background var(--transition); }
+.cs-ticket-card:hover, .cs-ticket-card:focus-visible { background: var(--bg); cursor: pointer; outline: none; }
+.cs-ticket-card.selected { background: var(--primary-light); box-shadow: inset 3px 0 var(--primary); }
+.cs-ticket-card h3 { margin: 7px 0 5px; font-size: 14px; line-height: 1.35; }
+.cs-ticket-card p { margin: 0 0 10px; color: var(--text-light); font-size: 13px; }
+.cs-ticket-card-topline, .cs-ticket-card-meta { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.cs-ticket-card-topline { justify-content: space-between; color: var(--primary); font-size: 12px; }
+.cs-time { color: var(--text-light); font-weight: 400; }
+.cs-assignee { font-size: 11px; color: var(--text-light); margin-left: auto; }
+
+.cs-badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 7px; font-size: 10px; font-weight: 700; }
+.cs-status-nieuw { background: #DBEAFE; color: #1D4ED8; }
+.cs-status-in_behandeling { background: #FEF3C7; color: #92400E; }
+.cs-status-wachten_op_klant { background: #EDE9FE; color: #6D28D9; }
+.cs-status-afgehandeld { background: #D1FAE5; color: #047857; }
+.cs-priority-laag { background: #F3F4F6; color: #4B5563; }
+.cs-priority-normaal { background: #E0F2FE; color: #0369A1; }
+.cs-priority-hoog { background: #FFEDD5; color: #C2410C; }
+.cs-priority-urgent { background: #FEE2E2; color: #B91C1C; }
+
+.cs-pagination { min-height: 54px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border-top: 1px solid var(--border); font-size: 12px; }
+.cs-loading, .cs-empty-state { min-height: 220px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 28px; text-align: center; color: var(--text-light); }
+.cs-loading i, .cs-empty-state > i { font-size: 28px; color: var(--primary); }
+.cs-empty-state h3 { margin: 0; color: var(--text); font-size: 16px; }
+.cs-empty-state p { margin: 0; font-size: 13px; }
+.cs-detail-placeholder { min-height: 100%; box-sizing: border-box; }
+.cs-error-state > i { color: var(--danger); }
+
+.cs-detail-header { padding: 20px 22px 18px; border-bottom: 1px solid var(--border); }
+.cs-detail-eyebrow { display: flex; justify-content: space-between; gap: 12px; color: var(--primary); font-size: 12px; }
+.cs-detail-eyebrow span { color: var(--text-light); font-weight: 400; }
+.cs-detail-header h2 { margin: 8px 0 16px; font-size: 20px; line-height: 1.3; }
+.cs-customer-card { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: var(--radius-sm); background: var(--bg); }
+.cs-customer-card > i { color: var(--primary); font-size: 24px; }
+.cs-customer-card div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cs-customer-card strong, .cs-customer-card a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cs-customer-card a { color: var(--text-light); font-size: 12px; }
+.cs-detail-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.cs-detail-assignee { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; color: var(--text-light); font-size: 12px; }
+.cs-avatar { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; color: white; font-size: 11px; font-weight: 700; }
+.cs-ticket-actions { display: flex; align-items: end; gap: 9px; flex-wrap: wrap; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.cs-action-select { display: flex; flex-direction: column; gap: 4px; color: var(--text-light); font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.cs-action-select select { min-width: 128px; height: 32px; padding: 4px 8px; font-size: 12px; text-transform: none; }
+
+.cs-detail-tabs { position: sticky; top: 0; z-index: 2; display: flex; background: var(--bg-card); border-bottom: 1px solid var(--border); }
+.cs-detail-tab { flex: 1; padding: 12px 8px 10px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text-light); font-weight: 600; cursor: pointer; }
+.cs-detail-tab:hover { color: var(--primary); background: var(--bg); }
+.cs-detail-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+.cs-detail-tab span { display: inline-flex; min-width: 19px; justify-content: center; margin-left: 3px; padding: 1px 5px; border-radius: 999px; background: var(--bg); font-size: 10px; }
+.cs-detail-tab-content { padding: 18px 20px 24px; }
+
+.cs-timeline, .cs-note-list { display: flex; flex-direction: column; gap: 14px; }
+.cs-message { max-width: 88%; padding: 12px 14px; border-radius: 12px; }
+.cs-message.incoming { align-self: flex-start; background: var(--bg); border-bottom-left-radius: 3px; }
+.cs-message.outgoing { align-self: flex-end; background: var(--primary-light); border-bottom-right-radius: 3px; }
+.cs-message-heading, .cs-note-heading { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 7px; font-size: 11px; }
+.cs-message-heading span, .cs-note-heading span { color: var(--text-light); }
+.cs-message-body, .cs-note-body { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.5; }
+.cs-note { padding: 13px 14px; border: 1px solid #FDE68A; border-radius: var(--radius-sm); background: #FFFBEB; }
+
+.cs-activity-list { list-style: none; margin: 0; padding: 0; }
+.cs-activity-list li { display: grid; grid-template-columns: 30px 1fr; gap: 10px; position: relative; padding-bottom: 18px; }
+.cs-activity-list li:not(:last-child)::before { content: ''; position: absolute; left: 14px; top: 28px; bottom: 0; width: 1px; background: var(--border); }
+.cs-activity-icon { width: 29px; height: 29px; z-index: 1; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--primary-light); color: var(--primary); font-size: 11px; }
+.cs-activity-list strong { font-size: 13px; }
+.cs-activity-list p { margin: 2px 0 0; color: var(--text-light); font-size: 11px; }
+.cs-activity-list small { display: block; margin-top: 5px; color: var(--text-light); }
+.cs-tab-empty { min-height: 180px; padding: 15px; }
+
+.cs-composer { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-card); }
+.cs-composer-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.cs-composer-heading select { width: auto; min-width: 190px; font-size: 12px; }
+.cs-composer textarea { resize: vertical; line-height: 1.45; }
+.cs-composer .btn { align-self: flex-end; }
+.cs-composer-hint { margin: -2px 0 0; color: var(--text-light); font-size: 11px; line-height: 1.4; }
+.cs-note-composer { background: #FFFBEB; border-color: #FDE68A; }
+.cs-conflict-banner { position: sticky; top: 0; z-index: 4; display: flex; align-items: center; gap: 9px; padding: 10px 12px; border-bottom: 1px solid #F59E0B; background: #FEF3C7; color: #92400E; font-size: 12px; }
+.cs-conflict-banner span { flex: 1; }
+.cs-form-error { margin-bottom: 14px; padding: 10px 12px; border-radius: var(--radius-sm); background: #FEE2E2; color: #B91C1C; font-size: 12px; }
+.cs-back-btn { display: none; }
+
 @media (max-width: 1024px) {
   .kanban-board { grid-template-columns: repeat(2, 1fr); }
+  .cs-layout { grid-template-columns: 180px 300px minmax(360px, 1fr); overflow-x: auto; }
 }
 
 @media (max-width: 768px) {
@@ -1631,6 +1768,44 @@ input, select, textarea { font: inherit; }
   .main-content { margin-left: 60px; padding: 16px; }
   .kanban-board { grid-template-columns: 1fr; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  /* Customer service: lijst-detailworkflow op mobiel */
+  .cs-page-header { flex-wrap: wrap; gap: 10px; }
+  .cs-layout { display: flex; flex-direction: column; height: auto; min-height: 0; overflow: visible; }
+  .cs-filters, .cs-list-panel { width: auto; border-right: none; }
+  .cs-filters { border-bottom: 1px solid var(--border); }
+  .cs-ticket-list { overflow: visible; }
+  .cs-detail { display: none; }
+  .cs-layout.cs-detail-open .cs-detail {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 500;
+    min-width: 0;
+    background: var(--bg-card);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .cs-back-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    width: 100%;
+    height: 44px;
+    padding: 0 16px;
+    border: 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--primary);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: left;
+  }
+  .cs-layout.cs-detail-open .cs-conflict-banner { top: 44px; }
+  .cs-layout.cs-detail-open .cs-detail-tabs { top: 44px; }
 
   /* Chat responsive */
   .chat-sidebar {
