@@ -1620,6 +1620,8 @@ input, select, textarea { font: inherit; }
 
 /* ========== Responsive ========== */
 /* ========== Customer Service ========== */
+.main-content:has(#view-customer-service:not(.hidden)) { min-width: 0; }
+
 .cs-page-header {
   display: flex;
   align-items: center;
@@ -1633,8 +1635,11 @@ input, select, textarea { font: inherit; }
 .cs-layout {
   display: grid;
   grid-template-columns: 210px 350px minmax(420px, 1fr);
+  width: 100%;
+  max-width: 100%;
   height: calc(100vh - 150px);
   min-height: 560px;
+  box-sizing: border-box;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
@@ -1762,7 +1767,7 @@ input, select, textarea { font: inherit; }
   .main-content { margin-left: 60px; padding: 16px; }
   .kanban-board { grid-template-columns: 1fr; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
-  .cs-layout { display: flex; height: auto; min-height: calc(100vh - 120px); overflow: visible; }
+  .cs-layout { display: flex; height: calc(100vh - 120px); min-height: 560px; overflow-x: auto; overflow-y: hidden; }
   .cs-filters { width: 160px; flex-shrink: 0; }
   .cs-list-panel { width: 300px; flex-shrink: 0; }
   .cs-detail { min-width: 360px; flex: 1; }

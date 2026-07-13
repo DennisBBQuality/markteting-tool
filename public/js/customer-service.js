@@ -1,4 +1,4 @@
-// ========== Customer Service ========== 
+// ========== Customer Service ==========
 const CustomerServiceState = {
   tickets: [],
   meta: { page: 1, per_page: 25, total: 0, last_page: 1 },
