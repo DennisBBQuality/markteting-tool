@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api\CustomerService;
 
-use App\Http\Controllers\Controller;
 use App\Http\Requests\CustomerService\IndexTicketRequest;
 use App\Http\Requests\CustomerService\StoreTicketRequest;
 use App\Models\CustomerService\Ticket;
@@ -14,7 +13,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
-class TicketController extends Controller
+class TicketController extends CustomerServiceController
 {
     public function __construct(
         private readonly TicketNumberService $numberService,
@@ -134,38 +133,5 @@ class TicketController extends Controller
         $query->orderByRaw('CASE WHEN laatste_bericht_op IS NULL THEN 1 ELSE 0 END')
             ->orderBy('laatste_bericht_op', $direction)
             ->orderBy('created_at', $direction);
-    }
-
-    private function ticketData(Ticket $ticket): array
-    {
-        return [
-            'id' => $ticket->id,
-            'ticketnummer' => $ticket->ticketnummer,
-            'onderwerp' => $ticket->onderwerp,
-            'klant_naam' => $ticket->klant_naam,
-            'klant_email' => $ticket->klant_email,
-            'status' => $ticket->status,
-            'prioriteit' => $ticket->prioriteit,
-            'behandelaar' => $this->userData($ticket->behandelaar),
-            'aangemaakt_door' => $this->userData($ticket->aangemaaktDoor),
-            'versie' => $ticket->versie,
-            'laatste_bericht_op' => $ticket->laatste_bericht_op,
-            'afgehandeld_op' => $ticket->afgehandeld_op,
-            'created_at' => $ticket->created_at,
-            'updated_at' => $ticket->updated_at,
-        ];
-    }
-
-    private function userData(?User $user): ?array
-    {
-        if ($user === null) {
-            return null;
-        }
-
-        return [
-            'id' => $user->id,
-            'naam' => $user->naam,
-            'kleur' => $user->kleur,
-        ];
     }
 }

@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CalendarController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\ConvertController;
+use App\Http\Controllers\Api\CustomerService\TicketClaimController;
 use App\Http\Controllers\Api\CustomerService\TicketController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\NoteController;
@@ -28,6 +29,8 @@ Route::middleware('auth.custom')->group(function () {
     Route::get('/api/customer-service/tickets', [TicketController::class, 'index']);
     Route::post('/api/customer-service/tickets', [TicketController::class, 'store']);
     Route::get('/api/customer-service/tickets/{id}', [TicketController::class, 'show']);
+    Route::post('/api/customer-service/tickets/{id}/claim', [TicketClaimController::class, 'claim']);
+    Route::post('/api/customer-service/tickets/{id}/release', [TicketClaimController::class, 'release']);
 
     // Users
     Route::get('/api/users', [UserController::class, 'index']);

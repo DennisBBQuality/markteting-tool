@@ -15,5 +15,7 @@ class TicketAuthTest extends TestCase
         $this->getJson('/api/customer-service/tickets')->assertUnauthorized();
         $this->postJson('/api/customer-service/tickets')->assertUnauthorized();
         $this->getJson('/api/customer-service/tickets/'.Str::uuid())->assertUnauthorized();
+        $this->postJson('/api/customer-service/tickets/'.Str::uuid().'/claim')->assertUnauthorized();
+        $this->postJson('/api/customer-service/tickets/'.Str::uuid().'/release')->assertUnauthorized();
     }
 }
