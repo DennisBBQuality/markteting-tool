@@ -1619,8 +1619,79 @@ input, select, textarea { font: inherit; }
 }
 
 /* ========== Responsive ========== */
+/* ========== Customer Service ========== */
+.cs-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.cs-page-header h1 { margin: 0 0 4px; }
+.cs-page-header p, .cs-muted { color: var(--text-light); font-size: 13px; margin: 0; }
+
+.cs-layout {
+  display: grid;
+  grid-template-columns: 210px 350px minmax(420px, 1fr);
+  height: calc(100vh - 150px);
+  min-height: 560px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg-card);
+}
+
+.cs-filters, .cs-list-panel, .cs-detail { min-width: 0; min-height: 0; background: var(--bg-card); }
+.cs-filters, .cs-list-panel { border-right: 1px solid var(--border); }
+.cs-filters { padding: 18px; }
+.cs-list-panel { display: flex; flex-direction: column; }
+.cs-detail { overflow-y: auto; position: relative; }
+
+.cs-panel-heading {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cs-filters .cs-panel-heading { padding: 0 0 14px; margin-bottom: 14px; }
+.cs-panel-heading h2 { margin: 0; font-size: 16px; }
+.cs-count { background: var(--primary-light); color: var(--primary); border-radius: 999px; padding: 2px 8px; font-weight: 700; font-size: 12px; }
+
+.cs-ticket-list { flex: 1; overflow-y: auto; }
+.cs-ticket-card { padding: 15px 16px; border-bottom: 1px solid var(--border); transition: background var(--transition); }
+.cs-ticket-card:hover { background: var(--bg); }
+.cs-ticket-card h3 { margin: 7px 0 5px; font-size: 14px; line-height: 1.35; }
+.cs-ticket-card p { margin: 0 0 10px; color: var(--text-light); font-size: 13px; }
+.cs-ticket-card-topline, .cs-ticket-card-meta { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.cs-ticket-card-topline { justify-content: space-between; color: var(--primary); font-size: 12px; }
+.cs-time { color: var(--text-light); font-weight: 400; }
+.cs-assignee { font-size: 11px; color: var(--text-light); margin-left: auto; }
+
+.cs-badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 7px; font-size: 10px; font-weight: 700; }
+.cs-status-nieuw { background: #DBEAFE; color: #1D4ED8; }
+.cs-status-in_behandeling { background: #FEF3C7; color: #92400E; }
+.cs-status-wachten_op_klant { background: #EDE9FE; color: #6D28D9; }
+.cs-status-afgehandeld { background: #D1FAE5; color: #047857; }
+.cs-priority-laag { background: #F3F4F6; color: #4B5563; }
+.cs-priority-normaal { background: #E0F2FE; color: #0369A1; }
+.cs-priority-hoog { background: #FFEDD5; color: #C2410C; }
+.cs-priority-urgent { background: #FEE2E2; color: #B91C1C; }
+
+.cs-pagination { min-height: 54px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border-top: 1px solid var(--border); font-size: 12px; }
+.cs-loading, .cs-empty-state { min-height: 220px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 28px; text-align: center; color: var(--text-light); }
+.cs-loading i, .cs-empty-state > i { font-size: 28px; color: var(--primary); }
+.cs-empty-state h3 { margin: 0; color: var(--text); font-size: 16px; }
+.cs-empty-state p { margin: 0; font-size: 13px; }
+.cs-detail-placeholder { min-height: 100%; box-sizing: border-box; }
+.cs-error-state > i { color: var(--danger); }
+
 @media (max-width: 1024px) {
   .kanban-board { grid-template-columns: repeat(2, 1fr); }
+  .cs-layout { grid-template-columns: 180px 300px minmax(360px, 1fr); overflow-x: auto; }
 }
 
 @media (max-width: 768px) {
@@ -1631,6 +1702,10 @@ input, select, textarea { font: inherit; }
   .main-content { margin-left: 60px; padding: 16px; }
   .kanban-board { grid-template-columns: 1fr; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .cs-layout { display: flex; height: auto; min-height: calc(100vh - 120px); overflow: visible; }
+  .cs-filters { width: 160px; flex-shrink: 0; }
+  .cs-list-panel { width: 300px; flex-shrink: 0; }
+  .cs-detail { min-width: 360px; flex: 1; }
 
   /* Chat responsive */
   .chat-sidebar {

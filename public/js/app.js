@@ -140,6 +140,9 @@ function navigateTo(view) {
   if (view !== 'chat' && typeof cleanupChat === 'function') {
     cleanupChat();
   }
+  if (view !== 'customer-service' && typeof cleanupCustomerService === 'function') {
+    cleanupCustomerService();
+  }
 
   switch(view) {
     case 'dashboard': renderDashboard(); break;
@@ -148,6 +151,7 @@ function navigateTo(view) {
     case 'calendar': renderCalendar(); break;
     case 'notes': renderNotes(); break;
     case 'chat': renderChat(); break;
+    case 'customer-service': renderCustomerService(); break;
     case 'converter': renderConverter(); break;
     case 'settings': renderSettings(); break;
   }
