@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Ticket extends Model
 {
@@ -44,5 +45,20 @@ class Ticket extends Model
     public function aangemaaktDoor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'aangemaakt_door');
+    }
+
+    public function messages(): HasMany
+    {
+        return $this->hasMany(TicketMessage::class)->orderBy('created_at');
+    }
+
+    public function notes(): HasMany
+    {
+        return $this->hasMany(TicketNote::class)->orderBy('created_at');
+    }
+
+    public function activities(): HasMany
+    {
+        return $this->hasMany(TicketActivity::class)->orderByDesc('created_at');
     }
 }
