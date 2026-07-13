@@ -9,10 +9,18 @@ const CustomerServiceState = {
   isSubmitting: false,
   messageClientId: null,
   drafts: { direction: 'inkomend', message: '', note: '' },
+  filters: { search: '', status: '', priority: '', assignee: '', sort: 'laatste_bericht:desc' },
+  listRequestId: 0,
+  searchTimer: null,
+  isPolling: false,
   detailPollTimer: null,
 };
 
 function renderCustomerService() {
+  cleanupCustomerService();
+  CustomerServiceState.selectedTicketId = null;
+  CustomerServiceState.detail = null;
+  CustomerServiceState.conflict = null;
   const container = document.getElementById('view-customer-service');
   container.innerHTML = `
     <div class="cs-page-header">
@@ -28,12 +36,12 @@ function renderCustomerService() {
           <h2>Inbox</h2>
           <span class="cs-count" id="cs-total-count">0</span>
         </div>
-        <p class="cs-muted">Filters en zoeken worden in een volgende stap beschikbaar.</p>
+        ${customerServiceFilterControls()}
       </aside>
       <section class="cs-list-panel" aria-label="Ticketlijst">
         <div class="cs-panel-heading">
           <h2>Tickets</h2>
-          <span class="cs-muted">Nieuwste bericht eerst</span>
+          <span id="cs-list-sort-label" class="cs-muted">${customerServiceSortLabel()}</span>
         </div>
         <div id="cs-ticket-list" class="cs-ticket-list"></div>
         <div id="cs-pagination" class="cs-pagination"></div>
@@ -51,17 +59,23 @@ function cleanupCustomerService() {
     clearInterval(CustomerServiceState.detailPollTimer);
     CustomerServiceState.detailPollTimer = null;
   }
+  if (CustomerServiceState.searchTimer) {
+    clearTimeout(CustomerServiceState.searchTimer);
+    CustomerServiceState.searchTimer = null;
+  }
+  CustomerServiceState.isPolling = false;
 }
 
 async function loadCustomerServiceTickets(page = 1) {
   const list = document.getElementById('cs-ticket-list');
   if (!list) return;
+  const requestId = ++CustomerServiceState.listRequestId;
 
   list.innerHTML = customerServiceListLoading();
   document.getElementById('cs-pagination').innerHTML = '';
 
-  const result = await api(`/api/customer-service/tickets?page=${page}&per_page=25`);
-  if (!document.getElementById('cs-ticket-list')) return;
+  const result = await api(customerServiceListUrl(page));
+  if (!document.getElementById('cs-ticket-list') || requestId !== CustomerServiceState.listRequestId) return;
 
   if (!result) {
     list.innerHTML = customerServiceListError();
@@ -80,12 +94,10 @@ function renderCustomerServiceTicketList() {
   if (!list) return;
 
   if (CustomerServiceState.tickets.length === 0) {
-    list.innerHTML = `
-      <div class="cs-empty-state">
-        <i class="fas fa-inbox"></i>
-        <h3>Nog geen tickets</h3>
-        <p>Maak later een testticket aan om te beginnen.</p>
-      </div>`;
+    const filtered = customerServiceHasActiveFilters();
+    list.innerHTML = filtered
+      ? `<div class="cs-empty-state"><i class="fas fa-search"></i><h3>Geen tickets gevonden</h3><p>Pas de zoekopdracht of filters aan.</p><button class="btn btn-secondary btn-sm" onclick="customerServiceClearFilters()">Filters wissen</button></div>`
+      : `<div class="cs-empty-state"><i class="fas fa-inbox"></i><h3>Nog geen tickets</h3><p>Maak een testticket aan om te beginnen.</p></div>`;
     return;
   }
 
@@ -141,6 +153,127 @@ function customerServiceGoToPage(page) {
   loadCustomerServiceTickets(page);
 }
 
+function customerServiceFilterControls() {
+  const filters = CustomerServiceState.filters;
+  const users = App.users
+    .filter(user => user.actief)
+    .map(user => `<option value="${escHtml(user.id)}" ${filters.assignee === user.id ? 'selected' : ''}>${escHtml(user.naam)}</option>`)
+    .join('');
+
+  return `
+    <div class="cs-filter-form">
+      <label class="cs-filter-search">
+        <span>Zoeken</span>
+        <div><i class="fas fa-search"></i><input id="cs-filter-search" class="form-control" value="${escHtml(filters.search)}" maxlength="255" placeholder="Nummer, klant, onderwerp..." oninput="customerServiceSearchChanged(this.value)"></div>
+      </label>
+      <label><span>Status</span><select id="cs-filter-status" class="form-control" onchange="customerServiceFilterChanged('status', this.value)">
+        <option value="" ${filters.status === '' ? 'selected' : ''}>Actieve tickets</option>
+        <option value="alle" ${filters.status === 'alle' ? 'selected' : ''}>Alle statussen</option>
+        <option value="nieuw" ${filters.status === 'nieuw' ? 'selected' : ''}>Nieuw</option>
+        <option value="in_behandeling" ${filters.status === 'in_behandeling' ? 'selected' : ''}>In behandeling</option>
+        <option value="wachten_op_klant" ${filters.status === 'wachten_op_klant' ? 'selected' : ''}>Wachten op klant</option>
+        <option value="afgehandeld" ${filters.status === 'afgehandeld' ? 'selected' : ''}>Afgehandeld</option>
+      </select></label>
+      <label><span>Prioriteit</span><select id="cs-filter-priority" class="form-control" onchange="customerServiceFilterChanged('priority', this.value)">
+        <option value="" ${filters.priority === '' ? 'selected' : ''}>Alle prioriteiten</option>
+        <option value="laag" ${filters.priority === 'laag' ? 'selected' : ''}>Laag</option>
+        <option value="normaal" ${filters.priority === 'normaal' ? 'selected' : ''}>Normaal</option>
+        <option value="hoog" ${filters.priority === 'hoog' ? 'selected' : ''}>Hoog</option>
+        <option value="urgent" ${filters.priority === 'urgent' ? 'selected' : ''}>Urgent</option>
+      </select></label>
+      <label><span>Behandelaar</span><select id="cs-filter-assignee" class="form-control" onchange="customerServiceFilterChanged('assignee', this.value)">
+        <option value="" ${filters.assignee === '' ? 'selected' : ''}>Iedereen</option>
+        <option value="mine" ${filters.assignee === 'mine' ? 'selected' : ''}>Mijn tickets</option>
+        <option value="unassigned" ${filters.assignee === 'unassigned' ? 'selected' : ''}>Niet toegewezen</option>
+        ${users}
+      </select></label>
+      <label><span>Sorteren</span><select id="cs-filter-sort" class="form-control" onchange="customerServiceFilterChanged('sort', this.value)">
+        <option value="laatste_bericht:desc" ${filters.sort === 'laatste_bericht:desc' ? 'selected' : ''}>Laatste bericht · nieuw</option>
+        <option value="laatste_bericht:asc" ${filters.sort === 'laatste_bericht:asc' ? 'selected' : ''}>Laatste bericht · oud</option>
+        <option value="aangemaakt:desc" ${filters.sort === 'aangemaakt:desc' ? 'selected' : ''}>Aangemaakt · nieuw</option>
+        <option value="aangemaakt:asc" ${filters.sort === 'aangemaakt:asc' ? 'selected' : ''}>Aangemaakt · oud</option>
+        <option value="prioriteit:desc" ${filters.sort === 'prioriteit:desc' ? 'selected' : ''}>Prioriteit · hoog</option>
+      </select></label>
+      <button type="button" class="btn btn-secondary btn-sm cs-clear-filters" onclick="customerServiceClearFilters()" ${customerServiceHasActiveFilters() ? '' : 'disabled'}><i class="fas fa-times"></i> Wissen</button>
+    </div>`;
+}
+
+function customerServiceListUrl(page) {
+  const filters = CustomerServiceState.filters;
+  const params = new URLSearchParams({ page: String(page), per_page: '25' });
+  if (filters.search.trim()) params.set('zoek', filters.search.trim());
+  if (filters.status) params.set('status', filters.status);
+  if (filters.priority) params.set('prioriteit', filters.priority);
+  if (filters.assignee === 'mine') params.set('behandelaar_id', App.currentUser.id);
+  else if (filters.assignee === 'unassigned') params.set('niet_toegewezen', '1');
+  else if (filters.assignee) params.set('behandelaar_id', filters.assignee);
+  const [sort, direction] = filters.sort.split(':');
+  params.set('sorteer', sort);
+  params.set('richting', direction);
+  return `/api/customer-service/tickets?${params.toString()}`;
+}
+
+function customerServiceFilterChanged(filter, value) {
+  if (!['status', 'priority', 'assignee', 'sort'].includes(filter)) return;
+  CustomerServiceState.filters[filter] = value;
+  const sortLabel = document.getElementById('cs-list-sort-label');
+  if (sortLabel) sortLabel.textContent = customerServiceSortLabel();
+  customerServiceUpdateClearFilterButton();
+  loadCustomerServiceTickets(1);
+}
+
+function customerServiceSearchChanged(value) {
+  CustomerServiceState.filters.search = value;
+  customerServiceUpdateClearFilterButton();
+  if (CustomerServiceState.searchTimer) clearTimeout(CustomerServiceState.searchTimer);
+  CustomerServiceState.searchTimer = setTimeout(() => {
+    CustomerServiceState.searchTimer = null;
+    loadCustomerServiceTickets(1);
+  }, 300);
+}
+
+function customerServiceHasActiveFilters() {
+  const filters = CustomerServiceState.filters;
+  return Boolean(filters.search.trim() || filters.status || filters.priority || filters.assignee || filters.sort !== 'laatste_bericht:desc');
+}
+
+function customerServiceSortLabel() {
+  const labels = {
+    'laatste_bericht:desc': 'Nieuwste bericht eerst',
+    'laatste_bericht:asc': 'Oudste bericht eerst',
+    'aangemaakt:desc': 'Nieuwste ticket eerst',
+    'aangemaakt:asc': 'Oudste ticket eerst',
+    'prioriteit:desc': 'Hoogste prioriteit eerst',
+  };
+  return labels[CustomerServiceState.filters.sort] || labels['laatste_bericht:desc'];
+}
+
+function customerServiceUpdateClearFilterButton() {
+  const button = document.querySelector('.cs-clear-filters');
+  if (button) button.disabled = !customerServiceHasActiveFilters();
+}
+
+function customerServiceClearFilters() {
+  CustomerServiceState.filters = { search: '', status: '', priority: '', assignee: '', sort: 'laatste_bericht:desc' };
+  if (CustomerServiceState.searchTimer) clearTimeout(CustomerServiceState.searchTimer);
+  CustomerServiceState.searchTimer = null;
+  const controls = {
+    'cs-filter-search': '',
+    'cs-filter-status': '',
+    'cs-filter-priority': '',
+    'cs-filter-assignee': '',
+    'cs-filter-sort': 'laatste_bericht:desc',
+  };
+  Object.entries(controls).forEach(([id, value]) => {
+    const control = document.getElementById(id);
+    if (control) control.value = value;
+  });
+  customerServiceUpdateClearFilterButton();
+  const sortLabel = document.getElementById('cs-list-sort-label');
+  if (sortLabel) sortLabel.textContent = customerServiceSortLabel();
+  loadCustomerServiceTickets(1);
+}
+
 async function customerServiceSelectTicket(ticketId) {
   CustomerServiceState.selectedTicketId = ticketId;
   CustomerServiceState.detail = null;
@@ -150,25 +283,7 @@ async function customerServiceSelectTicket(ticketId) {
   CustomerServiceState.drafts = { direction: 'inkomend', message: '', note: '' };
   renderCustomerServiceTicketList();
 
-  const detail = document.getElementById('cs-detail');
-  if (!detail) return;
-  detail.innerHTML = customerServiceDetailLoading();
-
-  const [ticket, messages, notes, activities] = await Promise.all([
-    api(`/api/customer-service/tickets/${ticketId}`),
-    api(`/api/customer-service/tickets/${ticketId}/messages`),
-    api(`/api/customer-service/tickets/${ticketId}/notes`),
-    api(`/api/customer-service/tickets/${ticketId}/activities`),
-  ]);
-
-  if (CustomerServiceState.selectedTicketId !== ticketId || !document.getElementById('cs-detail')) return;
-  if (!ticket || !messages || !notes || !activities) {
-    detail.innerHTML = customerServiceDetailError();
-    return;
-  }
-
-  CustomerServiceState.detail = { ticket, messages, notes, activities };
-  renderCustomerServiceDetail();
+  await customerServiceLoadDetail(ticketId, 'timeline');
 }
 
 function renderCustomerServiceDetail() {
@@ -629,12 +744,12 @@ async function customerServiceRefreshAfterMutation(ticketId, activeTab) {
   await customerServiceLoadDetail(ticketId, activeTab);
 }
 
-async function customerServiceLoadDetail(ticketId, activeTab = 'timeline') {
+async function customerServiceLoadDetail(ticketId, activeTab = 'timeline', options = {}) {
   const detailContainer = document.getElementById('cs-detail');
   if (!detailContainer) return;
   CustomerServiceState.selectedTicketId = ticketId;
   CustomerServiceState.activeTab = activeTab;
-  detailContainer.innerHTML = customerServiceDetailLoading();
+  if (!options.silent) detailContainer.innerHTML = customerServiceDetailLoading();
 
   const [ticket, messages, notes, activities] = await Promise.all([
     api(`/api/customer-service/tickets/${ticketId}`),
@@ -650,6 +765,37 @@ async function customerServiceLoadDetail(ticketId, activeTab = 'timeline') {
   CustomerServiceState.detail = { ticket, messages, notes, activities };
   renderCustomerServiceTicketList();
   renderCustomerServiceDetail();
+  customerServiceStartDetailPolling();
+}
+
+function customerServiceStartDetailPolling() {
+  if (CustomerServiceState.detailPollTimer) clearInterval(CustomerServiceState.detailPollTimer);
+  CustomerServiceState.detailPollTimer = setInterval(customerServicePollDetail, 15000);
+}
+
+async function customerServicePollDetail() {
+  if (CustomerServiceState.isPolling || CustomerServiceState.isSubmitting || App.currentView !== 'customer-service' || !CustomerServiceState.detail) return;
+  CustomerServiceState.isPolling = true;
+  const ticketId = CustomerServiceState.detail.ticket.id;
+  const knownVersion = CustomerServiceState.detail.ticket.versie;
+  const result = await customerServiceRequest(`/api/customer-service/tickets/${ticketId}`);
+  CustomerServiceState.isPolling = false;
+
+  if (!result.ok || CustomerServiceState.selectedTicketId !== ticketId || result.data.versie <= knownVersion) return;
+  customerServiceCaptureDrafts();
+  const hasDraft = Boolean(CustomerServiceState.drafts.message.trim() || CustomerServiceState.drafts.note.trim());
+  if (hasDraft) {
+    CustomerServiceState.conflict = {
+      code: 'poll_update',
+      error: 'Dit ticket is zojuist door een collega bijgewerkt. Vernieuw voordat je verdergaat.',
+      ticket: result.data,
+    };
+    renderCustomerServiceDetail();
+    return;
+  }
+
+  await loadCustomerServiceTickets(CustomerServiceState.meta.page);
+  await customerServiceLoadDetail(ticketId, CustomerServiceState.activeTab, { silent: true });
 }
 
 function openCustomerServiceTicketModal() {

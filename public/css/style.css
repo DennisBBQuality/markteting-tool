@@ -1660,6 +1660,13 @@ input, select, textarea { font: inherit; }
 .cs-filters .cs-panel-heading { padding: 0 0 14px; margin-bottom: 14px; }
 .cs-panel-heading h2 { margin: 0; font-size: 16px; }
 .cs-count { background: var(--primary-light); color: var(--primary); border-radius: 999px; padding: 2px 8px; font-weight: 700; font-size: 12px; }
+.cs-filter-form { display: flex; flex-direction: column; gap: 13px; }
+.cs-filter-form label { display: flex; flex-direction: column; gap: 5px; color: var(--text-light); font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.cs-filter-form .form-control { width: 100%; min-width: 0; padding: 7px 8px; font-size: 12px; text-transform: none; }
+.cs-filter-search > div { position: relative; }
+.cs-filter-search i { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--text-light); font-size: 11px; }
+.cs-filter-search input { padding-left: 27px !important; }
+.cs-clear-filters { align-self: flex-start; }
 
 .cs-ticket-list { flex: 1; overflow-y: auto; }
 .cs-ticket-card { padding: 15px 16px; border-bottom: 1px solid var(--border); transition: background var(--transition); }
