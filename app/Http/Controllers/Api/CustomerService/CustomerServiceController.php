@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\CustomerService;
 
 use App\Http\Controllers\Controller;
 use App\Models\CustomerService\Ticket;
+use App\Models\CustomerService\TicketMessage;
 use App\Models\User;
 use App\Services\CustomerService\TicketConflictException;
 use Illuminate\Http\JsonResponse;
@@ -12,11 +13,17 @@ abstract class CustomerServiceController extends Controller
 {
     protected function conflictResponse(TicketConflictException $exception): JsonResponse
     {
-        return response()->json([
+        $data = [
             'error' => $exception->getMessage(),
             'code' => $exception->machineCode,
             'ticket' => $this->ticketData($exception->ticket),
-        ], 409);
+        ];
+
+        if ($exception->existingMessage !== null) {
+            $data['bericht'] = $this->messageData($exception->existingMessage);
+        }
+
+        return response()->json($data, 409);
     }
 
     protected function ticketData(Ticket $ticket): array
@@ -51,6 +58,21 @@ abstract class CustomerServiceController extends Controller
             'id' => $user->id,
             'naam' => $user->naam,
             'kleur' => $user->kleur,
+        ];
+    }
+
+    protected function messageData(TicketMessage $message): array
+    {
+        $message->loadMissing('auteur');
+
+        return [
+            'id' => $message->id,
+            'ticket_id' => $message->ticket_id,
+            'richting' => $message->richting,
+            'kanaal' => $message->kanaal,
+            'auteur' => $this->userData($message->auteur),
+            'inhoud' => $message->inhoud,
+            'created_at' => $message->created_at,
         ];
     }
 }

@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\ConvertController;
 use App\Http\Controllers\Api\CustomerService\TicketClaimController;
 use App\Http\Controllers\Api\CustomerService\TicketController;
+use App\Http\Controllers\Api\CustomerService\TicketMessageController;
 use App\Http\Controllers\Api\CustomerService\TicketPriorityController;
 use App\Http\Controllers\Api\CustomerService\TicketStatusController;
 use App\Http\Controllers\Api\DashboardController;
@@ -35,6 +36,8 @@ Route::middleware('auth.custom')->group(function () {
     Route::post('/api/customer-service/tickets/{id}/release', [TicketClaimController::class, 'release']);
     Route::put('/api/customer-service/tickets/{id}/status', [TicketStatusController::class, 'update']);
     Route::put('/api/customer-service/tickets/{id}/priority', [TicketPriorityController::class, 'update']);
+    Route::get('/api/customer-service/tickets/{id}/messages', [TicketMessageController::class, 'index']);
+    Route::post('/api/customer-service/tickets/{id}/messages', [TicketMessageController::class, 'store']);
 
     // Users
     Route::get('/api/users', [UserController::class, 'index']);
