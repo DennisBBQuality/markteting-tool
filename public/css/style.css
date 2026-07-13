@@ -1753,6 +1753,7 @@ input, select, textarea { font: inherit; }
 .cs-conflict-banner { position: sticky; top: 0; z-index: 4; display: flex; align-items: center; gap: 9px; padding: 10px 12px; border-bottom: 1px solid #F59E0B; background: #FEF3C7; color: #92400E; font-size: 12px; }
 .cs-conflict-banner span { flex: 1; }
 .cs-form-error { margin-bottom: 14px; padding: 10px 12px; border-radius: var(--radius-sm); background: #FEE2E2; color: #B91C1C; font-size: 12px; }
+.cs-back-btn { display: none; }
 
 @media (max-width: 1024px) {
   .kanban-board { grid-template-columns: repeat(2, 1fr); }
@@ -1767,10 +1768,44 @@ input, select, textarea { font: inherit; }
   .main-content { margin-left: 60px; padding: 16px; }
   .kanban-board { grid-template-columns: 1fr; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
-  .cs-layout { display: flex; height: calc(100vh - 120px); min-height: 560px; overflow-x: auto; overflow-y: hidden; }
-  .cs-filters { width: 160px; flex-shrink: 0; }
-  .cs-list-panel { width: 300px; flex-shrink: 0; }
-  .cs-detail { min-width: 360px; flex: 1; }
+  /* Customer service: lijst-detailworkflow op mobiel */
+  .cs-page-header { flex-wrap: wrap; gap: 10px; }
+  .cs-layout { display: flex; flex-direction: column; height: auto; min-height: 0; overflow: visible; }
+  .cs-filters, .cs-list-panel { width: auto; border-right: none; }
+  .cs-filters { border-bottom: 1px solid var(--border); }
+  .cs-ticket-list { overflow: visible; }
+  .cs-detail { display: none; }
+  .cs-layout.cs-detail-open .cs-detail {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 500;
+    min-width: 0;
+    background: var(--bg-card);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .cs-back-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    width: 100%;
+    height: 44px;
+    padding: 0 16px;
+    border: 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--primary);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: left;
+  }
+  .cs-layout.cs-detail-open .cs-conflict-banner { top: 44px; }
+  .cs-layout.cs-detail-open .cs-detail-tabs { top: 44px; }
 
   /* Chat responsive */
   .chat-sidebar {

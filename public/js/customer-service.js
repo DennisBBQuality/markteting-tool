@@ -66,10 +66,11 @@ function cleanupCustomerService() {
   CustomerServiceState.isPolling = false;
 }
 
-async function loadCustomerServiceTickets(page = 1) {
+async function loadCustomerServiceTickets(page = 1, options = {}) {
   const list = document.getElementById('cs-ticket-list');
   if (!list) return;
   const requestId = ++CustomerServiceState.listRequestId;
+  const previousScrollTop = options.preserveScroll ? list.scrollTop : 0;
 
   list.innerHTML = customerServiceListLoading();
   document.getElementById('cs-pagination').innerHTML = '';
@@ -87,6 +88,7 @@ async function loadCustomerServiceTickets(page = 1) {
   document.getElementById('cs-total-count').textContent = String(result.meta.total);
   renderCustomerServiceTicketList();
   renderCustomerServicePagination();
+  if (options.preserveScroll) list.scrollTop = previousScrollTop;
 }
 
 function renderCustomerServiceTicketList() {
@@ -275,15 +277,66 @@ function customerServiceClearFilters() {
 }
 
 async function customerServiceSelectTicket(ticketId) {
+  if (!ticketId) return;
+  const sameTicket = CustomerServiceState.selectedTicketId === ticketId;
+  customerServiceCaptureDrafts();
+
+  if (!sameTicket) {
+    if (customerServiceHasUnsentDraft()) {
+      customerServiceShowDraftWarning(ticketId);
+      return;
+    }
+    CustomerServiceState.activeTab = 'timeline';
+    CustomerServiceState.messageClientId = null;
+    CustomerServiceState.drafts = { direction: 'inkomend', message: '', note: '' };
+  }
+
   CustomerServiceState.selectedTicketId = ticketId;
   CustomerServiceState.detail = null;
-  CustomerServiceState.activeTab = 'timeline';
   CustomerServiceState.conflict = null;
-  CustomerServiceState.messageClientId = null;
-  CustomerServiceState.drafts = { direction: 'inkomend', message: '', note: '' };
   renderCustomerServiceTicketList();
+  customerServiceOpenDetailPanel();
 
-  await customerServiceLoadDetail(ticketId, 'timeline');
+  await customerServiceLoadDetail(ticketId, CustomerServiceState.activeTab);
+}
+
+function customerServiceShowDraftWarning(ticketId) {
+  openModal('Onverzonden concept', `
+    <p>Er staat nog onverzonden concepttekst bij het geopende ticket. Als je een
+    ander ticket opent, wordt dat concept verwijderd.</p>`, `
+    <button type="button" class="btn btn-secondary" onclick="closeModal()">Annuleren</button>
+    <button type="button" class="btn btn-primary" onclick="closeModal(); customerServiceDiscardDraftAndSelect('${escHtml(ticketId)}')">Concept verwijderen</button>`);
+}
+
+function customerServiceDiscardDraftAndSelect(ticketId) {
+  CustomerServiceState.drafts = { direction: 'inkomend', message: '', note: '' };
+  const message = document.getElementById('cs-message-content');
+  const note = document.getElementById('cs-note-content');
+  if (message) message.value = '';
+  if (note) note.value = '';
+  customerServiceSelectTicket(ticketId);
+}
+
+function customerServiceHasUnsentDraft() {
+  return Boolean(CustomerServiceState.drafts.message.trim() || CustomerServiceState.drafts.note.trim());
+}
+
+function customerServiceOpenDetailPanel() {
+  document.querySelector('#view-customer-service .cs-layout')?.classList.add('cs-detail-open');
+}
+
+function customerServiceCloseDetail() {
+  customerServiceCaptureDrafts();
+  if (CustomerServiceState.detailPollTimer) {
+    clearInterval(CustomerServiceState.detailPollTimer);
+    CustomerServiceState.detailPollTimer = null;
+  }
+  CustomerServiceState.isPolling = false;
+  document.querySelector('#view-customer-service .cs-layout')?.classList.remove('cs-detail-open');
+}
+
+function customerServiceBackButtonHtml() {
+  return `<button type="button" class="cs-back-btn" onclick="customerServiceCloseDetail()"><i class="fas fa-arrow-left"></i> Terug naar tickets</button>`;
 }
 
 function renderCustomerServiceDetail() {
@@ -294,6 +347,7 @@ function renderCustomerServiceDetail() {
   const ticket = detail.ticket;
   const assignee = ticket.behandelaar;
   container.innerHTML = `
+    ${customerServiceBackButtonHtml()}
     ${customerServiceConflictBanner()}
     <header class="cs-detail-header">
       <div class="cs-detail-eyebrow">
@@ -740,7 +794,7 @@ async function customerServiceRefreshConflict() {
 
 async function customerServiceRefreshAfterMutation(ticketId, activeTab) {
   CustomerServiceState.conflict = null;
-  await loadCustomerServiceTickets(CustomerServiceState.meta.page);
+  await loadCustomerServiceTickets(CustomerServiceState.meta.page, { preserveScroll: true });
   await customerServiceLoadDetail(ticketId, activeTab);
 }
 
@@ -794,7 +848,7 @@ async function customerServicePollDetail() {
     return;
   }
 
-  await loadCustomerServiceTickets(CustomerServiceState.meta.page);
+  await loadCustomerServiceTickets(CustomerServiceState.meta.page, { preserveScroll: true });
   await customerServiceLoadDetail(ticketId, CustomerServiceState.activeTab, { silent: true });
 }
 
@@ -874,11 +928,12 @@ function customerServiceDetailPlaceholder() {
 }
 
 function customerServiceDetailLoading() {
-  return `<div class="cs-loading cs-detail-placeholder"><i class="fas fa-spinner fa-spin"></i><span>Ticket laden...</span></div>`;
+  return `${customerServiceBackButtonHtml()}<div class="cs-loading cs-detail-placeholder"><i class="fas fa-spinner fa-spin"></i><span>Ticket laden...</span></div>`;
 }
 
 function customerServiceDetailError() {
   return `
+    ${customerServiceBackButtonHtml()}
     <div class="cs-empty-state cs-detail-placeholder cs-error-state">
       <i class="fas fa-exclamation-triangle"></i>
       <h3>Ticket kon niet worden geladen</h3>
