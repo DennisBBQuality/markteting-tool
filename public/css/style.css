@@ -1702,6 +1702,9 @@ input, select, textarea { font: inherit; }
 .cs-detail-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
 .cs-detail-assignee { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; color: var(--text-light); font-size: 12px; }
 .cs-avatar { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; color: white; font-size: 11px; font-weight: 700; }
+.cs-ticket-actions { display: flex; align-items: end; gap: 9px; flex-wrap: wrap; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.cs-action-select { display: flex; flex-direction: column; gap: 4px; color: var(--text-light); font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.cs-action-select select { min-width: 128px; height: 32px; padding: 4px 8px; font-size: 12px; text-transform: none; }
 
 .cs-detail-tabs { position: sticky; top: 0; z-index: 2; display: flex; background: var(--bg-card); border-bottom: 1px solid var(--border); }
 .cs-detail-tab { flex: 1; padding: 12px 8px 10px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text-light); font-weight: 600; cursor: pointer; }
@@ -1727,6 +1730,17 @@ input, select, textarea { font: inherit; }
 .cs-activity-list p { margin: 2px 0 0; color: var(--text-light); font-size: 11px; }
 .cs-activity-list small { display: block; margin-top: 5px; color: var(--text-light); }
 .cs-tab-empty { min-height: 180px; padding: 15px; }
+
+.cs-composer { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-card); }
+.cs-composer-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.cs-composer-heading select { width: auto; min-width: 190px; font-size: 12px; }
+.cs-composer textarea { resize: vertical; line-height: 1.45; }
+.cs-composer .btn { align-self: flex-end; }
+.cs-composer-hint { margin: -2px 0 0; color: var(--text-light); font-size: 11px; line-height: 1.4; }
+.cs-note-composer { background: #FFFBEB; border-color: #FDE68A; }
+.cs-conflict-banner { position: sticky; top: 0; z-index: 4; display: flex; align-items: center; gap: 9px; padding: 10px 12px; border-bottom: 1px solid #F59E0B; background: #FEF3C7; color: #92400E; font-size: 12px; }
+.cs-conflict-banner span { flex: 1; }
+.cs-form-error { margin-bottom: 14px; padding: 10px 12px; border-radius: var(--radius-sm); background: #FEE2E2; color: #B91C1C; font-size: 12px; }
 
 @media (max-width: 1024px) {
   .kanban-board { grid-template-columns: repeat(2, 1fr); }
