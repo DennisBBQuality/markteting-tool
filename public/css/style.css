@@ -1663,7 +1663,8 @@ input, select, textarea { font: inherit; }
 
 .cs-ticket-list { flex: 1; overflow-y: auto; }
 .cs-ticket-card { padding: 15px 16px; border-bottom: 1px solid var(--border); transition: background var(--transition); }
-.cs-ticket-card:hover { background: var(--bg); }
+.cs-ticket-card:hover, .cs-ticket-card:focus-visible { background: var(--bg); cursor: pointer; outline: none; }
+.cs-ticket-card.selected { background: var(--primary-light); box-shadow: inset 3px 0 var(--primary); }
 .cs-ticket-card h3 { margin: 7px 0 5px; font-size: 14px; line-height: 1.35; }
 .cs-ticket-card p { margin: 0 0 10px; color: var(--text-light); font-size: 13px; }
 .cs-ticket-card-topline, .cs-ticket-card-meta { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
@@ -1688,6 +1689,44 @@ input, select, textarea { font: inherit; }
 .cs-empty-state p { margin: 0; font-size: 13px; }
 .cs-detail-placeholder { min-height: 100%; box-sizing: border-box; }
 .cs-error-state > i { color: var(--danger); }
+
+.cs-detail-header { padding: 20px 22px 18px; border-bottom: 1px solid var(--border); }
+.cs-detail-eyebrow { display: flex; justify-content: space-between; gap: 12px; color: var(--primary); font-size: 12px; }
+.cs-detail-eyebrow span { color: var(--text-light); font-weight: 400; }
+.cs-detail-header h2 { margin: 8px 0 16px; font-size: 20px; line-height: 1.3; }
+.cs-customer-card { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: var(--radius-sm); background: var(--bg); }
+.cs-customer-card > i { color: var(--primary); font-size: 24px; }
+.cs-customer-card div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cs-customer-card strong, .cs-customer-card a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cs-customer-card a { color: var(--text-light); font-size: 12px; }
+.cs-detail-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.cs-detail-assignee { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; color: var(--text-light); font-size: 12px; }
+.cs-avatar { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; color: white; font-size: 11px; font-weight: 700; }
+
+.cs-detail-tabs { position: sticky; top: 0; z-index: 2; display: flex; background: var(--bg-card); border-bottom: 1px solid var(--border); }
+.cs-detail-tab { flex: 1; padding: 12px 8px 10px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text-light); font-weight: 600; cursor: pointer; }
+.cs-detail-tab:hover { color: var(--primary); background: var(--bg); }
+.cs-detail-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+.cs-detail-tab span { display: inline-flex; min-width: 19px; justify-content: center; margin-left: 3px; padding: 1px 5px; border-radius: 999px; background: var(--bg); font-size: 10px; }
+.cs-detail-tab-content { padding: 18px 20px 24px; }
+
+.cs-timeline, .cs-note-list { display: flex; flex-direction: column; gap: 14px; }
+.cs-message { max-width: 88%; padding: 12px 14px; border-radius: 12px; }
+.cs-message.incoming { align-self: flex-start; background: var(--bg); border-bottom-left-radius: 3px; }
+.cs-message.outgoing { align-self: flex-end; background: var(--primary-light); border-bottom-right-radius: 3px; }
+.cs-message-heading, .cs-note-heading { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 7px; font-size: 11px; }
+.cs-message-heading span, .cs-note-heading span { color: var(--text-light); }
+.cs-message-body, .cs-note-body { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.5; }
+.cs-note { padding: 13px 14px; border: 1px solid #FDE68A; border-radius: var(--radius-sm); background: #FFFBEB; }
+
+.cs-activity-list { list-style: none; margin: 0; padding: 0; }
+.cs-activity-list li { display: grid; grid-template-columns: 30px 1fr; gap: 10px; position: relative; padding-bottom: 18px; }
+.cs-activity-list li:not(:last-child)::before { content: ''; position: absolute; left: 14px; top: 28px; bottom: 0; width: 1px; background: var(--border); }
+.cs-activity-icon { width: 29px; height: 29px; z-index: 1; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--primary-light); color: var(--primary); font-size: 11px; }
+.cs-activity-list strong { font-size: 13px; }
+.cs-activity-list p { margin: 2px 0 0; color: var(--text-light); font-size: 11px; }
+.cs-activity-list small { display: block; margin-top: 5px; color: var(--text-light); }
+.cs-tab-empty { min-height: 180px; padding: 15px; }
 
 @media (max-width: 1024px) {
   .kanban-board { grid-template-columns: repeat(2, 1fr); }

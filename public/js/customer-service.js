@@ -3,6 +3,8 @@ const CustomerServiceState = {
   tickets: [],
   meta: { page: 1, per_page: 25, total: 0, last_page: 1 },
   selectedTicketId: null,
+  detail: null,
+  activeTab: 'timeline',
   detailPollTimer: null,
 };
 
@@ -83,7 +85,7 @@ function renderCustomerServiceTicketList() {
   }
 
   list.innerHTML = CustomerServiceState.tickets.map(ticket => `
-    <article class="cs-ticket-card" data-ticket-id="${escHtml(ticket.id)}">
+    <article class="cs-ticket-card${ticket.id === CustomerServiceState.selectedTicketId ? ' selected' : ''}" data-ticket-id="${escHtml(ticket.id)}" role="button" tabindex="0">
       <div class="cs-ticket-card-topline">
         <strong>${escHtml(ticket.ticketnummer)}</strong>
         <span class="cs-time">${escHtml(formatDateTime(ticket.laatste_bericht_op || ticket.created_at))}</span>
@@ -96,6 +98,17 @@ function renderCustomerServiceTicketList() {
         <span class="cs-assignee"><i class="fas fa-user"></i> ${escHtml(ticket.behandelaar?.naam || 'Niet toegewezen')}</span>
       </div>
     </article>`).join('');
+
+  list.querySelectorAll('.cs-ticket-card').forEach(card => {
+    const selectTicket = () => customerServiceSelectTicket(card.dataset.ticketId);
+    card.addEventListener('click', selectTicket);
+    card.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        selectTicket();
+      }
+    });
+  });
 }
 
 function renderCustomerServicePagination() {
@@ -112,7 +125,7 @@ function renderCustomerServicePagination() {
     <button class="btn btn-secondary btn-sm" onclick="customerServiceGoToPage(${meta.page - 1})" ${meta.page <= 1 ? 'disabled' : ''}>
       <i class="fas fa-chevron-left"></i> Vorige
     </button>
-    <span>Pagina ${escHtml(meta.page)} van ${escHtml(meta.last_page)}</span>
+    <span>Pagina ${escHtml(String(meta.page))} van ${escHtml(String(meta.last_page))}</span>
     <button class="btn btn-secondary btn-sm" onclick="customerServiceGoToPage(${meta.page + 1})" ${meta.page >= meta.last_page ? 'disabled' : ''}>
       Volgende <i class="fas fa-chevron-right"></i>
     </button>`;
@@ -121,6 +134,184 @@ function renderCustomerServicePagination() {
 function customerServiceGoToPage(page) {
   if (page < 1 || page > CustomerServiceState.meta.last_page) return;
   loadCustomerServiceTickets(page);
+}
+
+async function customerServiceSelectTicket(ticketId) {
+  CustomerServiceState.selectedTicketId = ticketId;
+  CustomerServiceState.detail = null;
+  CustomerServiceState.activeTab = 'timeline';
+  renderCustomerServiceTicketList();
+
+  const detail = document.getElementById('cs-detail');
+  if (!detail) return;
+  detail.innerHTML = customerServiceDetailLoading();
+
+  const [ticket, messages, notes, activities] = await Promise.all([
+    api(`/api/customer-service/tickets/${ticketId}`),
+    api(`/api/customer-service/tickets/${ticketId}/messages`),
+    api(`/api/customer-service/tickets/${ticketId}/notes`),
+    api(`/api/customer-service/tickets/${ticketId}/activities`),
+  ]);
+
+  if (CustomerServiceState.selectedTicketId !== ticketId || !document.getElementById('cs-detail')) return;
+  if (!ticket || !messages || !notes || !activities) {
+    detail.innerHTML = customerServiceDetailError();
+    return;
+  }
+
+  CustomerServiceState.detail = { ticket, messages, notes, activities };
+  renderCustomerServiceDetail();
+}
+
+function renderCustomerServiceDetail() {
+  const container = document.getElementById('cs-detail');
+  const detail = CustomerServiceState.detail;
+  if (!container || !detail) return;
+
+  const ticket = detail.ticket;
+  const assignee = ticket.behandelaar;
+  container.innerHTML = `
+    <header class="cs-detail-header">
+      <div class="cs-detail-eyebrow">
+        <strong>${escHtml(ticket.ticketnummer)}</strong>
+        <span>Versie ${escHtml(String(ticket.versie))}</span>
+      </div>
+      <h2>${escHtml(ticket.onderwerp)}</h2>
+      <div class="cs-customer-card">
+        <i class="fas fa-user-circle"></i>
+        <div>
+          <strong>${escHtml(ticket.klant_naam)}</strong>
+          <a href="mailto:${encodeURIComponent(ticket.klant_email)}">${escHtml(ticket.klant_email)}</a>
+        </div>
+      </div>
+      <div class="cs-detail-meta">
+        ${customerServiceStatusBadge(ticket.status)}
+        ${customerServicePriorityBadge(ticket.prioriteit)}
+        <span class="cs-detail-assignee">
+          <span class="cs-avatar" style="background:${customerServiceSafeColor(assignee?.kleur)}">${escHtml((assignee?.naam || '?').charAt(0).toUpperCase())}</span>
+          ${escHtml(assignee?.naam || 'Niet toegewezen')}
+        </span>
+      </div>
+    </header>
+    <nav class="cs-detail-tabs" aria-label="Ticketdetail tabs">
+      ${customerServiceDetailTabButton('timeline', 'Tijdlijn', detail.messages.length)}
+      ${customerServiceDetailTabButton('notes', 'Notities', detail.notes.length)}
+      ${customerServiceDetailTabButton('history', 'Historie', detail.activities.length)}
+    </nav>
+    <div id="cs-detail-tab-content" class="cs-detail-tab-content"></div>`;
+
+  renderCustomerServiceDetailTab();
+}
+
+function customerServiceDetailTabButton(tab, label, count) {
+  const active = CustomerServiceState.activeTab === tab;
+  return `<button type="button" class="cs-detail-tab${active ? ' active' : ''}" data-cs-tab="${tab}" onclick="customerServiceSwitchTab('${tab}')" aria-selected="${active}">${label} <span>${escHtml(String(count))}</span></button>`;
+}
+
+function customerServiceSwitchTab(tab) {
+  if (!['timeline', 'notes', 'history'].includes(tab) || !CustomerServiceState.detail) return;
+  CustomerServiceState.activeTab = tab;
+  renderCustomerServiceDetail();
+}
+
+function renderCustomerServiceDetailTab() {
+  const container = document.getElementById('cs-detail-tab-content');
+  const detail = CustomerServiceState.detail;
+  if (!container || !detail) return;
+
+  if (CustomerServiceState.activeTab === 'notes') {
+    container.innerHTML = customerServiceNotesHtml(detail.notes);
+  } else if (CustomerServiceState.activeTab === 'history') {
+    container.innerHTML = customerServiceActivitiesHtml(detail.activities);
+  } else {
+    container.innerHTML = customerServiceTimelineHtml(detail.messages);
+  }
+}
+
+function customerServiceTimelineHtml(messages) {
+  if (messages.length === 0) return customerServiceTabEmpty('fa-comments', 'Nog geen berichten');
+
+  return `<div class="cs-timeline">${messages.map(message => {
+    const outgoing = message.richting === 'uitgaand';
+    const author = outgoing ? (message.auteur?.naam || 'Medewerker') : CustomerServiceState.detail.ticket.klant_naam;
+    return `
+      <article class="cs-message ${outgoing ? 'outgoing' : 'incoming'}">
+        <div class="cs-message-heading">
+          <strong>${escHtml(author)}</strong>
+          <span>${outgoing ? 'Uitgaand' : 'Inkomend'} · ${escHtml(formatDateTime(message.created_at))}</span>
+        </div>
+        <div class="cs-message-body">${escHtml(message.inhoud)}</div>
+      </article>`;
+  }).join('')}</div>`;
+}
+
+function customerServiceNotesHtml(notes) {
+  if (notes.length === 0) return customerServiceTabEmpty('fa-sticky-note', 'Nog geen interne notities');
+
+  return `<div class="cs-note-list">${notes.map(note => `
+    <article class="cs-note">
+      <div class="cs-note-heading"><strong>${escHtml(note.auteur?.naam || 'Onbekende medewerker')}</strong><span>${escHtml(formatDateTime(note.created_at))}</span></div>
+      <div class="cs-note-body">${escHtml(note.inhoud)}</div>
+    </article>`).join('')}</div>`;
+}
+
+function customerServiceActivitiesHtml(activities) {
+  if (activities.length === 0) return customerServiceTabEmpty('fa-history', 'Nog geen activiteiten');
+
+  return `<ol class="cs-activity-list">${activities.map(activity => `
+    <li>
+      <span class="cs-activity-icon"><i class="fas ${customerServiceActivityIcon(activity.actie)}"></i></span>
+      <div>
+        <strong>${escHtml(customerServiceActivityLabel(activity.actie))}</strong>
+        <p>${escHtml(activity.gebruiker?.naam || 'Systeem')} · ${escHtml(formatDateTime(activity.created_at))}</p>
+        ${customerServiceActivityDetails(activity)}
+      </div>
+    </li>`).join('')}</ol>`;
+}
+
+function customerServiceActivityLabel(action) {
+  const labels = {
+    ticket_aangemaakt: 'Ticket aangemaakt',
+    status_gewijzigd: 'Status gewijzigd',
+    prioriteit_gewijzigd: 'Prioriteit gewijzigd',
+    ticket_geclaimd: 'Ticket geclaimd',
+    ticket_vrijgegeven: 'Ticket vrijgegeven',
+    bericht_toegevoegd: 'Bericht toegevoegd',
+    notitie_toegevoegd: 'Notitie toegevoegd',
+  };
+  return labels[action] || 'Activiteit';
+}
+
+function customerServiceActivityIcon(action) {
+  const icons = {
+    ticket_aangemaakt: 'fa-plus',
+    status_gewijzigd: 'fa-exchange-alt',
+    prioriteit_gewijzigd: 'fa-flag',
+    ticket_geclaimd: 'fa-user-check',
+    ticket_vrijgegeven: 'fa-user-times',
+    bericht_toegevoegd: 'fa-comment',
+    notitie_toegevoegd: 'fa-sticky-note',
+  };
+  return icons[action] || 'fa-circle';
+}
+
+function customerServiceActivityDetails(activity) {
+  const details = activity.details || {};
+  if (activity.actie === 'status_gewijzigd' && details.van && details.naar) {
+    return `<small>${escHtml(details.van)} → ${escHtml(details.naar)}</small>`;
+  }
+  if (activity.actie === 'prioriteit_gewijzigd' && details.van && details.naar) {
+    return `<small>${escHtml(details.van)} → ${escHtml(details.naar)}</small>`;
+  }
+  return '';
+}
+
+function customerServiceTabEmpty(icon, text) {
+  return `<div class="cs-empty-state cs-tab-empty"><i class="fas ${icon}"></i><p>${escHtml(text)}</p></div>`;
+}
+
+function customerServiceSafeColor(color) {
+  return /^#[0-9a-f]{6}$/i.test(color || '') ? color : '#6B7280';
 }
 
 function customerServiceStatusBadge(status) {
@@ -146,6 +337,19 @@ function customerServiceDetailPlaceholder() {
       <i class="fas fa-ticket-alt"></i>
       <h3>Selecteer een ticket uit de lijst</h3>
       <p>Het volledige ticketdetail verschijnt hier.</p>
+    </div>`;
+}
+
+function customerServiceDetailLoading() {
+  return `<div class="cs-loading cs-detail-placeholder"><i class="fas fa-spinner fa-spin"></i><span>Ticket laden...</span></div>`;
+}
+
+function customerServiceDetailError() {
+  return `
+    <div class="cs-empty-state cs-detail-placeholder cs-error-state">
+      <i class="fas fa-exclamation-triangle"></i>
+      <h3>Ticket kon niet worden geladen</h3>
+      <button class="btn btn-secondary" onclick="customerServiceSelectTicket(CustomerServiceState.selectedTicketId)">Opnieuw proberen</button>
     </div>`;
 }
 
