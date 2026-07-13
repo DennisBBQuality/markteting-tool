@@ -13,6 +13,25 @@ class TicketMessageService
 {
     public function __construct(private readonly TicketActivityLogger $activityLogger) {}
 
+    public function addInitialMessage(Ticket $ticket, User $user, string $inhoud): TicketMessage
+    {
+        $message = $ticket->messages()->create([
+            'richting' => 'inkomend',
+            'kanaal' => 'handmatig',
+            'auteur_id' => $user->id,
+            'inhoud' => $inhoud,
+            'client_message_id' => (string) str()->uuid(),
+        ]);
+
+        $ticket->forceFill(['laatste_bericht_op' => $message->created_at])->save();
+        $this->activityLogger->log($ticket, $user, 'bericht_toegevoegd', [
+            'bericht_id' => $message->id,
+            'richting' => 'inkomend',
+        ]);
+
+        return $message;
+    }
+
     /**
      * @return array{bericht: TicketMessage, ticket: Ticket}
      */
