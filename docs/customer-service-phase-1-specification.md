@@ -1,15 +1,24 @@
 # Klantenservicemodule — Fase 1 Specificatie
 
-Documentversie: 1.0
+Documentversie: 1.1
 Datum: 13 juli 2026
 Status: definitief ontwerp voor implementatie
 Doelgroep: Codex (implementatie in kleine stappen), reviewers en het BBQuality-team
+
+Wijzigingshistorie:
+- 1.0 — initieel fase 1-ontwerp.
+- 1.1 — definitieve kanaalstrategie voor e-mail, WhatsApp en de toekomstige
+  websitechatbot verwerkt (hoofdstukken 28–31) als richtinggevende doorkijk;
+  de bouwscope van fase 1 is hierdoor niet vergroot.
 
 Dit document is het volledige functionele en technische ontwerp voor fase 1 van de
 klantenservicemodule van BBQuality The Pitboard. Het is gebaseerd op de bestaande
 codebase (Laravel 12, custom sessie-authenticatie, Vanilla JavaScript SPA in
 `public/`) en op `docs/current-system-audit.md`. Fase 1 werkt uitsluitend met
 handmatige, lokale testtickets; er is geen enkele externe communicatie.
+Hoofdstukken 1–27 beschrijven wat in fase 1 gebouwd wordt; hoofdstukken 28–31
+beschrijven de kanaalstrategie en het toekomstige datamodel als
+architectuurkader dat in fase 1 uitdrukkelijk níét gebouwd wordt.
 
 ---
 
@@ -30,8 +39,16 @@ Fase 1 legt het fundament van de klantenservicemodule:
 
 Het resultaat: meerdere medewerkers kunnen tegelijk veilig met handmatige
 testtickets werken, van aanmaken tot afhandelen, zonder stille dataverlies- of
-dubbel-antwoordproblemen. Alle latere fases (e-mail, WhatsApp, orders, AI)
-bouwen hierop voort zonder dat het fase 1-datamodel hoeft te worden herzien.
+dubbel-antwoordproblemen. Alle latere fases (e-mail, WhatsApp, chatbot,
+orders, AI) bouwen hierop voort zonder dat het fase 1-datamodel hoeft te
+worden herzien.
+
+Het handmatige testticket is de simulatie van de toekomstige e-mailroute:
+iedere inkomende klantenservice-e-mail wordt later automatisch precies zo'n
+ticket met een eerste inkomend bericht (hoofdstuk 28). WhatsApp en de
+websitechatbot starten later juist als conversatie en leiden alleen indien
+nodig tot een ticket (hoofdstuk 29); conversaties zijn bewust géén onderdeel
+van fase 1.
 
 ## 2. Exacte scope
 
@@ -39,6 +56,8 @@ bouwen hierop voort zonder dat het fase 1-datamodel hoeft te worden herzien.
 
 1. Handmatig aanmaken van testtickets met onderwerp, fictieve klantnaam,
    fictief klant-e-mailadres, prioriteit en een eerste (inkomend) testbericht.
+   Dit simuleert de toekomstige e-mailintake: één binnenkomende e-mail wordt
+   later automatisch zo'n ticket.
 2. Centrale ticketinbox met server-side paginering.
 3. Driedelige interface: filterpaneel, ticketlijst, ticketdetail.
 4. Eén primaire behandelaar per ticket (`behandelaar_id`).
@@ -46,8 +65,9 @@ bouwen hierop voort zonder dat het fase 1-datamodel hoeft te worden herzien.
 6. Statuswijzigingen volgens een vaste statusmachine.
 7. Prioriteitswijzigingen.
 8. Interne notities (alleen zichtbaar voor medewerkers).
-9. Handmatige testberichten in de tijdlijn: inkomend (gesimuleerde klant) en
-   uitgaand (gesimuleerd antwoord; wordt nergens echt verzonden).
+9. Handmatige testberichten in de tijdlijn: inkomend (gesimuleerde klant-
+   e-mail) en uitgaand (gesimuleerd e-mailantwoord van het team; wordt nergens
+   echt verzonden).
 10. Append-only activiteitenhistorie per ticket.
 11. Zoeken op ticketnummer, onderwerp, klantnaam en klant-e-mailadres.
 12. Filteren op status, prioriteit, behandelaar en "niet toegewezen".
@@ -60,9 +80,13 @@ bouwen hierop voort zonder dat het fase 1-datamodel hoeft te worden herzien.
 
 ### Nadrukkelijk niet in scope (zie ook hoofdstuk 25)
 
-- echte e-mailintegratie;
-- WhatsApp-integratie;
-- orderkoppelingen;
+- echte e-mailintegratie of e-mailimport;
+- WhatsApp-integratie of WhatsApp-inbox;
+- websitechatbot;
+- conversatiebeheer (conversaties als apart begrip naast tickets,
+  hoofdstuk 29);
+- orderkoppelingen, order-API of vervoerders-API;
+- automatische klantmatching of automatische ordermatching;
 - AI-antwoordvoorstellen;
 - echte uitgaande klantcommunicatie (er wordt niets verstuurd);
 - SLA-functionaliteit;
@@ -75,7 +99,8 @@ bouwen hierop voort zonder dat het fase 1-datamodel hoeft te worden herzien.
 1. **Aanmaken.** Een medewerker klikt in de inbox op "Nieuw testticket", vult
    onderwerp, fictieve klantnaam, fictief e-mailadres, prioriteit en de inhoud
    van het eerste klantbericht in. Het ticket krijgt status `nieuw`, een uniek
-   ticketnummer (bijv. `CS-2026-00001`) en géén behandelaar.
+   ticketnummer (bijv. `CS-2026-00001`) en géén behandelaar. Deze stap is de
+   handmatige simulatie van de toekomstige automatische e-mailintake.
 2. **Signaleren.** Het ticket verschijnt bovenaan de inbox. Iedere medewerker
    ziet in de lijst status, prioriteit, klantnaam, onderwerp, behandelaar
    (leeg) en het tijdstip van het laatste bericht.
@@ -245,9 +270,17 @@ Ontwerpkeuzes:
 
 - **Geen aparte klantentabel in fase 1.** Klantnaam en klant-e-mailadres staan
   als snapshotvelden op het ticket (`klant_naam`, `klant_email`). Fase 1 bevat
-  uitsluitend fictieve testdata, dus er is geen migratierisico; een
-  genormaliseerde `cs_customers`-tabel volgt in de fase waarin echte kanalen
-  worden gekoppeld.
+  uitsluitend fictieve testdata, dus er is geen migratierisico; de
+  genormaliseerde tabellen `cs_customers` en `cs_customer_identifiers`
+  (hoofdstuk 31) volgen in de fase waarin echte kanalen worden gekoppeld.
+- **Kanaalonafhankelijk uitbreidbaar, zonder voorbouw.** Het ticket zelf heeft
+  geen kanaalveld; alleen berichten hebben een `kanaal`-enum. De e-mailfase
+  breidt die enum uit met `email`, want e-mail wordt later altijd automatisch
+  een ticket (hoofdstuk 28). WhatsApp- en chatbotcommunicatie komt in aparte
+  conversatietabellen die via een koppeltabel aan tickets hangen
+  (hoofdstukken 29 en 31); `cs_ticket_messages` wordt dus nooit de enige
+  opslag voor alle kanaalcommunicatie. Geen van die toekomstige tabellen
+  wordt in fase 1 aangemaakt.
 - **Prefix `cs_`** op alle tabellen houdt de module herkenbaar gescheiden van
   de bestaande portaltabellen.
 - Alle modellen gebruiken `HasUuids` en UUID primary keys, conform de rest van
@@ -292,7 +325,7 @@ Relaties:
 | `id` | uuid, primary | nee | — | |
 | `ticket_id` | uuid, FK `cs_tickets.id` `cascadeOnDelete` | nee | — | |
 | `richting` | enum(`inkomend`,`uitgaand`) | nee | — | `inkomend` = gesimuleerde klant, `uitgaand` = gesimuleerd antwoord. |
-| `kanaal` | enum(`handmatig`) | nee | `handmatig` | Enum wordt in latere fases uitgebreid met `email`, `whatsapp`. |
+| `kanaal` | enum(`handmatig`) | nee | `handmatig` | Wordt in de e-mailfase uitgebreid met `email`. WhatsApp- en chatbotberichten krijgen eigen conversatietabellen (hoofdstuk 31) en komen niet in deze tabel. |
 | `auteur_id` | uuid, FK `users.id` `nullOnDelete` | ja | — | Medewerker die het (test)bericht invoerde. |
 | `inhoud` | text | nee | — | Max 10.000 tekens (validatie). |
 | `client_message_id` | uuid | nee | — | Idempotencysleutel, aangeleverd door de client. |
@@ -934,10 +967,21 @@ geverifieerd volgens de acceptatiecriteria.
 De volgende onderwerpen zijn in fase 1 bewust afwezig en mogen door Codex in
 geen enkele taak "alvast" worden meegebouwd:
 
-- echte e-mailintegratie (inbound én outbound), mailboxen, IMAP/SMTP,
-  providers, webhooks;
-- WhatsApp-integratie in welke vorm dan ook;
-- orderkoppelingen of verwijzingen naar ordersystemen;
+- echte e-mailintegratie of e-mailimport (inbound én outbound), mailboxen,
+  IMAP/SMTP, providers, webhooks;
+- WhatsApp-integratie, WhatsApp-inbox of WhatsApp-conversaties in welke vorm
+  dan ook;
+- websitechatbot en iedere chatbotintegratie;
+- conversatiebeheer: conversaties als apart begrip naast tickets, inclusief
+  alle toekomstige tabellen uit hoofdstuk 31 (`cs_customers`,
+  `cs_customer_identifiers`, `cs_conversations`, `cs_conversation_messages`,
+  `cs_ticket_conversations`, `cs_ticket_order_links`,
+  `cs_external_message_ids`, `cs_channel_accounts`) — ook niet als lege of
+  "alvast" aangemaakte tabellen;
+- orderkoppelingen, order-API-clients, vervoerders-API-clients of andere
+  externe API-koppelingen;
+- automatische klantmatching, automatische ordermatching en matchvoorstellen
+  (hoofdstuk 30);
 - AI-antwoordvoorstellen of andere AI-functionaliteit;
 - echte uitgaande klantcommunicatie (niets verlaat het systeem);
 - SLA's, deadlines, escalaties, openingstijden;
@@ -985,7 +1029,9 @@ geen enkele taak "alvast" worden meegebouwd:
 
 ## 27. Implementatievolgorde voor Codex
 
-Op hoofdlijnen (volledig uitgewerkt in het volgende hoofdstuk):
+Op hoofdlijnen (volledig uitgewerkt in het hoofdstuk "Codex Implementation
+Plan" aan het einde van dit document; hoofdstukken 28–31 daartussen zijn
+architectuurkader, geen bouwtaken):
 
 1. **Testfundament** — factory/testhelperreparatie zodat featuretests met de
    custom sessie-authenticatie kunnen werken (CS-001).
@@ -1006,6 +1052,187 @@ de frontend start pas na afronding van CS-011.
 
 ---
 
+## 28. Kanaalstrategie: e-mail, WhatsApp en websitechatbot (na fase 1)
+
+Dit hoofdstuk legt de definitieve functionele kanaalkeuzes vast zodat het
+fase 1-ontwerp er niet mee in strijd raakt. Het is richtinggevend: **niets uit
+dit hoofdstuk wordt in fase 1 gebouwd.**
+
+### E-mail: altijd automatisch een ticket
+
+- Iedere inkomende e-mail naar de klantenservice wordt later automatisch een
+  ticket. E-mail hoeft dus nooit eerst als losse conversatie beoordeeld te
+  worden.
+- Het afzenderadres is altijd bekend; het ordernummer staat vaak in het
+  onderwerp of de inhoud.
+- Het systeem probeert bij binnenkomst via de order-API de klant te
+  herkennen, het ordernummer te herkennen en de juiste order te koppelen
+  (matchniveaus in hoofdstuk 30).
+- Mislukt de automatische klant- of orderherkenning, dan komt de e-mail
+  alsnog gewoon als ticket binnen. Een mislukte match mag nooit de ontvangst
+  of behandeling blokkeren.
+- De medewerker kan een voorgestelde koppeling later bevestigen, corrigeren of
+  verwijderen.
+- **Relatie met fase 1:** het handmatige testticket (nieuw ticket plus eerste
+  inkomend bericht) simuleert exact deze route. De e-mailfase vervangt alleen
+  de handmatige invoer door automatische intake; het ticketmodel en de
+  workflow van fase 1 blijven ongewijzigd.
+
+### WhatsApp: eerst conversatie, alleen indien nodig een ticket
+
+- Een WhatsApp-bericht wordt níét automatisch een ticket; het start een
+  conversatie.
+- Algemene vragen (bereidingsadvies, productadvies, kerntemperaturen) worden
+  zonder ticket beantwoord en afgesloten.
+- Is opvolging nodig, dan kan de medewerker vanuit de conversatie:
+  - een nieuw ticket aanmaken;
+  - de conversatie aan een bestaand ticket koppelen;
+  - de conversatie zonder ticket afsluiten.
+- Het WhatsApp-nummer is direct beschikbaar en mag als mogelijke klantmatch
+  worden gebruikt. Een telefoonnummermatch is niet altijd betrouwbaar en wordt
+  daarom bij twijfel alleen als voorstel getoond (hoofdstuk 30).
+- Latere zoekingangen: ordernummer, e-mailadres, telefoonnummer,
+  WhatsApp-nummer en vervoersnummer/track-and-tracenummer via externe
+  vervoerders-API's. Een vervoersnummer kan afwijken van het interne
+  ordernummer en is daarom een apart herkenningstype.
+
+### Websitechatbot: eveneens eerst conversatie
+
+- De toekomstige chatbot start als conversatie en maakt niet standaard een
+  ticket.
+- Bij algemene BBQ- of bereidingsvragen vraagt de chatbot níét om e-mailadres
+  of ordernummer (dataminimalisatie, hoofdstuk 30).
+- Bij bestelvragen, klachten, retouren, bezorgproblemen of compensatievragen
+  mag de chatbot gericht vragen om ordernummer, e-mailadres en eventueel
+  telefoonnummer.
+- De chatbot moet later: direct algemene vragen kunnen beantwoorden; een
+  medewerker kunnen inschakelen; een ticket kunnen voorstellen; en een
+  conversatie aan een bestaand ticket kunnen koppelen.
+- In de eerste versie mag de chatbot niet autonoom, op basis van vrije
+  AI-interpretatie, definitief tickets aanmaken zonder duidelijke regels of
+  menselijke controle.
+
+### Tijdelijke kanaalstrategie: WhatsApp en chatbot naast elkaar
+
+- WhatsApp en chatbot moeten tijdelijk naast elkaar kunnen bestaan; de website
+  kan in eerste instantie zowel een WhatsApp-knop als de chatbot tonen.
+- Later moet de WhatsApp-knop op de website uitschakelbaar zijn, met de
+  chatbot als primair kanaal.
+- Bestaande WhatsApp-gesprekken mogen technisch blijven binnenkomen, ook
+  wanneer de websiteknop verdwenen is. Inbound-verwerking van WhatsApp mag
+  daarom nooit hard gekoppeld worden aan de zichtbaarheid van de websiteknop;
+  die aan/uit-schakeling hoort bij de kanaalconfiguratie
+  (`cs_channel_accounts`, hoofdstuk 31).
+
+## 29. Conceptueel model: tickets versus conversaties
+
+Kernonderscheid dat alle latere fases aanstuurt:
+
+- **Een ticket is niet hetzelfde als een conversatie.** Een ticket is de
+  werkeenheid van het team: het heeft status, prioriteit, behandelaar en een
+  afhandelplicht. Een conversatie is een berichtenstroom met een klant via één
+  kanaal en heeft die verplichtingen niet.
+- E-mail leidt later **altijd automatisch** tot een ticket; er ontstaat geen
+  losse e-mailconversatie.
+- WhatsApp en chatbot starten als **conversatie** en leiden alleen indien
+  nodig tot een ticket.
+- Een conversatie kan **zonder ticket worden afgesloten** (bijv. een
+  beantwoorde kerntemperatuurvraag).
+- Een conversatie kan een **nieuw ticket aanmaken**.
+- Een conversatie kan aan een **bestaand ticket worden gekoppeld**.
+- **Eén ticket kan meerdere conversaties uit verschillende kanalen bevatten**
+  (bijv. gestart per e-mail, waarna de klant over hetzelfde onderwerp appt).
+- Een ticket kan gekoppeld zijn aan: **één klant**, **één primaire order**,
+  eventueel **meerdere relevante orders** en **één of meer conversaties**.
+
+Conceptuele structuur:
+
+```
+customer
+├── identifiers      (e-mailadres, telefoonnummer, WhatsApp-nummer, extern klant-ID)
+├── orders           (live via de order-API; lokaal alleen koppelinformatie)
+├── conversations    (WhatsApp, chatbot; e-mail wordt direct een ticket)
+└── optional ticket(s)
+```
+
+Gevolg voor fase 1: het fase 1-ticket met zijn `cs_ticket_messages`-tijdlijn
+dekt uitsluitend de e-mail-/handmatige route. Ticketberichten worden
+uitdrukkelijk níét de enige opslag voor alle kanaalcommunicatie:
+WhatsApp- en chatbotberichten komen later in `cs_conversation_messages`
+binnen een `cs_conversations`-record, dat via de koppeltabel
+`cs_ticket_conversations` aan nul of één ticket hangt (hoofdstuk 31). De
+tickettijdlijn toont gekoppelde conversaties dan via die relatie, zonder
+berichten te kopiëren.
+
+## 30. Klant- en orderherkenning (matchniveaus)
+
+Herkenningsstrategie voor latere fases, van sterk naar zwak. De matchstatus
+wordt te zijner tijd opgeslagen op de orderkoppeling
+(`cs_ticket_order_links.matchstatus`, hoofdstuk 31).
+
+| Niveau | Criterium | Gedrag | Matchstatus |
+|---|---|---|---|
+| 1. Bevestigde match | Ordernummer én e-mailadres komen overeen met dezelfde order. | Automatisch koppelen is toegestaan; medewerker kan de koppeling altijd nog corrigeren of verwijderen. | `bevestigd` |
+| 2. Sterke match | E-mailadres bekend en er is precies één relevante recente order. | Als voorstel tonen; medewerker bevestigt of corrigeert. | `voorstel_sterk` |
+| 3. Mogelijke match | Alleen telefoonnummer, WhatsApp-nummer of vervoersnummer, of meerdere kandidaat-orders. | Uitsluitend als voorstel tonen; menselijke bevestiging vereist vóór koppeling. | `voorstel_mogelijk` |
+| 4. Geen match | Geen bruikbare identifier of geen treffer. | Ticket of conversatie blijft gewoon bestaan en behandelbaar; medewerker kan later handmatig koppelen. | `geen` |
+
+Aanvullende principes:
+
+- **Herkenning blokkeert nooit.** Iedere e-mail wordt een ticket en iedere
+  conversatie blijft bestaan, ongeacht het matchresultaat.
+- **Voorstellen zijn altijd corrigeerbaar.** Bevestigen, corrigeren en
+  verwijderen van een koppeling zijn medewerkersacties die in het
+  activiteitenlog terechtkomen.
+- **Vervoersnummer is een apart herkenningstype.** Het kan afwijken van het
+  interne ordernummer en wordt via externe vervoerders-API's vertaald naar een
+  order; het wordt nooit als ordernummer behandeld.
+- **Dataminimalisatie.** Identificatiegegevens (ordernummer, e-mailadres,
+  telefoonnummer) worden alleen opgevraagd wanneer de vraag daar aanleiding
+  toe geeft. Bij algemene BBQ- of bereidingsvragen vraagt geen enkel kanaal om
+  deze gegevens.
+
+## 31. Toekomstig datamodel en uitbreidbaarheid (niet bouwen in fase 1)
+
+Waarschijnlijk benodigde tabellen/modellen in latere fases. Deze lijst dient
+uitsluitend om te bewaken dat fase 1-keuzes ze niet onmogelijk maken; **geen
+enkele van deze tabellen wordt in fase 1 aangemaakt**, ook niet leeg en ook
+niet in CS-001 t/m CS-017.
+
+| Toekomstige tabel | Doel |
+|---|---|
+| `cs_customers` | Genormaliseerde klant; de snapshotvelden `klant_naam`/`klant_email` op het ticket migreren hier op termijn naartoe. |
+| `cs_customer_identifiers` | Identifiers per klant en per type (`email`, `telefoon`, `whatsapp`, `extern_klant_id`), met verificatie-/betrouwbaarheidsstatus voor de matchniveaus van hoofdstuk 30. |
+| `cs_conversations` | Conversaties per kanaal (`whatsapp`, `chatbot`) met eigen status (open/afgesloten) en optionele klantkoppeling; los van tickets. |
+| `cs_conversation_messages` | Berichten binnen een conversatie; nadrukkelijk gescheiden van `cs_ticket_messages`. |
+| `cs_ticket_conversations` | Koppeltabel ticket ↔ conversatie (n:m): één ticket kan meerdere conversaties uit verschillende kanalen bevatten. |
+| `cs_ticket_order_links` | Orderkoppelingen per ticket met uitsluitend koppelinformatie: `external_order_id`, `ordernummer`, `is_primair` (primaire-orderindicator), `matchstatus` (hoofdstuk 30), herkenningstype (`ordernummer`, `email`, `telefoon`, `whatsapp`, `vervoersnummer`) en `laatst_gesynchroniseerd_op`. |
+| `cs_external_message_ids` | Externe bericht-/thread-ID's per kanaal voor idempotente inbound-verwerking (e-mail Message-ID, WhatsApp-ID's). |
+| `cs_channel_accounts` | Kanaalconfiguratie: mailbox(en), WhatsApp-account, chatbot-widget, inclusief aan/uit-schakeling per kanaal (o.a. de website-WhatsAppknop, los van inbound-verwerking). |
+
+Uitbreidbaarheidsprincipes:
+
+- **Orderdata blijft bij de bron.** Orders worden later bij voorkeur live via
+  de order-API opgehaald. Lokaal wordt alleen de noodzakelijke
+  koppelinformatie bewaard (zie `cs_ticket_order_links` hierboven). Volledige
+  klant-, adres-, betaal- of orderdata wordt niet zonder noodzaak naar de
+  portal gekopieerd.
+- **Tickets blijven kanaalonafhankelijk.** Het ticket krijgt geen kanaalveld;
+  kanalen uiten zich in berichten (`kanaal`-enum) en conversaties
+  (koppeltabel). Fase 1 hoeft hiervoor niets extra's te bouwen.
+- **Conversaties zijn geen tickets.** De toekomstige conversatiemodule
+  hergebruikt de ticketworkflow (statussen, claims, versie) niet automatisch;
+  conversaties krijgen hun eigen, lichtere levenscyclus.
+- **Fase 1 is al voorbereid.** De eigen namespace
+  (`App\Models\CustomerService`), de `cs_`-prefix, UUID's, de
+  `kanaal`-enum op berichten, de snapshot-klantvelden en de servicelaag
+  (waar matching en conversatiekoppeling later inhaken) maken deze
+  uitbreidingen mogelijk zonder herontwerp van het fase 1-model. Er worden in
+  fase 1 géén speculatieve interfaces, lege hooks of feature flags voor deze
+  toekomst gebouwd.
+
+---
+
 # Codex Implementation Plan
 
 Algemene regels voor iedere taak:
@@ -1018,6 +1245,32 @@ Algemene regels voor iedere taak:
   migrations uit op gedeelde omgevingen en raak geen bestaande functionele
   bestanden aan behalve waar een taak dit expliciet noemt.
 - Alle Nederlandse veld- en enumnamen exact zoals in deze specificatie.
+
+## Architectuur- en extensiebewaking (geldt voor iedere taak)
+
+Hoofdstukken 28–31 zijn richtinggevend architectuurkader voor látere fases.
+In geen enkele taak CS-001 t/m CS-017 wordt daarvan iets gebouwd:
+
+- Fase 1 maakt uitsluitend de vijf tabellen uit hoofdstuk 10 aan
+  (`cs_ticket_counters`, `cs_tickets`, `cs_ticket_messages`,
+  `cs_ticket_notes`, `cs_ticket_activities`). De toekomstige tabellen uit
+  hoofdstuk 31 (`cs_customers`, `cs_customer_identifiers`, `cs_conversations`,
+  `cs_conversation_messages`, `cs_ticket_conversations`,
+  `cs_ticket_order_links`, `cs_external_message_ids`, `cs_channel_accounts`)
+  worden in geen enkele migration opgenomen, ook niet leeg of achter een
+  feature flag.
+- De `kanaal`-enum op `cs_ticket_messages` blijft in fase 1 beperkt tot
+  `handmatig`; voeg niet "alvast" `email`, `whatsapp` of `chatbot` toe.
+- `cs_tickets` krijgt geen kanaal-, conversatie-, klant-ID- of ordervelden.
+- Geen externe API-clients of configuratie daarvoor (order-API,
+  vervoerders-API, mail, WhatsApp, chatbot).
+- Geen speculatieve interfaces, lege hooks, events of feature flags voor
+  matching of conversaties; de servicelaag zelf is de latere inhaakplek.
+- Frontend voor conversaties, WhatsApp en chatbot blijft volledig buiten
+  fase 1.
+- De vier ticketstatussen (`nieuw`, `in_behandeling`, `wachten_op_klant`,
+  `afgehandeld`) en het ontbreken van aparte klantenservicerollen blijven
+  ongewijzigd.
 
 ---
 
@@ -1039,7 +1292,8 @@ Algemene regels voor iedere taak:
   zonder helper geeft hetzelfde endpoint 401.
 - **Tests:** nieuwe `AuthHelperTest` (beide gevallen hierboven) plus de
   bestaande testsuite groen.
-- **Niet in deze taak:** klantenservicetabellen, modellen, routes of
+- **Niet in deze taak:** klantenservicetabellen of andere migrations van welke
+  aard dan ook (dus zeker geen tabellen uit hoofdstuk 31), modellen, routes of
   frontendwijzigingen; geen aanpassingen aan middleware of `AuthController`.
 
 ## CS-002 — Migrations en model voor tickets en ticketnummerteller
@@ -1064,7 +1318,10 @@ Algemene regels voor iedere taak:
 - **Tests:** `TicketModelTest` (creatie, defaults, unique constraint,
   relaties); volledige suite groen.
 - **Niet in deze taak:** berichten-, notitie- en activiteitentabellen; geen
-  services, routes, controllers of frontend; geen seeder.
+  services, routes, controllers of frontend; geen seeder; geen enkele
+  toekomstige tabel uit hoofdstuk 31 (o.a. `cs_customers`,
+  `cs_conversations`, `cs_ticket_order_links`) en geen kanaal-, klant-ID- of
+  ordervelden op `cs_tickets`.
 
 ## CS-003 — Migrations en modellen voor berichten, notities en activiteiten
 
@@ -1087,7 +1344,11 @@ Algemene regels voor iedere taak:
   (`ticket_id`,`client_message_id`) wordt afgedwongen; een activiteit heeft
   geen `updated_at`.
 - **Tests:** `TicketRelationsTest`; volledige suite groen.
-- **Niet in deze taak:** services, routes, controllers, frontend, seeder.
+- **Niet in deze taak:** services, routes, controllers, frontend, seeder;
+  geen conversatie- of orderkoppelingstabellen uit hoofdstuk 31
+  (`cs_conversations`, `cs_conversation_messages`, `cs_ticket_conversations`,
+  `cs_ticket_order_links`, `cs_external_message_ids`, `cs_channel_accounts`);
+  de `kanaal`-enum bevat uitsluitend `handmatig`.
 
 ## CS-004 — TicketNumberService
 
