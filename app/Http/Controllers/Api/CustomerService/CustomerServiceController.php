@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api\CustomerService;
 
 use App\Http\Controllers\Controller;
 use App\Models\CustomerService\Ticket;
+use App\Models\CustomerService\TicketActivity;
 use App\Models\CustomerService\TicketMessage;
+use App\Models\CustomerService\TicketNote;
 use App\Models\User;
 use App\Services\CustomerService\TicketConflictException;
 use Illuminate\Http\JsonResponse;
@@ -73,6 +75,33 @@ abstract class CustomerServiceController extends Controller
             'auteur' => $this->userData($message->auteur),
             'inhoud' => $message->inhoud,
             'created_at' => $message->created_at,
+        ];
+    }
+
+    protected function noteData(TicketNote $note): array
+    {
+        $note->loadMissing('auteur');
+
+        return [
+            'id' => $note->id,
+            'ticket_id' => $note->ticket_id,
+            'auteur' => $this->userData($note->auteur),
+            'inhoud' => $note->inhoud,
+            'created_at' => $note->created_at,
+        ];
+    }
+
+    protected function activityData(TicketActivity $activity): array
+    {
+        $activity->loadMissing('gebruiker');
+
+        return [
+            'id' => $activity->id,
+            'ticket_id' => $activity->ticket_id,
+            'gebruiker' => $this->userData($activity->gebruiker),
+            'actie' => $activity->actie,
+            'details' => $activity->details,
+            'created_at' => $activity->created_at,
         ];
     }
 }

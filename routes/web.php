@@ -5,9 +5,11 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CalendarController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\ConvertController;
+use App\Http\Controllers\Api\CustomerService\TicketActivityController;
 use App\Http\Controllers\Api\CustomerService\TicketClaimController;
 use App\Http\Controllers\Api\CustomerService\TicketController;
 use App\Http\Controllers\Api\CustomerService\TicketMessageController;
+use App\Http\Controllers\Api\CustomerService\TicketNoteController;
 use App\Http\Controllers\Api\CustomerService\TicketPriorityController;
 use App\Http\Controllers\Api\CustomerService\TicketStatusController;
 use App\Http\Controllers\Api\DashboardController;
@@ -38,6 +40,9 @@ Route::middleware('auth.custom')->group(function () {
     Route::put('/api/customer-service/tickets/{id}/priority', [TicketPriorityController::class, 'update']);
     Route::get('/api/customer-service/tickets/{id}/messages', [TicketMessageController::class, 'index']);
     Route::post('/api/customer-service/tickets/{id}/messages', [TicketMessageController::class, 'store']);
+    Route::get('/api/customer-service/tickets/{id}/notes', [TicketNoteController::class, 'index']);
+    Route::post('/api/customer-service/tickets/{id}/notes', [TicketNoteController::class, 'store']);
+    Route::get('/api/customer-service/tickets/{id}/activities', [TicketActivityController::class, 'index']);
 
     // Users
     Route::get('/api/users', [UserController::class, 'index']);
