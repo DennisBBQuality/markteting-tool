@@ -38,11 +38,24 @@ function todayStr() {
   return new Date().toISOString().split('T')[0];
 }
 
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return decodeURIComponent(parts.pop().split(';').shift());
+  return null;
+}
+
 // ========== API Helper ==========
 async function api(url, options = {}) {
+  const headers = { 'Content-Type': 'application/json', ...options.headers };
+  const xsrfToken = getCookie('XSRF-TOKEN');
+  if (xsrfToken) {
+    headers['X-XSRF-TOKEN'] = xsrfToken;
+  }
+
   const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
     ...options,
+    headers,
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
   if (res.status === 401 && !url.includes('/auth/')) {
@@ -58,7 +71,13 @@ async function api(url, options = {}) {
 }
 
 async function apiUpload(url, formData) {
-  const res = await fetch(url, { method: 'POST', body: formData });
+  const headers = {};
+  const xsrfToken = getCookie('XSRF-TOKEN');
+  if (xsrfToken) {
+    headers['X-XSRF-TOKEN'] = xsrfToken;
+  }
+
+  const res = await fetch(url, { method: 'POST', headers, body: formData });
   if (!res.ok) {
     toast('Upload mislukt', 'error');
     return null;
@@ -96,27 +115,7 @@ function showApp() {
 
   loadGlobalData().then(() => {
     navigateTo('dashboard');
-    // Start global notification polling for unread count
-    startGlobalNotificationPolling();
   });
-}
-
-// ========== Global Notification Polling ==========
-let globalNotificationInterval = null;
-
-function startGlobalNotificationPolling() {
-  // Initial fetch
-  if (typeof fetchUnreadCount === 'function') {
-    fetchUnreadCount();
-  }
-
-  // Poll every 30 seconds when not in chat view
-  if (globalNotificationInterval) clearInterval(globalNotificationInterval);
-  globalNotificationInterval = setInterval(() => {
-    if (App.currentView !== 'chat' && typeof fetchUnreadCount === 'function') {
-      fetchUnreadCount();
-    }
-  }, 30000);
 }
 
 async function loadGlobalData() {
@@ -136,10 +135,6 @@ function navigateTo(view) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.querySelector(`[data-view="${view}"]`)?.classList.add('active');
 
-  // Stop chat polling when leaving chat view
-  if (view !== 'chat' && typeof cleanupChat === 'function') {
-    cleanupChat();
-  }
   if (view !== 'customer-service' && typeof cleanupCustomerService === 'function') {
     cleanupCustomerService();
   }
@@ -150,7 +145,6 @@ function navigateTo(view) {
     case 'tasks': renderTasks(); break;
     case 'calendar': renderCalendar(); break;
     case 'notes': renderNotes(); break;
-    case 'chat': renderChat(); break;
     case 'customer-service': renderCustomerService(); break;
     case 'converter': renderConverter(); break;
     case 'settings': renderSettings(); break;
@@ -226,10 +220,11 @@ async function loadAttachments(entityType, entityId) {
   if (!list) return;
   list.innerHTML = atts.map(a => {
     const isImage = a.mimetype && a.mimetype.startsWith('image/');
+    const filename = encodeURIComponent(a.bestandsnaam || '');
     return `<div class="attachment-item">
-      ${isImage ? `<img src="/uploads/${a.bestandsnaam}" alt="">` : `<i class="fas fa-file"></i>`}
-      <span>${a.originele_naam}</span>
-      <a href="/uploads/${a.bestandsnaam}" target="_blank" class="btn-icon"><i class="fas fa-download"></i></a>
+      ${isImage ? `<img src="/uploads/${filename}" alt="">` : `<i class="fas fa-file"></i>`}
+      <span>${escHtml(a.originele_naam)}</span>
+      <a href="/uploads/${filename}" target="_blank" rel="noopener" class="btn-icon"><i class="fas fa-download"></i></a>
       <button class="btn-icon" onclick="deleteAttachment('${a.id}', '${entityType}', '${entityId}')"><i class="fas fa-trash"></i></button>
     </div>`;
   }).join('');

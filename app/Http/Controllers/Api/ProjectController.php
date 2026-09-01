@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\ChatChannel;
 use App\Models\Project;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -38,7 +37,7 @@ class ProjectController extends Controller
 
         foreach ($projects as $project) {
             $project->medewerkers = ($medewerkerData->get($project->id) ?? collect())
-                ->map(fn($u) => ['id' => $u->id, 'naam' => $u->naam, 'kleur' => $u->kleur])
+                ->map(fn ($u) => ['id' => $u->id, 'naam' => $u->naam, 'kleur' => $u->kleur])
                 ->values();
         }
 
@@ -50,19 +49,12 @@ class ProjectController extends Controller
         $request->validate(['naam' => 'required|string']);
 
         $project = Project::create([
-            'naam'           => $request->naam,
-            'beschrijving'   => $request->beschrijving ?? '',
-            'kleur'          => $request->kleur ?? '#3B82F6',
-            'prioriteit'     => $request->prioriteit ?? 'normaal',
-            'deadline'       => $request->deadline,
-            'aangemaakt_door'=> $request->session()->get('userId'),
-        ]);
-
-        ChatChannel::create([
-            'naam'           => $request->naam,
-            'type'           => 'project',
-            'project_id'     => $project->id,
-            'aangemaakt_door'=> $request->session()->get('userId'),
+            'naam' => $request->naam,
+            'beschrijving' => $request->beschrijving ?? '',
+            'kleur' => $request->kleur ?? '#3B82F6',
+            'prioriteit' => $request->prioriteit ?? 'normaal',
+            'deadline' => $request->deadline,
+            'aangemaakt_door' => $request->session()->get('userId'),
         ]);
 
         if (Schema::hasTable('project_gebruiker')) {
@@ -70,6 +62,7 @@ class ProjectController extends Controller
         }
 
         $project->medewerkers = $this->getMedewerkers($project->id);
+
         return response()->json($project);
     }
 
@@ -77,12 +70,12 @@ class ProjectController extends Controller
     {
         $project = Project::findOrFail($id);
         $project->update([
-            'naam'        => $request->naam,
-            'beschrijving'=> $request->beschrijving,
-            'kleur'       => $request->kleur,
-            'status'      => $request->status,
-            'prioriteit'  => $request->prioriteit,
-            'deadline'    => $request->deadline,
+            'naam' => $request->naam,
+            'beschrijving' => $request->beschrijving,
+            'kleur' => $request->kleur,
+            'status' => $request->status,
+            'prioriteit' => $request->prioriteit,
+            'deadline' => $request->deadline,
         ]);
 
         if (Schema::hasTable('project_gebruiker')) {
@@ -91,32 +84,38 @@ class ProjectController extends Controller
 
         $fresh = $project->fresh();
         $fresh->medewerkers = $this->getMedewerkers($id);
+
         return response()->json($fresh);
     }
 
     public function destroy(string $id)
     {
         Project::destroy($id);
+
         return response()->json(['ok' => true]);
     }
 
     private function getMedewerkers(string $projectId): array
     {
-        if (!Schema::hasTable('project_gebruiker')) return [];
+        if (! Schema::hasTable('project_gebruiker')) {
+            return [];
+        }
 
         return DB::table('project_gebruiker')
             ->join('users', 'project_gebruiker.user_id', '=', 'users.id')
             ->where('project_gebruiker.project_id', $projectId)
             ->select('users.id', 'users.naam', 'users.kleur')
             ->get()
-            ->map(fn($u) => ['id' => $u->id, 'naam' => $u->naam, 'kleur' => $u->kleur])
+            ->map(fn ($u) => ['id' => $u->id, 'naam' => $u->naam, 'kleur' => $u->kleur])
             ->values()
             ->toArray();
     }
 
     private function syncMedewerkers(string $projectId, Request $request): void
     {
-        if (!Schema::hasTable('project_gebruiker')) return;
+        if (! Schema::hasTable('project_gebruiker')) {
+            return;
+        }
         $value = $request->medewerkers;
         $ids = match (true) {
             is_array($value) => array_filter($value),
@@ -127,9 +126,9 @@ class ProjectController extends Controller
         DB::table('project_gebruiker')->where('project_id', $projectId)->delete();
         foreach ($ids as $userId) {
             DB::table('project_gebruiker')->insert([
-                'id'         => (string) Str::uuid(),
+                'id' => (string) Str::uuid(),
                 'project_id' => $projectId,
-                'user_id'    => $userId,
+                'user_id' => $userId,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);

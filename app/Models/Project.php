@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Project extends Model
 {
@@ -37,14 +36,9 @@ class Project extends Model
         return $this->hasMany(Note::class, 'project_id');
     }
 
-    public function chatChannel(): HasOne
-    {
-        return $this->hasOne(ChatChannel::class, 'project_id');
-    }
-
     public function medewerkers(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'project_gebruiker', 'project_id', 'user_id')
-                    ->withTimestamps();
+            ->withTimestamps();
     }
 }

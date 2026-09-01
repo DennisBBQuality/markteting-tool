@@ -3,7 +3,6 @@
 use App\Http\Controllers\Api\AttachmentController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CalendarController;
-use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\ConvertController;
 use App\Http\Controllers\Api\CustomerService\TicketActivityController;
 use App\Http\Controllers\Api\CustomerService\TicketClaimController;
@@ -14,14 +13,14 @@ use App\Http\Controllers\Api\CustomerService\TicketPriorityController;
 use App\Http\Controllers\Api\CustomerService\TicketStatusController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\NoteController;
-use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 
 // ========== AUTH (no middleware) ==========
-Route::post('/api/auth/login', [AuthController::class, 'login']);
+Route::post('/api/auth/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 Route::post('/api/auth/logout', [AuthController::class, 'logout']);
 
 // ========== AUTHENTICATED ROUTES ==========
@@ -89,42 +88,23 @@ Route::middleware('auth.custom')->group(function () {
     // Dashboard
     Route::get('/api/dashboard/stats', [DashboardController::class, 'stats']);
 
-    // Chat Channels
-    Route::get('/api/chat/channels', [ChatController::class, 'channels']);
-    Route::get('/api/chat/channels/{id}', [ChatController::class, 'channel']);
-    Route::post('/api/chat/channels', [ChatController::class, 'createChannel'])->middleware('manager_or_admin');
-    Route::delete('/api/chat/channels/{id}', [ChatController::class, 'deleteChannel'])->middleware('admin');
-
-    // Chat Messages
-    Route::get('/api/chat/channels/{id}/messages', [ChatController::class, 'channelMessages']);
-    Route::post('/api/chat/channels/{id}/messages', [ChatController::class, 'sendChannelMessage']);
-    Route::delete('/api/chat/messages/{id}', [ChatController::class, 'deleteMessage']);
-
-    // Direct Messages
-    Route::get('/api/chat/direct', [ChatController::class, 'directThreads']);
-    Route::get('/api/chat/direct/{userId}', [ChatController::class, 'directThread']);
-    Route::get('/api/chat/threads/{threadId}/messages', [ChatController::class, 'threadMessages']);
-    Route::post('/api/chat/threads/{threadId}/messages', [ChatController::class, 'sendThreadMessage']);
-
-    // Notifications
-    Route::get('/api/notifications', [NotificationController::class, 'index']);
-    Route::get('/api/notifications/unread-count', [NotificationController::class, 'unreadCount']);
-    Route::put('/api/notifications/{id}/read', [NotificationController::class, 'markRead']);
-    Route::put('/api/notifications/read-all', [NotificationController::class, 'markAllRead']);
-    Route::put('/api/notifications/read-channel/{channelId}', [NotificationController::class, 'markChannelRead']);
-    Route::put('/api/notifications/read-thread/{threadId}', [NotificationController::class, 'markThreadRead']);
-
-    // Chat Polling
-    Route::get('/api/chat/poll', [ChatController::class, 'poll']);
-
     // Serve uploaded files
     Route::get('/uploads/{filename}', function (string $filename) {
-        $path = storage_path('app/public/uploads/'.basename($filename));
-        if (! file_exists($path)) {
+        $safeFilename = basename($filename);
+        $relativePath = 'uploads/'.$safeFilename;
+
+        if (! Storage::disk('local')->exists($relativePath)) {
             abort(404);
         }
 
-        return response()->file($path);
+        $headers = ['X-Content-Type-Options' => 'nosniff'];
+        $inlineExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+
+        if (! in_array(strtolower(pathinfo($safeFilename, PATHINFO_EXTENSION)), $inlineExtensions, true)) {
+            $headers['Content-Disposition'] = 'attachment; filename="'.addcslashes($safeFilename, '"\\').'"';
+        }
+
+        return response()->file(Storage::disk('local')->path($relativePath), $headers);
     });
 });
 

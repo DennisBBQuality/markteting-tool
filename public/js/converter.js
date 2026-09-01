@@ -199,8 +199,13 @@ async function startConversion() {
   formData.append('quality', quality);
 
   try {
+    const headers = {};
+    const xsrfToken = typeof getCookie === 'function' ? getCookie('XSRF-TOKEN') : null;
+    if (xsrfToken) headers['X-XSRF-TOKEN'] = xsrfToken;
+
     const res = await fetch('/api/convert/webp', {
       method: 'POST',
+      headers,
       body: formData,
     });
 

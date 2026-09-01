@@ -8,18 +8,20 @@ use Illuminate\Support\Facades\DB;
 class ImportOldData extends Command
 {
     protected $signature = 'import:old-data {path : Path to the old marketing.db file}';
+
     protected $description = 'Import data from the old Node.js SQLite database';
 
     public function handle(): int
     {
         $path = $this->argument('path');
 
-        if (!file_exists($path)) {
+        if (! file_exists($path)) {
             $this->error("Database file not found: {$path}");
+
             return 1;
         }
 
-        $old = new \PDO('sqlite:' . $path);
+        $old = new \PDO('sqlite:'.$path);
         $old->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
 
         // Import users
@@ -41,7 +43,7 @@ class ImportOldData extends Command
                 ]
             );
         }
-        $this->info("  Imported " . count($users) . " users");
+        $this->info('  Imported '.count($users).' users');
 
         // Import projects
         $this->info('Importing projects...');
@@ -62,7 +64,7 @@ class ImportOldData extends Command
                 ]
             );
         }
-        $this->info("  Imported " . count($projects) . " projects");
+        $this->info('  Imported '.count($projects).' projects');
 
         // Import tasks
         $this->info('Importing tasks...');
@@ -86,7 +88,7 @@ class ImportOldData extends Command
                 ]
             );
         }
-        $this->info("  Imported " . count($tasks) . " tasks");
+        $this->info('  Imported '.count($tasks).' tasks');
 
         // Import calendar items
         $this->info('Importing calendar items...');
@@ -109,7 +111,7 @@ class ImportOldData extends Command
                 ]
             );
         }
-        $this->info("  Imported " . count($items) . " calendar items");
+        $this->info('  Imported '.count($items).' calendar items');
 
         // Import notes
         $this->info('Importing notes...');
@@ -130,7 +132,7 @@ class ImportOldData extends Command
                 ]
             );
         }
-        $this->info("  Imported " . count($notes) . " notes");
+        $this->info('  Imported '.count($notes).' notes');
 
         // Import attachments
         $this->info('Importing attachments...');
@@ -153,83 +155,11 @@ class ImportOldData extends Command
                 ]
             );
         }
-        $this->info("  Imported " . count($attachments) . " attachments");
-
-        // Import chat channels
-        $this->info('Importing chat channels...');
-        $channels = $old->query('SELECT * FROM chat_channels')->fetchAll(\PDO::FETCH_ASSOC);
-        foreach ($channels as $ch) {
-            DB::table('chat_channels')->updateOrInsert(
-                ['id' => $ch['id']],
-                [
-                    'naam' => $ch['naam'],
-                    'type' => $ch['type'] ?? 'general',
-                    'project_id' => $ch['project_id'] ?? null,
-                    'beschrijving' => $ch['beschrijving'] ?? '',
-                    'aangemaakt_door' => $ch['aangemaakt_door'] ?? null,
-                    'created_at' => $ch['created_at'] ?? now(),
-                    'updated_at' => now(),
-                ]
-            );
-        }
-        $this->info("  Imported " . count($channels) . " chat channels");
-
-        // Import chat threads
-        $this->info('Importing chat threads...');
-        $threads = $old->query('SELECT * FROM chat_threads')->fetchAll(\PDO::FETCH_ASSOC);
-        foreach ($threads as $th) {
-            DB::table('chat_threads')->updateOrInsert(
-                ['id' => $th['id']],
-                [
-                    'user1_id' => $th['user1_id'],
-                    'user2_id' => $th['user2_id'],
-                    'created_at' => $th['created_at'] ?? now(),
-                    'updated_at' => now(),
-                ]
-            );
-        }
-        $this->info("  Imported " . count($threads) . " chat threads");
-
-        // Import chat messages
-        $this->info('Importing chat messages...');
-        $messages = $old->query('SELECT * FROM chat_messages')->fetchAll(\PDO::FETCH_ASSOC);
-        foreach ($messages as $m) {
-            DB::table('chat_messages')->updateOrInsert(
-                ['id' => $m['id']],
-                [
-                    'channel_id' => $m['channel_id'] ?? null,
-                    'thread_id' => $m['thread_id'] ?? null,
-                    'afzender_id' => $m['afzender_id'],
-                    'inhoud' => $m['inhoud'],
-                    'created_at' => $m['created_at'] ?? now(),
-                    'updated_at' => now(),
-                ]
-            );
-        }
-        $this->info("  Imported " . count($messages) . " chat messages");
-
-        // Import notifications
-        $this->info('Importing notifications...');
-        $notifications = $old->query('SELECT * FROM notifications')->fetchAll(\PDO::FETCH_ASSOC);
-        foreach ($notifications as $n) {
-            DB::table('notifications')->updateOrInsert(
-                ['id' => $n['id']],
-                [
-                    'user_id' => $n['user_id'],
-                    'type' => $n['type'] ?? 'mention',
-                    'message_id' => $n['message_id'] ?? null,
-                    'channel_id' => $n['channel_id'] ?? null,
-                    'thread_id' => $n['thread_id'] ?? null,
-                    'gelezen' => (bool) ($n['gelezen'] ?? 0),
-                    'created_at' => $n['created_at'] ?? now(),
-                    'updated_at' => now(),
-                ]
-            );
-        }
-        $this->info("  Imported " . count($notifications) . " notifications");
+        $this->info('  Imported '.count($attachments).' attachments');
 
         $this->info('');
         $this->info('Import completed successfully!');
+
         return 0;
     }
 }
