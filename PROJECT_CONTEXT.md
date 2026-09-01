@@ -4,7 +4,7 @@
 BBQuality is een online slagerij en BBQ-webshop.
 
 ## Applicatie
-The Pitboard is de interne portal voor projecten, taken, kalenderplanning, teamchat, notities, bijlagen, meldingen en dashboardinformatie.
+The Pitboard is de interne portal voor projecten, taken, kalenderplanning, notities, bijlagen en dashboardinformatie.
 
 ## Nieuw project
 We willen een klantenservicemodule toevoegen waarin meerdere medewerkers tegelijk kunnen werken.

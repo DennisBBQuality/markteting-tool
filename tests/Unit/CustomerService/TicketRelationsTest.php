@@ -27,7 +27,7 @@ class TicketRelationsTest extends TestCase
         $this->assertTrue(Schema::hasTable('cs_ticket_activities'));
 
         try {
-            $this->artisan('migrate:rollback', ['--step' => 1])->assertSuccessful();
+            $this->artisan('migrate:rollback', ['--step' => 2])->assertSuccessful();
 
             $this->assertFalse(Schema::hasTable('cs_ticket_activities'));
             $this->assertFalse(Schema::hasTable('cs_ticket_notes'));

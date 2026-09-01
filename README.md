@@ -1,6 +1,6 @@
 # BBQuality The Pitboard — Marketing Team Tool
 
-Een uitgebreide marketing team samenwerkingstool gebouwd met Laravel 12 en een vanilla JavaScript SPA-frontend. De applicatie is volledig Nederlandstalig en biedt projectmanagement, taakbeheer, kalenderplanning, team chat en meer.
+Een uitgebreide marketing team samenwerkingstool gebouwd met Laravel 12 en een vanilla JavaScript SPA-frontend. De applicatie is volledig Nederlandstalig en biedt projectmanagement, taakbeheer, kalenderplanning en meer.
 
 ## Kernfunctionaliteiten
 
@@ -8,7 +8,6 @@ Een uitgebreide marketing team samenwerkingstool gebouwd met Laravel 12 en een v
 - **Taakbeheer** — Kanban-stijl taken (todo/bezig/review/klaar) met drag-and-drop herordening
 - **Kalender** — Evenementen voor content, deadlines, meetings, social posts, emails en blogs (FullCalendar integratie)
 - **Sticky Notes** — Kleurgecodeerde notities gekoppeld aan projecten en taken
-- **Team Chat** — Kanalen per project + directe berichten, met @mention-notificaties en polling
 - **Bestandsbijlagen** — Uploads tot 10MB gekoppeld aan projecten, taken, kalenderitems en notities
 - **WebP-conversie** — Batch image conversie tool met kwaliteitsinstelling
 - **Dashboard** — Statistieken over projecten, actieve taken, deadlines en kalenderitems
@@ -77,10 +76,6 @@ De applicatie gebruikt 10 modellen, allemaal met UUID primary keys:
 - **Calendar Items** — Titel, type, start/einddatum, kleur
 - **Notes** — Titel, inhoud, kleur (standaard geel)
 - **Attachments** — Bestanden tot 10MB, gekoppeld aan projecten/taken/kalender/notities
-- **Chat Channels** — Algemeen of per project
-- **Chat Threads** — Directe berichten tussen twee gebruikers
-- **Chat Messages** — Berichten in kanalen of threads
-- **Notifications** — @mentions en directe berichten notificaties
 
 ## API Overzicht
 
@@ -96,10 +91,6 @@ Alle API routes zijn beschermd met custom session-based authenticatie.
 | `GET/POST /api/calendar`  | Kalenderitems lijst en aanmaken           |
 | `GET/POST /api/notes`     | Notities lijst en aanmaken                |
 | `GET/POST /api/attachments` | Bijlagen lijst en uploaden              |
-| `GET/POST /api/chat/channels` | Chat kanalen                          |
-| `GET /api/chat/threads`   | Directe berichten threads                 |
-| `GET /api/chat/poll`      | Real-time message polling                 |
-| `GET /api/notifications`  | Notificaties ophalen                      |
 | `POST /api/convert/webp`  | Batch WebP conversie                      |
 | `GET /api/dashboard/stats`| Dashboard statistieken                    |
 
@@ -109,7 +100,7 @@ Alle API routes zijn beschermd met custom session-based authenticatie.
 |---------|------------------------------------------------------------|
 | Admin   | Volledige toegang, gebruikersbeheer, kanalen verwijderen   |
 | Manager | Projecten aanmaken/verwijderen, kanalen aanmaken           |
-| Lid     | Taken, notities, kalenderitems en chat gebruiken            |
+| Lid     | Taken, notities en kalenderitems gebruiken                  |
 
 ## Data Migratie
 
@@ -119,4 +110,4 @@ Voor migratie vanuit het oudere Node.js/SQLite systeem:
 php artisan import:old-data /pad/naar/oude/database.sqlite
 ```
 
-Dit importeert alle gebruikers, projecten, taken, kalenderitems, notities, bijlagen, chat kanalen, threads, berichten en notificaties.
+Dit importeert gebruikers, projecten, taken, kalenderitems, notities en bijlagen.
