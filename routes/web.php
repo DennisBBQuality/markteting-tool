@@ -22,6 +22,11 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 
 // ========== AUTH (no middleware) ==========
+Route::get('/api/auth/csrf', function () {
+    return response()->noContent()->withHeaders([
+        'Cache-Control' => 'no-store, no-cache, must-revalidate',
+    ]);
+});
 Route::post('/api/auth/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 Route::post('/api/auth/logout', [AuthController::class, 'logout']);
 
