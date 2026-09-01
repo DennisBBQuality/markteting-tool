@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Attachment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class AttachmentController extends Controller
 {
@@ -14,10 +15,18 @@ class AttachmentController extends Controller
         $query = Attachment::select('attachments.*', 'u.naam as geupload_door_naam')
             ->leftJoin('users as u', 'attachments.geupload_door', '=', 'u.id');
 
-        if ($request->filled('project_id')) $query->where('attachments.project_id', $request->project_id);
-        if ($request->filled('task_id')) $query->where('attachments.task_id', $request->task_id);
-        if ($request->filled('calendar_item_id')) $query->where('attachments.calendar_item_id', $request->calendar_item_id);
-        if ($request->filled('note_id')) $query->where('attachments.note_id', $request->note_id);
+        if ($request->filled('project_id')) {
+            $query->where('attachments.project_id', $request->project_id);
+        }
+        if ($request->filled('task_id')) {
+            $query->where('attachments.task_id', $request->task_id);
+        }
+        if ($request->filled('calendar_item_id')) {
+            $query->where('attachments.calendar_item_id', $request->calendar_item_id);
+        }
+        if ($request->filled('note_id')) {
+            $query->where('attachments.note_id', $request->note_id);
+        }
 
         return response()->json($query->orderByDesc('attachments.created_at')->get());
     }
@@ -36,7 +45,7 @@ class AttachmentController extends Controller
 
         $file = $request->file('bestand');
         $extension = strtolower($file->getClientOriginalExtension());
-        $filename = \Illuminate\Support\Str::uuid() . '.' . $extension;
+        $filename = Str::uuid().'.'.$extension;
         $file->storeAs('uploads', $filename, 'local');
 
         $attachment = Attachment::create([
@@ -58,9 +67,10 @@ class AttachmentController extends Controller
     {
         $attachment = Attachment::find($id);
         if ($attachment) {
-            Storage::disk('local')->delete('uploads/' . $attachment->bestandsnaam);
+            Storage::disk('local')->delete('uploads/'.$attachment->bestandsnaam);
             $attachment->delete();
         }
+
         return response()->json(['ok' => true]);
     }
 }

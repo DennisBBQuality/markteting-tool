@@ -17,15 +17,22 @@ class TicketModelTest extends TestCase
 
     public function test_migration_creates_and_rolls_back_both_tables(): void
     {
+        $ticketMigration = require database_path('migrations/2026_07_13_000001_create_cs_tickets_tables.php');
+        $detailMigration = require database_path('migrations/2026_07_13_000002_create_cs_ticket_detail_tables.php');
+
         $this->assertTrue(Schema::hasTable('cs_ticket_counters'));
         $this->assertTrue(Schema::hasTable('cs_tickets'));
 
-        $this->artisan('migrate:rollback', ['--step' => 3])->assertSuccessful();
+        try {
+            $detailMigration->down();
+            $ticketMigration->down();
 
-        $this->assertFalse(Schema::hasTable('cs_tickets'));
-        $this->assertFalse(Schema::hasTable('cs_ticket_counters'));
-
-        $this->artisan('migrate')->assertSuccessful();
+            $this->assertFalse(Schema::hasTable('cs_tickets'));
+            $this->assertFalse(Schema::hasTable('cs_ticket_counters'));
+        } finally {
+            $ticketMigration->up();
+            $detailMigration->up();
+        }
 
         $this->assertTrue(Schema::hasTable('cs_ticket_counters'));
         $this->assertTrue(Schema::hasTable('cs_tickets'));

@@ -24,7 +24,7 @@ return new class extends Migration
                 }
 
                 $source = $publicDisk->readStream($file);
-                if (!is_resource($source)) {
+                if (! is_resource($source)) {
                     continue;
                 }
 

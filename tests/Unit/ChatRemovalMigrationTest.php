@@ -12,18 +12,20 @@ class ChatRemovalMigrationTest extends TestCase
 
     public function test_chat_tables_are_removed_and_can_be_restored_by_rollback(): void
     {
+        $migration = require database_path('migrations/2026_09_01_000001_remove_chat_tables.php');
+
         foreach (['chat_channels', 'chat_threads', 'chat_messages', 'notifications'] as $table) {
             $this->assertFalse(Schema::hasTable($table));
         }
 
         try {
-            $this->artisan('migrate:rollback', ['--step' => 1])->assertSuccessful();
+            $migration->down();
 
             foreach (['chat_channels', 'chat_threads', 'chat_messages', 'notifications'] as $table) {
                 $this->assertTrue(Schema::hasTable($table));
             }
         } finally {
-            $this->artisan('migrate')->assertSuccessful();
+            $migration->up();
         }
 
         foreach (['chat_channels', 'chat_threads', 'chat_messages', 'notifications'] as $table) {

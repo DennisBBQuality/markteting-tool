@@ -8,18 +8,20 @@ use Illuminate\Support\Facades\DB;
 class ImportOldData extends Command
 {
     protected $signature = 'import:old-data {path : Path to the old marketing.db file}';
+
     protected $description = 'Import data from the old Node.js SQLite database';
 
     public function handle(): int
     {
         $path = $this->argument('path');
 
-        if (!file_exists($path)) {
+        if (! file_exists($path)) {
             $this->error("Database file not found: {$path}");
+
             return 1;
         }
 
-        $old = new \PDO('sqlite:' . $path);
+        $old = new \PDO('sqlite:'.$path);
         $old->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
 
         // Import users
@@ -41,7 +43,7 @@ class ImportOldData extends Command
                 ]
             );
         }
-        $this->info("  Imported " . count($users) . " users");
+        $this->info('  Imported '.count($users).' users');
 
         // Import projects
         $this->info('Importing projects...');
@@ -62,7 +64,7 @@ class ImportOldData extends Command
                 ]
             );
         }
-        $this->info("  Imported " . count($projects) . " projects");
+        $this->info('  Imported '.count($projects).' projects');
 
         // Import tasks
         $this->info('Importing tasks...');
@@ -86,7 +88,7 @@ class ImportOldData extends Command
                 ]
             );
         }
-        $this->info("  Imported " . count($tasks) . " tasks");
+        $this->info('  Imported '.count($tasks).' tasks');
 
         // Import calendar items
         $this->info('Importing calendar items...');
@@ -109,7 +111,7 @@ class ImportOldData extends Command
                 ]
             );
         }
-        $this->info("  Imported " . count($items) . " calendar items");
+        $this->info('  Imported '.count($items).' calendar items');
 
         // Import notes
         $this->info('Importing notes...');
@@ -130,7 +132,7 @@ class ImportOldData extends Command
                 ]
             );
         }
-        $this->info("  Imported " . count($notes) . " notes");
+        $this->info('  Imported '.count($notes).' notes');
 
         // Import attachments
         $this->info('Importing attachments...');
@@ -153,10 +155,11 @@ class ImportOldData extends Command
                 ]
             );
         }
-        $this->info("  Imported " . count($attachments) . " attachments");
+        $this->info('  Imported '.count($attachments).' attachments');
 
         $this->info('');
         $this->info('Import completed successfully!');
+
         return 0;
     }
 }

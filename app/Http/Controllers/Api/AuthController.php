@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
@@ -18,7 +17,7 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->where('actief', true)->first();
 
-        if (!$user || !password_verify($request->wachtwoord, $user->wachtwoord_hash)) {
+        if (! $user || ! password_verify($request->wachtwoord, $user->wachtwoord_hash)) {
             return response()->json(['error' => 'Ongeldige inloggegevens'], 401);
         }
 
@@ -48,7 +47,7 @@ class AuthController extends Controller
         $user = User::select('id', 'naam', 'email', 'rol', 'kleur', 'avatar')
             ->find($request->session()->get('userId'));
 
-        if (!$user) {
+        if (! $user) {
             return response()->json(['error' => 'Gebruiker niet gevonden'], 401);
         }
 

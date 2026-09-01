@@ -39,6 +39,6 @@ class Project extends Model
     public function medewerkers(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'project_gebruiker', 'project_id', 'user_id')
-                    ->withTimestamps();
+            ->withTimestamps();
     }
 }
