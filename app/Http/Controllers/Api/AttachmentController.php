@@ -37,7 +37,7 @@ class AttachmentController extends Controller
         $file = $request->file('bestand');
         $extension = strtolower($file->getClientOriginalExtension());
         $filename = \Illuminate\Support\Str::uuid() . '.' . $extension;
-        $file->storeAs('uploads', $filename, 'public');
+        $file->storeAs('uploads', $filename, 'local');
 
         $attachment = Attachment::create([
             'project_id' => $request->project_id,
@@ -58,7 +58,7 @@ class AttachmentController extends Controller
     {
         $attachment = Attachment::find($id);
         if ($attachment) {
-            Storage::disk('public')->delete('uploads/' . $attachment->bestandsnaam);
+            Storage::disk('local')->delete('uploads/' . $attachment->bestandsnaam);
             $attachment->delete();
         }
         return response()->json(['ok' => true]);

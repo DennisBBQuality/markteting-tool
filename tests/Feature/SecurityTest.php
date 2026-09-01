@@ -73,7 +73,7 @@ class SecurityTest extends TestCase
 
     public function test_scriptable_upload_formats_are_rejected(): void
     {
-        Storage::fake('public');
+        Storage::fake('local');
         $this->actingAsUser();
 
         foreach (['html', 'svg'] as $extension) {
@@ -89,12 +89,12 @@ class SecurityTest extends TestCase
                 ->assertJsonValidationErrors('bestand');
         }
 
-        Storage::disk('public')->assertDirectoryEmpty('uploads');
+        Storage::disk('local')->assertDirectoryEmpty('uploads');
     }
 
     public function test_a_safe_image_upload_is_stored_with_a_server_detected_mime_type(): void
     {
-        Storage::fake('public');
+        Storage::fake('local');
         $this->actingAsUser();
 
         $response = $this->post('/api/attachments', [
@@ -108,18 +108,69 @@ class SecurityTest extends TestCase
                 'mimetype' => 'image/jpeg',
             ]);
 
-        Storage::disk('public')->assertExists('uploads/'.$response->json('bestandsnaam'));
+        Storage::disk('local')->assertExists('uploads/'.$response->json('bestandsnaam'));
     }
 
     public function test_uploaded_files_are_protected_against_content_sniffing_and_documents_download(): void
     {
-        Storage::fake('public');
+        Storage::fake('local');
         $this->actingAsUser();
-        Storage::disk('public')->put('uploads/rapport.pdf', "%PDF-1.4\n%%EOF");
+        Storage::disk('local')->put('uploads/rapport.pdf', "%PDF-1.4\n%%EOF");
 
         $this->get('/uploads/rapport.pdf')
             ->assertOk()
             ->assertHeader('X-Content-Type-Options', 'nosniff')
             ->assertHeader('Content-Disposition', 'attachment; filename="rapport.pdf"');
+    }
+
+    public function test_uploaded_files_require_authentication_to_download(): void
+    {
+        Storage::fake('local');
+        Storage::disk('local')->put('uploads/geheim.pdf', 'secret');
+
+        $this->getJson('/uploads/geheim.pdf')
+            ->assertUnauthorized()
+            ->assertJson(['error' => 'Niet ingelogd']);
+    }
+
+    public function test_existing_public_uploads_move_to_private_storage(): void
+    {
+        Storage::fake('public');
+        Storage::fake('local');
+        Storage::disk('public')->put('uploads/bestaand.pdf', 'inhoud');
+
+        $migration = require database_path('migrations/2026_09_01_120000_move_existing_uploads_to_local_disk.php');
+        $migration->up();
+
+        Storage::disk('public')->assertMissing('uploads/bestaand.pdf');
+        Storage::disk('local')->assertExists('uploads/bestaand.pdf');
+        $this->assertSame('inhoud', Storage::disk('local')->get('uploads/bestaand.pdf'));
+    }
+
+    public function test_upload_migration_never_overwrites_an_existing_private_file(): void
+    {
+        Storage::fake('public');
+        Storage::fake('local');
+        Storage::disk('public')->put('uploads/dubbel.pdf', 'openbaar');
+        Storage::disk('local')->put('uploads/dubbel.pdf', 'privé');
+
+        $migration = require database_path('migrations/2026_09_01_120000_move_existing_uploads_to_local_disk.php');
+        $migration->up();
+
+        Storage::disk('public')->assertExists('uploads/dubbel.pdf');
+        $this->assertSame('privé', Storage::disk('local')->get('uploads/dubbel.pdf'));
+    }
+
+    public function test_upload_migration_rollback_keeps_private_files_private(): void
+    {
+        Storage::fake('public');
+        Storage::fake('local');
+        Storage::disk('local')->put('uploads/geheim.pdf', 'privé');
+
+        $migration = require database_path('migrations/2026_09_01_120000_move_existing_uploads_to_local_disk.php');
+        $migration->down();
+
+        Storage::disk('local')->assertExists('uploads/geheim.pdf');
+        Storage::disk('public')->assertMissing('uploads/geheim.pdf');
     }
 }

@@ -625,9 +625,13 @@ function customerServiceConflictBanner() {
 
 async function customerServiceRequest(url, options = {}) {
   try {
+    const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json', ...(options.headers || {}) };
+    const xsrfToken = typeof getCookie === 'function' ? getCookie('XSRF-TOKEN') : null;
+    if (xsrfToken) headers['X-XSRF-TOKEN'] = xsrfToken;
+
     const response = await fetch(url, {
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       ...options,
+      headers,
       body: options.body ? JSON.stringify(options.body) : undefined,
     });
     const data = await response.json();

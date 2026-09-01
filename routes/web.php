@@ -123,7 +123,7 @@ Route::middleware('auth.custom')->group(function () {
         $safeFilename = basename($filename);
         $relativePath = 'uploads/'.$safeFilename;
 
-        if (! Storage::disk('public')->exists($relativePath)) {
+        if (! Storage::disk('local')->exists($relativePath)) {
             abort(404);
         }
 
@@ -134,7 +134,7 @@ Route::middleware('auth.custom')->group(function () {
             $headers['Content-Disposition'] = 'attachment; filename="'.addcslashes($safeFilename, '"\\').'"';
         }
 
-        return response()->file(Storage::disk('public')->path($relativePath), $headers);
+        return response()->file(Storage::disk('local')->path($relativePath), $headers);
     });
 });
 
