@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AiSettingController;
 use App\Http\Controllers\Api\AttachmentController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CalendarController;
@@ -50,6 +51,10 @@ Route::middleware('auth.custom')->group(function () {
         Route::post('/api/users', [UserController::class, 'store']);
         Route::put('/api/users/{id}', [UserController::class, 'update']);
         Route::delete('/api/users/{id}', [UserController::class, 'destroy']);
+        Route::get('/api/settings/ai/openai', [AiSettingController::class, 'show']);
+        Route::put('/api/settings/ai/openai', [AiSettingController::class, 'update'])->middleware('throttle:5,1');
+        Route::post('/api/settings/ai/openai/test', [AiSettingController::class, 'test'])->middleware('throttle:10,1');
+        Route::delete('/api/settings/ai/openai', [AiSettingController::class, 'destroy']);
     });
 
     // Projects

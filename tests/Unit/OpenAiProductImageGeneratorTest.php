@@ -13,6 +13,7 @@ class OpenAiProductImageGeneratorTest extends TestCase
 {
     public function test_it_requests_two_prepared_and_two_raw_variants(): void
     {
+        config()->set('services.product_images.driver', 'openai');
         config()->set('services.product_images.openai', [
             'api_key' => 'test-key',
             'endpoint' => 'https://api.openai.test/v1/images/edits',
@@ -27,7 +28,7 @@ class OpenAiProductImageGeneratorTest extends TestCase
             ->push(['data' => [['b64_json' => $encoded], ['b64_json' => $encoded]]])
             ->push(['data' => [['b64_json' => $encoded], ['b64_json' => $encoded]]]);
 
-        $results = (new OpenAiProductImageGenerator)->generate(
+        $results = app(OpenAiProductImageGenerator::class)->generate(
             UploadedFile::fake()->image('reference.jpg', 100, 100),
             'Create a premium product photo from this reference.',
         );
@@ -71,6 +72,7 @@ class OpenAiProductImageGeneratorTest extends TestCase
 
     public function test_it_rejects_incomplete_api_results(): void
     {
+        config()->set('services.product_images.driver', 'openai');
         config()->set('services.product_images.openai', [
             'api_key' => 'test-key',
             'endpoint' => 'https://api.openai.test/v1/images/edits',
@@ -84,7 +86,7 @@ class OpenAiProductImageGeneratorTest extends TestCase
         $this->expectException(ProductImageGenerationException::class);
         $this->expectExceptionMessage('onvolledig resultaat');
 
-        (new OpenAiProductImageGenerator)->generate(
+        app(OpenAiProductImageGenerator::class)->generate(
             UploadedFile::fake()->image('reference.jpg'),
             'Create a product photo from this reference.',
         );
@@ -92,6 +94,7 @@ class OpenAiProductImageGeneratorTest extends TestCase
 
     public function test_it_never_sends_a_request_without_an_api_key(): void
     {
+        config()->set('services.product_images.driver', 'openai');
         config()->set('services.product_images.openai.api_key', null);
         Http::fake();
 
@@ -99,7 +102,7 @@ class OpenAiProductImageGeneratorTest extends TestCase
         $this->expectExceptionMessage('API-sleutel is niet ingesteld');
 
         try {
-            (new OpenAiProductImageGenerator)->generate(
+            app(OpenAiProductImageGenerator::class)->generate(
                 UploadedFile::fake()->image('reference.jpg'),
                 'Create a product photo from this reference.',
             );

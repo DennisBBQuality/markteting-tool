@@ -101,7 +101,9 @@ Alle API routes zijn beschermd met custom session-based authenticatie.
 
 De module **Afbeeldingen** gebruikt lokaal standaard de kostenloze `fake`-driver. Daarmee kan de volledige upload- en resultaatflow worden getest zonder externe verzoeken of API-kosten.
 
-Stel uitsluitend in de productie-`.env` de echte driver en sleutel in:
+Een beheerder kan de OpenAI API-sleutel veilig instellen via **Instellingen → AI-koppelingen**. De sleutel wordt met de Laravel-applicatiesleutel versleuteld in de database opgeslagen, wordt nooit teruggestuurd naar de browser en komt niet in Git terecht.
+
+Als alternatief kan een serverbeheerder de koppeling via de productie-`.env` instellen:
 
 ```dotenv
 PRODUCT_IMAGE_DRIVER=openai

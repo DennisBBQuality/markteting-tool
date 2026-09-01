@@ -20,9 +20,11 @@ class OpenAiProductImageGenerator implements ProductImageGenerator
         'rauw' => 'MANDATORY VARIANT: Show the meat completely raw and uncooked, outside all packaging. Preserve the natural raw colour, marbling, fat and texture of this exact cut. Create subtle visual variety between the two outputs through camera angle, composition or surface, without adding seasoning, garnish, text or packaging.',
     ];
 
+    public function __construct(private readonly AiCredentialStore $credentials) {}
+
     public function generate(UploadedFile $source, string $basePrompt): array
     {
-        $apiKey = (string) config('services.product_images.openai.api_key');
+        $apiKey = $this->credentials->openAiApiKey() ?? '';
 
         if ($apiKey === '') {
             throw new ProductImageGenerationException('De OpenAI API-sleutel is niet ingesteld.');
