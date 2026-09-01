@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
 
@@ -9,12 +10,28 @@ class RequireAdmin
 {
     public function handle(Request $request, Closure $next)
     {
-        if (!$request->session()->has('userId')) {
+        $userId = $request->session()->get('userId');
+
+        if (! $userId) {
             return response()->json(['error' => 'Niet ingelogd'], 401);
         }
-        if ($request->session()->get('rol') !== 'admin') {
+
+        $user = $request->attributes->get('authenticatedUser')
+            ?? User::select('id', 'actief', 'rol')->find($userId);
+
+        if (! $user || ! $user->actief) {
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return response()->json(['error' => 'Niet ingelogd'], 401);
+        }
+
+        $request->session()->put('rol', $user->rol);
+
+        if ($user->rol !== 'admin') {
             return response()->json(['error' => 'Geen toegang'], 403);
         }
+
         return $next($request);
     }
 }
