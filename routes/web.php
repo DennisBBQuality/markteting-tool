@@ -124,5 +124,7 @@ Route::middleware('auth.custom')->group(function () {
 
 // SPA fallback - serve index.html for all non-API routes
 Route::get('/{any?}', function () {
-    return response()->file(public_path('index.html'));
+    return response()->file(public_path('index.html'), [
+        'Cache-Control' => 'no-cache, must-revalidate',
+    ]);
 })->where('any', '.*');
