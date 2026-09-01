@@ -46,43 +46,118 @@ function getCookie(name) {
 }
 
 // ========== API Helper ==========
-async function api(url, options = {}) {
-  const headers = { 'Content-Type': 'application/json', ...options.headers };
-  const xsrfToken = getCookie('XSRF-TOKEN');
-  if (xsrfToken) {
-    headers['X-XSRF-TOKEN'] = xsrfToken;
+async function refreshCsrfCookie() {
+  const response = await fetch('/api/auth/csrf', {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    credentials: 'same-origin',
+    cache: 'no-store',
+  });
+
+  if (!response.ok || !getCookie('XSRF-TOKEN')) {
+    throw new Error('De beveiligde verbinding kon niet worden gestart. Vernieuw de pagina en probeer opnieuw.');
+  }
+}
+
+async function readApiResponse(response) {
+  const contentType = response.headers.get('content-type') || '';
+
+  if (response.status === 204) return {};
+
+  if (contentType.includes('application/json')) {
+    return await response.json();
   }
 
-  const res = await fetch(url, {
-    ...options,
-    headers,
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
-  if (res.status === 401 && !url.includes('/auth/')) {
-    showLogin();
+  const text = await response.text();
+  return text ? { message: text } : {};
+}
+
+async function api(url, options = {}) {
+  const method = (options.method || 'GET').toUpperCase();
+  const needsCsrf = !['GET', 'HEAD', 'OPTIONS'].includes(method);
+
+  const sendRequest = async () => {
+    const headers = { 'Content-Type': 'application/json', Accept: 'application/json', ...options.headers };
+    const xsrfToken = getCookie('XSRF-TOKEN');
+    if (xsrfToken) headers['X-XSRF-TOKEN'] = xsrfToken;
+
+    return await fetch(url, {
+      ...options,
+      method,
+      headers,
+      credentials: 'same-origin',
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+  };
+
+  try {
+    // De live pagina is een statisch bestand. Vraag daarom vóór een wijziging
+    // eerst expliciet de beveiligingscookie bij Laravel op.
+    if (needsCsrf && (!getCookie('XSRF-TOKEN') || url.includes('/auth/login'))) {
+      await refreshCsrfCookie();
+    }
+
+    let res = await sendRequest();
+
+    // Een verlopen sessie kan een oude cookie achterlaten. Haal dan één keer
+    // automatisch een nieuwe op en probeer dezelfde opdracht opnieuw.
+    if (needsCsrf && res.status === 419) {
+      await refreshCsrfCookie();
+      res = await sendRequest();
+    }
+
+    if (res.status === 401 && !url.includes('/auth/')) {
+      showLogin();
+      return null;
+    }
+
+    const data = await readApiResponse(res);
+    if (!res.ok) {
+      toast(data.error || data.message || 'Er ging iets mis', 'error');
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    toast(error.message || 'De server is niet bereikbaar. Probeer het opnieuw.', 'error');
     return null;
   }
-  const data = await res.json();
-  if (!res.ok) {
-    toast(data.error || 'Er ging iets mis', 'error');
-    return null;
-  }
-  return data;
 }
 
 async function apiUpload(url, formData) {
-  const headers = {};
-  const xsrfToken = getCookie('XSRF-TOKEN');
-  if (xsrfToken) {
-    headers['X-XSRF-TOKEN'] = xsrfToken;
-  }
+  const sendRequest = async () => {
+    const headers = { Accept: 'application/json' };
+    const xsrfToken = getCookie('XSRF-TOKEN');
+    if (xsrfToken) headers['X-XSRF-TOKEN'] = xsrfToken;
 
-  const res = await fetch(url, { method: 'POST', headers, body: formData });
-  if (!res.ok) {
-    toast('Upload mislukt', 'error');
+    return await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+      credentials: 'same-origin',
+    });
+  };
+
+  try {
+    if (!getCookie('XSRF-TOKEN')) await refreshCsrfCookie();
+
+    let res = await sendRequest();
+    if (res.status === 419) {
+      await refreshCsrfCookie();
+      res = await sendRequest();
+    }
+
+    const data = await readApiResponse(res);
+    if (!res.ok) {
+      toast(data.error || data.message || 'Upload mislukt', 'error');
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    toast(error.message || 'Upload mislukt', 'error');
     return null;
   }
-  return await res.json();
 }
 
 // ========== Auth ==========
