@@ -22,6 +22,7 @@ class AuthController extends Controller
             return response()->json(['error' => 'Ongeldige inloggegevens'], 401);
         }
 
+        $request->session()->regenerate();
         $request->session()->put('userId', $user->id);
         $request->session()->put('rol', $user->rol);
 
@@ -36,7 +37,9 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
-        $request->session()->flush();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+        
         return response()->json(['ok' => true]);
     }
 

@@ -19,9 +19,10 @@ use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 
 // ========== AUTH (no middleware) ==========
-Route::post('/api/auth/login', [AuthController::class, 'login']);
+Route::post('/api/auth/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 Route::post('/api/auth/logout', [AuthController::class, 'logout']);
 
 // ========== AUTHENTICATED ROUTES ==========
@@ -119,12 +120,21 @@ Route::middleware('auth.custom')->group(function () {
 
     // Serve uploaded files
     Route::get('/uploads/{filename}', function (string $filename) {
-        $path = storage_path('app/public/uploads/'.basename($filename));
-        if (! file_exists($path)) {
+        $safeFilename = basename($filename);
+        $relativePath = 'uploads/'.$safeFilename;
+
+        if (! Storage::disk('public')->exists($relativePath)) {
             abort(404);
         }
 
-        return response()->file($path);
+        $headers = ['X-Content-Type-Options' => 'nosniff'];
+        $inlineExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+
+        if (! in_array(strtolower(pathinfo($safeFilename, PATHINFO_EXTENSION)), $inlineExtensions, true)) {
+            $headers['Content-Disposition'] = 'attachment; filename="'.addcslashes($safeFilename, '"\\').'"';
+        }
+
+        return response()->file(Storage::disk('public')->path($relativePath), $headers);
     });
 });
 

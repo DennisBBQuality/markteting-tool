@@ -24,10 +24,19 @@ class AttachmentController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate(['bestand' => 'required|file|max:10240']);
+        $request->validate([
+            'bestand' => [
+                'required',
+                'file',
+                'max:10240',
+                'extensions:jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,txt,csv,zip',
+                'mimes:jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,txt,csv,zip',
+            ],
+        ]);
 
         $file = $request->file('bestand');
-        $filename = \Str::uuid() . '.' . $file->getClientOriginalExtension();
+        $extension = strtolower($file->getClientOriginalExtension());
+        $filename = \Illuminate\Support\Str::uuid() . '.' . $extension;
         $file->storeAs('uploads', $filename, 'public');
 
         $attachment = Attachment::create([
@@ -37,7 +46,7 @@ class AttachmentController extends Controller
             'note_id' => $request->note_id,
             'bestandsnaam' => $filename,
             'originele_naam' => $file->getClientOriginalName(),
-            'mimetype' => $file->getClientMimeType(),
+            'mimetype' => $file->getMimeType(),
             'grootte' => $file->getSize(),
             'geupload_door' => $request->session()->get('userId'),
         ]);

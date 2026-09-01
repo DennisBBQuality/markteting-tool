@@ -226,10 +226,11 @@ async function loadAttachments(entityType, entityId) {
   if (!list) return;
   list.innerHTML = atts.map(a => {
     const isImage = a.mimetype && a.mimetype.startsWith('image/');
+    const filename = encodeURIComponent(a.bestandsnaam || '');
     return `<div class="attachment-item">
-      ${isImage ? `<img src="/uploads/${a.bestandsnaam}" alt="">` : `<i class="fas fa-file"></i>`}
-      <span>${a.originele_naam}</span>
-      <a href="/uploads/${a.bestandsnaam}" target="_blank" class="btn-icon"><i class="fas fa-download"></i></a>
+      ${isImage ? `<img src="/uploads/${filename}" alt="">` : `<i class="fas fa-file"></i>`}
+      <span>${escHtml(a.originele_naam)}</span>
+      <a href="/uploads/${filename}" target="_blank" rel="noopener" class="btn-icon"><i class="fas fa-download"></i></a>
       <button class="btn-icon" onclick="deleteAttachment('${a.id}', '${entityType}', '${entityId}')"><i class="fas fa-trash"></i></button>
     </div>`;
   }).join('');
