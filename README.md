@@ -9,7 +9,7 @@ Een uitgebreide marketing team samenwerkingstool gebouwd met Laravel 12 en een v
 - **Kalender** — Evenementen voor content, deadlines, meetings, social posts, emails en blogs (FullCalendar integratie)
 - **Sticky Notes** — Kleurgecodeerde notities gekoppeld aan projecten en taken
 - **Bestandsbijlagen** — Uploads tot 10MB gekoppeld aan projecten, taken, kalenderitems en notities
-- **WebP-conversie** — Batch image conversie tool met kwaliteitsinstelling
+- **Afbeeldingen** — AI-productfotogenerator met 2 bereide en 2 rauwe varianten, plus batch WebP-conversie
 - **Dashboard** — Statistieken over projecten, actieve taken, deadlines en kalenderitems
 
 ## Technische Stack
@@ -92,7 +92,33 @@ Alle API routes zijn beschermd met custom session-based authenticatie.
 | `GET/POST /api/notes`     | Notities lijst en aanmaken                |
 | `GET/POST /api/attachments` | Bijlagen lijst en uploaden              |
 | `POST /api/convert/webp`  | Batch WebP conversie                      |
+| `GET/PUT /api/images/prompt` | Productfotoprompt lezen of instellen   |
+| `POST /api/images/generate` | Productfoto-opdracht veilig in de wachtrij zetten |
+| `GET /api/images/requests/{id}` | Voortgang en resultaat van een productfoto-opdracht |
 | `GET /api/dashboard/stats`| Dashboard statistieken                    |
+
+## Productfoto-generator
+
+De module **Afbeeldingen** gebruikt lokaal standaard de kostenloze `fake`-driver. Daarmee kan de volledige upload- en resultaatflow worden getest zonder externe verzoeken of API-kosten.
+
+Stel uitsluitend in de productie-`.env` de echte driver en sleutel in:
+
+```dotenv
+PRODUCT_IMAGE_DRIVER=openai
+OPENAI_API_KEY=<jouw-api-sleutel>
+```
+
+De standaardadapter gebruikt `gpt-image-2` via de OpenAI Image Edit API met hoge uitvoerkwaliteit en hoge trouw aan de referentiefoto. De referentiefoto wordt lokaal genormaliseerd naar een ondoorzichtige vierkante PNG; GPT Image kan de volledige invoerafbeelding via de prompt aanpassen en heeft daarvoor geen transparante uitsnede of DALL·E-masker nodig. Resultaten worden altijd als PNG verwerkt. Model, afmetingen, kwaliteit en timeout zijn configureerbaar via de bijbehorende `OPENAI_IMAGE_*` variabelen in `.env.example`. API-sleutels horen nooit in Git.
+
+Beeldgeneratie draait als achtergrondtaak, zodat een normale webaanvraag niet minutenlang open hoeft te blijven. Standaard gebruikt deze module Laravel's `background`-verbinding. Daarmee wordt na het webantwoord een los PHP-proces gestart en is op een normale server geen permanente queue-worker nodig.
+
+Voor een grotere productieomgeving kan `PRODUCT_IMAGE_QUEUE_CONNECTION=database` worden ingesteld. Start dan naast de website permanent een queue-worker:
+
+```bash
+php artisan queue:work --queue=images --timeout=600 --tries=2
+```
+
+Gegenereerde afbeeldingen worden op de lokale, afgeschermde filesystem-disk opgeslagen en zijn alleen beschikbaar voor de ingelogde medewerker die de opdracht heeft gestart.
 
 ## Rollen & Rechten
 

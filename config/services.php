@@ -35,4 +35,19 @@ return [
         ],
     ],
 
+    'product_images' => [
+        'driver' => env('PRODUCT_IMAGE_DRIVER', 'fake'),
+        'queue_connection' => env('PRODUCT_IMAGE_QUEUE_CONNECTION', 'background'),
+        'max_output_bytes' => 20 * 1024 * 1024,
+        'openai' => [
+            'api_key' => env('OPENAI_API_KEY'),
+            'endpoint' => env('OPENAI_IMAGE_ENDPOINT', 'https://api.openai.com/v1/images/edits'),
+            'model' => env('OPENAI_IMAGE_MODEL', 'gpt-image-2'),
+            'size' => env('OPENAI_IMAGE_SIZE', '1024x1024'),
+            'quality' => env('OPENAI_IMAGE_QUALITY', 'high'),
+            'input_fidelity' => env('OPENAI_IMAGE_INPUT_FIDELITY', 'high'),
+            'timeout' => (int) env('OPENAI_IMAGE_TIMEOUT', 240),
+        ],
+    ],
+
 ];
