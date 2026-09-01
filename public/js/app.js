@@ -96,27 +96,7 @@ function showApp() {
 
   loadGlobalData().then(() => {
     navigateTo('dashboard');
-    // Start global notification polling for unread count
-    startGlobalNotificationPolling();
   });
-}
-
-// ========== Global Notification Polling ==========
-let globalNotificationInterval = null;
-
-function startGlobalNotificationPolling() {
-  // Initial fetch
-  if (typeof fetchUnreadCount === 'function') {
-    fetchUnreadCount();
-  }
-
-  // Poll every 30 seconds when not in chat view
-  if (globalNotificationInterval) clearInterval(globalNotificationInterval);
-  globalNotificationInterval = setInterval(() => {
-    if (App.currentView !== 'chat' && typeof fetchUnreadCount === 'function') {
-      fetchUnreadCount();
-    }
-  }, 30000);
 }
 
 async function loadGlobalData() {
@@ -136,10 +116,6 @@ function navigateTo(view) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.querySelector(`[data-view="${view}"]`)?.classList.add('active');
 
-  // Stop chat polling when leaving chat view
-  if (view !== 'chat' && typeof cleanupChat === 'function') {
-    cleanupChat();
-  }
   if (view !== 'customer-service' && typeof cleanupCustomerService === 'function') {
     cleanupCustomerService();
   }
@@ -150,7 +126,6 @@ function navigateTo(view) {
     case 'tasks': renderTasks(); break;
     case 'calendar': renderCalendar(); break;
     case 'notes': renderNotes(); break;
-    case 'chat': renderChat(); break;
     case 'customer-service': renderCustomerService(); break;
     case 'converter': renderConverter(); break;
     case 'settings': renderSettings(); break;

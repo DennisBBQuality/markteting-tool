@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\ChatChannel;
 use App\Models\Project;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -55,13 +54,6 @@ class ProjectController extends Controller
             'kleur'          => $request->kleur ?? '#3B82F6',
             'prioriteit'     => $request->prioriteit ?? 'normaal',
             'deadline'       => $request->deadline,
-            'aangemaakt_door'=> $request->session()->get('userId'),
-        ]);
-
-        ChatChannel::create([
-            'naam'           => $request->naam,
-            'type'           => 'project',
-            'project_id'     => $project->id,
             'aangemaakt_door'=> $request->session()->get('userId'),
         ]);
 

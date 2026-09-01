@@ -20,7 +20,7 @@ class TicketModelTest extends TestCase
         $this->assertTrue(Schema::hasTable('cs_ticket_counters'));
         $this->assertTrue(Schema::hasTable('cs_tickets'));
 
-        $this->artisan('migrate:rollback', ['--step' => 2])->assertSuccessful();
+        $this->artisan('migrate:rollback', ['--step' => 3])->assertSuccessful();
 
         $this->assertFalse(Schema::hasTable('cs_tickets'));
         $this->assertFalse(Schema::hasTable('cs_ticket_counters'));

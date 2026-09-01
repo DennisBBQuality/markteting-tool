@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\ChatChannel;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -22,13 +21,5 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
-        // Default general chat channel
-        if (ChatChannel::where('type', 'general')->count() === 0) {
-            ChatChannel::create([
-                'naam' => 'algemeen',
-                'type' => 'general',
-                'beschrijving' => 'Algemene teamchat',
-            ]);
-        }
     }
 }
