@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\CustomerService\TicketPriorityController;
 use App\Http\Controllers\Api\CustomerService\TicketStatusController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\NoteController;
+use App\Http\Controllers\Api\ProductImageController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\UserController;
@@ -84,6 +85,14 @@ Route::middleware('auth.custom')->group(function () {
     // Image Converter
     Route::post('/api/convert/webp', [ConvertController::class, 'toWebp']);
     Route::get('/api/convert/download/{filename}', [ConvertController::class, 'download']);
+
+    // Product images
+    Route::get('/api/images/prompt', [ProductImageController::class, 'prompt']);
+    Route::put('/api/images/prompt', [ProductImageController::class, 'updatePrompt']);
+    Route::post('/api/images/generate', [ProductImageController::class, 'generate'])->middleware('throttle:3,1');
+    Route::get('/api/images/requests/{imageRequest}', [ProductImageController::class, 'status']);
+    Route::get('/api/images/requests/{imageRequest}/generated/{filename}', [ProductImageController::class, 'show'])
+        ->where('filename', '[A-Za-z0-9._-]+');
 
     // Dashboard
     Route::get('/api/dashboard/stats', [DashboardController::class, 'stats']);

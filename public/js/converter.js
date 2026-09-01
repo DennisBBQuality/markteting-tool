@@ -6,6 +6,17 @@ let converterState = {
   seoData: {}, // { index: { beschrijving, bestandsnaam, altTekst, titel, slug } }
 };
 
+let productImageState = {
+  file: null,
+  previewUrl: null,
+  results: [],
+  generating: false,
+  requestId: null,
+  pollTimer: null,
+};
+
+const PRODUCT_IMAGE_REQUEST_KEY = 'pitboard-product-image-request';
+
 // Nederlandse stopwoorden voor bestandsnamen en titels
 const NL_STOPWOORDEN = [
   'van', 'op', 'een', 'de', 'het', 'in', 'met', 'voor', 'aan', 'bij',
@@ -18,13 +29,76 @@ const NL_STOPWOORDEN = [
 function renderConverter() {
   const container = document.getElementById('view-converter');
 
+  if (productImageState.previewUrl) URL.revokeObjectURL(productImageState.previewUrl);
+  if (productImageState.pollTimer) clearTimeout(productImageState.pollTimer);
+  const pendingRequestId = sessionStorage.getItem(PRODUCT_IMAGE_REQUEST_KEY);
+  productImageState = {
+    file: null,
+    previewUrl: null,
+    results: [],
+    generating: Boolean(pendingRequestId),
+    requestId: pendingRequestId,
+    pollTimer: null,
+  };
+
   container.innerHTML = `
     <div class="page-header">
-      <h2><i class="fas fa-image" style="color:var(--primary)"></i> Image Converter</h2>
-      <p style="color:var(--text-light);font-size:14px;">Converteer afbeeldingen naar WEBP en genereer SEO-optimale metadata</p>
+      <h2><i class="fas fa-image" style="color:var(--primary)"></i> Afbeeldingen</h2>
+      <p style="color:var(--text-light);font-size:14px;">Maak productfoto's en converteer afbeeldingen naar WEBP</p>
     </div>
 
-    <div class="converter-layout">
+    <section class="product-image-card" aria-labelledby="product-image-title">
+      <div class="product-image-header">
+        <div>
+          <span class="product-image-eyebrow">AI productfotografie</span>
+          <h3 id="product-image-title">Productfoto Generator</h3>
+          <p>Upload een foto van het vlees in de verpakking. Je ontvangt altijd twee bereide en twee rauwe varianten.</p>
+        </div>
+        <button class="btn btn-outline" type="button" onclick="openProductPromptModal()">
+          <i class="fas fa-pen"></i> Prompt instellen
+        </button>
+      </div>
+
+      <div class="product-image-workspace">
+        <div class="product-image-dropzone" id="product-image-dropzone"
+          role="button" tabindex="0"
+          onclick="document.getElementById('product-image-file-input').click()"
+          onkeydown="handleProductImageDropzoneKeydown(event)">
+          <i class="fas fa-camera"></i>
+          <h4>Upload de verpakkingsfoto</h4>
+          <p>Sleep de foto hierheen of klik om te kiezen</p>
+          <span>JPG, PNG of WEBP · maximaal 10 MB</span>
+        </div>
+        <input type="file" id="product-image-file-input" accept="image/jpeg,image/png,image/webp"
+          style="display:none" onchange="handleProductImageFile(this.files[0])">
+        <div class="product-image-selection" id="product-image-selection">
+          <div class="product-image-empty-preview">
+            <i class="fas fa-drumstick-bite"></i>
+            <span>Je voorbeeldfoto verschijnt hier</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="product-image-actions">
+        <button class="btn btn-primary btn-lg" id="product-image-generate-btn" type="button"
+          onclick="startProductImageGeneration()" disabled>
+          <i class="fas fa-wand-magic-sparkles"></i> Maak productfoto
+        </button>
+        <span class="product-image-action-hint">De vier afbeeldingen worden op de achtergrond gemaakt. Je mag ondertussen verder werken.</span>
+      </div>
+
+      <div class="product-image-status hidden" id="product-image-status" role="status" aria-live="polite"></div>
+      <div class="product-image-results hidden" id="product-image-results" aria-live="polite"></div>
+    </section>
+
+    <section class="webp-converter-section" aria-labelledby="webp-converter-title">
+      <div class="section-heading">
+        <span class="product-image-eyebrow">Optimaliseren</span>
+        <h3 id="webp-converter-title">Converter naar WEBP</h3>
+        <p>Converteer afbeeldingen naar WEBP en genereer SEO-optimale metadata.</p>
+      </div>
+
+      <div class="converter-layout">
       <!-- Upload zone -->
       <div class="converter-upload-card">
         <div class="converter-dropzone" id="converter-dropzone"
@@ -76,11 +150,313 @@ function renderConverter() {
         <div id="converter-results-list" class="converter-results-list"></div>
         <div id="converter-stats" class="converter-stats"></div>
       </div>
-    </div>
+      </div>
+    </section>
   `;
 
   converterState = { files: [], results: [], converting: false, seoData: {} };
+  initProductImageDropzone();
   initDropzone();
+  if (pendingRequestId) {
+    showProductImagePendingState();
+    pollProductImageRequest(pendingRequestId);
+  }
+}
+
+function initProductImageDropzone() {
+  const dropzone = document.getElementById('product-image-dropzone');
+  if (!dropzone) return;
+
+  dropzone.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    dropzone.classList.add('dragover');
+  });
+
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+  dropzone.addEventListener('drop', (event) => {
+    event.preventDefault();
+    dropzone.classList.remove('dragover');
+    handleProductImageFile(event.dataTransfer.files[0]);
+  });
+}
+
+function handleProductImageDropzoneKeydown(event) {
+  if (!['Enter', ' '].includes(event.key)) return;
+
+  event.preventDefault();
+  document.getElementById('product-image-file-input')?.click();
+}
+
+function handleProductImageFile(file) {
+  const input = document.getElementById('product-image-file-input');
+  if (input) input.value = '';
+  if (!file) return;
+
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  if (!allowedTypes.includes(file.type)) {
+    toast('Kies een JPG-, PNG- of WEBP-afbeelding.', 'error');
+    return;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    toast('De voorbeeldfoto mag maximaal 10 MB zijn.', 'error');
+    return;
+  }
+
+  if (productImageState.previewUrl) URL.revokeObjectURL(productImageState.previewUrl);
+  productImageState.file = file;
+  productImageState.previewUrl = URL.createObjectURL(file);
+  productImageState.results = [];
+
+  document.getElementById('product-image-results')?.classList.add('hidden');
+  renderProductImageSelection();
+}
+
+function renderProductImageSelection() {
+  const selection = document.getElementById('product-image-selection');
+  const button = document.getElementById('product-image-generate-btn');
+  if (!selection || !button) return;
+
+  if (!productImageState.file) {
+    selection.innerHTML = `
+      <div class="product-image-empty-preview">
+        <i class="fas fa-drumstick-bite"></i>
+        <span>Je voorbeeldfoto verschijnt hier</span>
+      </div>`;
+    button.disabled = true;
+    return;
+  }
+
+  selection.innerHTML = `
+    <div class="product-image-preview-wrap">
+      <img src="${productImageState.previewUrl}" alt="Voorbeeld van ${escHtml(productImageState.file.name)}">
+      <div class="product-image-preview-meta">
+        <span title="${escHtml(productImageState.file.name)}">${escHtml(productImageState.file.name)}</span>
+        <small>${formatFileSize(productImageState.file.size)}</small>
+      </div>
+      <button class="btn-icon" type="button" onclick="clearProductImageFile()" title="Foto verwijderen">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>`;
+  button.disabled = productImageState.generating;
+}
+
+function clearProductImageFile() {
+  if (productImageState.generating) return;
+  if (productImageState.previewUrl) URL.revokeObjectURL(productImageState.previewUrl);
+  productImageState.file = null;
+  productImageState.previewUrl = null;
+  productImageState.results = [];
+  document.getElementById('product-image-results')?.classList.add('hidden');
+  renderProductImageSelection();
+}
+
+async function openProductPromptModal() {
+  let data;
+
+  try {
+    data = await api('/api/images/prompt');
+  } catch (error) {
+    toast('De productfotoprompt kon niet worden geladen.', 'error');
+    return;
+  }
+
+  if (!data) return;
+
+  const modeNotice = data.voorbeeldmodus
+    ? `<div class="product-image-mode-notice"><i class="fas fa-flask"></i> Lokale voorbeeldmodus is actief; er worden geen externe API-kosten gemaakt.</div>`
+    : '';
+
+  openModal('Prompt instellen', `
+    ${modeNotice}
+    <div class="form-group">
+      <label for="product-image-prompt">Basisinstructie voor de productfoto's</label>
+      <textarea id="product-image-prompt" rows="12" maxlength="6000" required>${escHtml(data.prompt)}</textarea>
+      <small class="product-image-prompt-help">De vaste instructie voor precies twee bereide en twee rauwe varianten wordt automatisch toegevoegd.</small>
+    </div>
+  `, `
+    <button class="btn btn-outline" type="button" onclick="closeModal()">Annuleren</button>
+    <button class="btn btn-primary" id="save-product-image-prompt" type="button" onclick="saveProductImagePrompt()">
+      <i class="fas fa-save"></i> Prompt opslaan
+    </button>
+  `);
+}
+
+async function saveProductImagePrompt() {
+  const textarea = document.getElementById('product-image-prompt');
+  const button = document.getElementById('save-product-image-prompt');
+  const prompt = textarea?.value.trim() || '';
+
+  if (prompt.length < 20) {
+    toast('De prompt moet minimaal 20 tekens bevatten.', 'error');
+    textarea?.focus();
+    return;
+  }
+
+  button.disabled = true;
+  let result;
+
+  try {
+    result = await api('/api/images/prompt', { method: 'PUT', body: { prompt } });
+  } catch (error) {
+    toast('De productfotoprompt kon niet worden opgeslagen.', 'error');
+    return;
+  } finally {
+    button.disabled = false;
+  }
+
+  if (!result) return;
+  closeModal();
+  toast('De productfotoprompt is opgeslagen.', 'success');
+}
+
+async function startProductImageGeneration() {
+  if (!productImageState.file || productImageState.generating) return;
+
+  productImageState.generating = true;
+  const button = document.getElementById('product-image-generate-btn');
+  const status = document.getElementById('product-image-status');
+  const results = document.getElementById('product-image-results');
+  button.disabled = true;
+  button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Vier productfoto\'s maken...';
+  status.classList.remove('hidden');
+  status.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i><div><strong>Beeldgeneratie wordt klaargezet</strong><span>We maken twee bereide en twee rauwe varianten op de achtergrond.</span></div>';
+  results.classList.add('hidden');
+
+  const formData = new FormData();
+  formData.append('foto', productImageState.file);
+  const headers = {};
+  const xsrfToken = typeof getCookie === 'function' ? getCookie('XSRF-TOKEN') : null;
+  if (xsrfToken) headers['X-XSRF-TOKEN'] = xsrfToken;
+
+  try {
+    const response = await fetch('/api/images/generate', { method: 'POST', headers, body: formData });
+    if (response.status === 401) {
+      showLogin();
+      return;
+    }
+
+    const data = await response.json();
+    if (!response.ok) {
+      const validationError = data.errors ? Object.values(data.errors).flat()[0] : null;
+      toast(data.error || validationError || data.message || 'Productfoto maken is mislukt.', 'error');
+      return;
+    }
+
+    if (!data.request_id || data.status !== 'queued') {
+      toast('De achtergrondtaak kon niet worden gestart.', 'error');
+      return;
+    }
+
+    productImageState.requestId = data.request_id;
+    sessionStorage.setItem(PRODUCT_IMAGE_REQUEST_KEY, data.request_id);
+    showProductImagePendingState();
+    pollProductImageRequest(data.request_id);
+  } catch (error) {
+    toast('De achtergrondtaak kon niet worden gestart.', 'error');
+    productImageState.generating = false;
+    button.disabled = !productImageState.file;
+    button.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Maak productfoto';
+    status.classList.add('hidden');
+  }
+}
+
+function showProductImagePendingState() {
+  const button = document.getElementById('product-image-generate-btn');
+  const status = document.getElementById('product-image-status');
+  if (!button || !status) return;
+
+  productImageState.generating = true;
+  button.disabled = true;
+  button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Productfoto\'s worden gemaakt...';
+  status.classList.remove('hidden');
+  status.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i><div><strong>OpenAI werkt op de achtergrond</strong><span>Je mag naar een ander scherm gaan. Het resultaat wordt hier automatisch geladen.</span></div>';
+}
+
+async function pollProductImageRequest(requestId) {
+  if (!requestId || productImageState.requestId !== requestId) return;
+
+  try {
+    const response = await fetch(`/api/images/requests/${encodeURIComponent(requestId)}`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (response.status === 401) {
+      showLogin();
+      return;
+    }
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Status ophalen is mislukt.');
+
+    if (data.status === 'completed') {
+      if (!Array.isArray(data.results) || data.results.length !== 4) {
+        throw new Error('De beeldservice leverde geen vier productfoto\'s op.');
+      }
+      productImageState.results = data.results;
+      finishProductImageRequest();
+      renderProductImageResults();
+      toast('Vier productfoto\'s zijn klaar!', 'success');
+      return;
+    }
+    if (data.status === 'failed') {
+      finishProductImageRequest();
+      toast(data.error || 'Productfoto maken is mislukt.', 'error');
+      return;
+    }
+
+    productImageState.pollTimer = setTimeout(() => pollProductImageRequest(requestId), 2500);
+  } catch (error) {
+    finishProductImageRequest();
+    toast(error.message || 'De voortgang kon niet worden geladen.', 'error');
+  }
+}
+
+function finishProductImageRequest() {
+  if (productImageState.pollTimer) clearTimeout(productImageState.pollTimer);
+  productImageState.pollTimer = null;
+  productImageState.generating = false;
+  productImageState.requestId = null;
+  sessionStorage.removeItem(PRODUCT_IMAGE_REQUEST_KEY);
+
+  const button = document.getElementById('product-image-generate-btn');
+  const status = document.getElementById('product-image-status');
+  if (button) {
+    button.disabled = !productImageState.file;
+    button.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Maak productfoto';
+  }
+  status?.classList.add('hidden');
+}
+
+function renderProductImageResults() {
+  const container = document.getElementById('product-image-results');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="product-image-results-header">
+      <div>
+        <span class="product-image-eyebrow">Resultaat</span>
+        <h3>Kies je favoriete productfoto</h3>
+      </div>
+      <span class="product-image-count"><i class="fas fa-check-circle"></i> 4 afbeeldingen</span>
+    </div>
+    <div class="product-image-grid">
+      ${productImageState.results.map(result => `
+        <article class="product-image-result-card">
+          <div class="product-image-result-visual">
+            <img src="${escHtml(result.url)}" alt="${escHtml(result.label)} variant ${Number(result.variant)}">
+            <span class="product-image-result-badge ${result.status}">${escHtml(result.label)}</span>
+          </div>
+          <div class="product-image-result-footer">
+            <div>
+              <strong>${escHtml(result.label)}</strong>
+              <span>Variant ${Number(result.variant)}</span>
+            </div>
+            <a class="btn btn-primary btn-sm" href="${escHtml(result.download_url)}">
+              <i class="fas fa-download"></i> Download
+            </a>
+          </div>
+        </article>
+      `).join('')}
+    </div>`;
+  container.classList.remove('hidden');
 }
 
 function initDropzone() {
