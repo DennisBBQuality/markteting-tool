@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\GenerateProductImages;
 use App\Models\ImagePrompt;
 use App\Models\ProductImageRequest;
+use App\Services\AiCredentialStore;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -13,14 +14,14 @@ use Illuminate\Support\Str;
 
 class ProductImageController extends Controller
 {
-    public function prompt(): JsonResponse
+    public function prompt(AiCredentialStore $credentials): JsonResponse
     {
         $prompt = ImagePrompt::productPhoto();
 
         return response()->json([
             'prompt' => $prompt->prompt,
             'bijgewerkt_op' => $prompt->updated_at?->toISOString(),
-            'voorbeeldmodus' => config('services.product_images.driver') === 'fake',
+            'voorbeeldmodus' => ! $credentials->openAiIsActive(),
         ]);
     }
 

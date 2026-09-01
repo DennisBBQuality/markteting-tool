@@ -389,6 +389,28 @@ input, select, textarea { font: inherit; }
 /* ========== Settings ========== */
 .settings-section { margin-bottom: 32px; }
 .settings-section h3 { font-size: 18px; font-weight: 600; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.ai-settings-card { background: white; border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+.ai-settings-brand { display: flex; align-items: center; gap: 14px; padding: 18px 20px; border-bottom: 1px solid var(--border); }
+.ai-settings-logo { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; flex-shrink: 0; background: var(--primary-light); color: var(--primary); font-weight: 800; }
+.ai-settings-brand > div:nth-child(2) { min-width: 0; flex: 1; }
+.ai-settings-brand h4 { margin: 0 0 3px; font-size: 15px; }
+.ai-settings-brand p { margin: 0; color: var(--text-light); font-size: 12px; }
+.ai-connection-badge { display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.ai-connection-badge.connected { background: #D1FAE5; color: #047857; }
+.ai-connection-badge.inactive { background: #FEF3C7; color: #92400E; }
+.ai-settings-body { padding: 20px; display: grid; gap: 18px; }
+.ai-settings-current { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--bg); }
+.ai-settings-current span { color: var(--text-light); font-size: 12px; }
+.ai-settings-current strong { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+.ai-settings-current small { margin-left: auto; color: var(--text-light); font-size: 11px; }
+.ai-key-form label { display: block; margin-bottom: 7px; font-size: 12px; font-weight: 600; }
+.ai-key-input-row { display: flex; gap: 10px; }
+.ai-key-input-row input { flex: 1; min-width: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.ai-key-form p { margin: 7px 0 0; color: var(--text-light); font-size: 11px; }
+.ai-settings-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn-danger-outline { color: var(--danger); border-color: #FCA5A5; }
+.btn-danger-outline:hover { background: #FEF2F2; }
+.settings-table-scroll { max-width: 100%; overflow-x: auto; border-radius: var(--radius); box-shadow: var(--shadow); }
 .users-table { width: 100%; border-collapse: collapse; background: white; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
 .users-table th, .users-table td { padding: 12px 16px; text-align: left; font-size: 13px; }
 .users-table th { background: var(--bg); font-weight: 600; color: var(--text-light); font-size: 12px; text-transform: uppercase; }
@@ -1573,6 +1595,13 @@ input, select, textarea { font: inherit; }
   .product-image-results-header { align-items: flex-start; flex-direction: column; }
   .product-image-grid { grid-template-columns: 1fr; }
   .webp-converter-section { padding: 22px 20px; }
+  .ai-settings-brand { display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: start; }
+  .ai-connection-badge { grid-column: 2; justify-self: start; margin-left: 0; }
+  .ai-settings-current { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .ai-settings-current small { margin-left: 0; }
+  .ai-key-input-row { align-items: stretch; flex-direction: column; }
+  .ai-key-input-row .btn { width: 100%; }
+  .users-table { min-width: 720px; box-shadow: none; }
   /* Customer service: lijst-detailworkflow op mobiel */
   .cs-page-header { flex-wrap: wrap; gap: 10px; }
   .cs-layout { display: flex; flex-direction: column; height: auto; min-height: 0; overflow: visible; }
