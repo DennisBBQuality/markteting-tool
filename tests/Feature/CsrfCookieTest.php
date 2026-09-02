@@ -31,7 +31,7 @@ class CsrfCookieTest extends TestCase
 
         $this->assertIsString($appShell);
         $this->assertIsString($appJavascript);
-        $this->assertStringContainsString('/js/app.js?v=20260902-1', $appShell);
+        $this->assertStringContainsString('/js/app.js?v=20260902-2', $appShell);
         $this->assertStringContainsString("fetch('/api/auth/csrf'", $appJavascript);
         $this->assertStringContainsString('res.status === 419', $appJavascript);
     }
