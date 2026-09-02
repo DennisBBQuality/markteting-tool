@@ -110,7 +110,7 @@ PRODUCT_IMAGE_DRIVER=openai
 OPENAI_API_KEY=<jouw-api-sleutel>
 ```
 
-De standaardadapter gebruikt `gpt-image-2` via de OpenAI Image Edit API met hoge uitvoerkwaliteit en hoge trouw aan de referentiefoto. De referentiefoto wordt lokaal genormaliseerd naar een ondoorzichtige vierkante PNG; GPT Image kan de volledige invoerafbeelding via de prompt aanpassen en heeft daarvoor geen transparante uitsnede of DALL·E-masker nodig. Resultaten worden altijd als PNG verwerkt. Model, afmetingen, kwaliteit en timeout zijn configureerbaar via de bijbehorende `OPENAI_IMAGE_*` variabelen in `.env.example`. API-sleutels horen nooit in Git.
+De standaardadapter gebruikt `gpt-image-2` via de OpenAI Image Edit API met hoge uitvoerkwaliteit. GPT Image 2 verwerkt referentiebeelden automatisch met hoge trouw; de niet-ondersteunde instelling `input_fidelity` wordt daarom bewust niet meegestuurd. De referentiefoto wordt lokaal genormaliseerd naar een ondoorzichtige vierkante PNG; GPT Image kan de volledige invoerafbeelding via de prompt aanpassen en heeft daarvoor geen transparante uitsnede of DALL·E-masker nodig. Resultaten worden altijd als PNG verwerkt. Model, afmetingen, kwaliteit en timeout zijn configureerbaar via de bijbehorende `OPENAI_IMAGE_*` variabelen in `.env.example`. API-sleutels horen nooit in Git.
 
 Beeldgeneratie draait als achtergrondtaak, zodat een normale webaanvraag niet minutenlang open hoeft te blijven. Standaard gebruikt deze module Laravel's `deferred`-verbinding. Daarmee start de taak direct nadat het webantwoord is verstuurd en is op een normale server geen apart proces of permanente queue-worker nodig. De status wordt tijdens het maken per stap in de database bijgewerkt.
 

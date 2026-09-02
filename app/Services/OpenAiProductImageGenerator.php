@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -73,8 +74,12 @@ class OpenAiProductImageGenerator implements ProductImageGenerator
 
         $parameters['output_format'] = 'png';
         $parameters['quality'] = (string) config('services.product_images.openai.quality', 'high');
-        $parameters['input_fidelity'] = (string) config('services.product_images.openai.input_fidelity', 'high');
         $parameters['background'] = 'opaque';
+
+        // GPT Image 2 always uses high input fidelity and rejects this parameter.
+        if (! str_starts_with($model, 'gpt-image-2')) {
+            $parameters['input_fidelity'] = (string) config('services.product_images.openai.input_fidelity', 'high');
+        }
 
         try {
             $response = Http::withToken($apiKey)
@@ -96,7 +101,7 @@ class OpenAiProductImageGenerator implements ProductImageGenerator
                 'error_code' => $response->json('error.code'),
             ]);
 
-            throw new ProductImageGenerationException('De beeldservice kon de productfoto niet maken.');
+            throw new ProductImageGenerationException($this->userFacingApiError($response));
         }
 
         $encodedImages = $response->json('data');
@@ -119,6 +124,49 @@ class OpenAiProductImageGenerator implements ProductImageGenerator
         }
 
         return $images;
+    }
+
+    private function userFacingApiError(Response $response): string
+    {
+        $status = $response->status();
+        $code = strtolower((string) $response->json('error.code'));
+        $type = strtolower((string) $response->json('error.type'));
+        $message = strtolower((string) $response->json('error.message'));
+        $errorText = $code.' '.$type.' '.$message;
+
+        if (str_contains($errorText, 'content_policy')) {
+            return 'OpenAI heeft deze afbeelding of prompt geweigerd vanwege de inhoudsregels. Probeer een andere foto of pas de prompt aan.';
+        }
+
+        if ($status === 401) {
+            return 'De OpenAI API-sleutel is ongeldig of ingetrokken. Controleer de sleutel bij Instellingen → AI-koppelingen.';
+        }
+
+        if ($status === 403) {
+            if (str_contains($errorText, 'verification') || str_contains($errorText, 'verified')) {
+                return 'De OpenAI-organisatie moet eerst worden geverifieerd voordat GPT Image 2 gebruikt kan worden.';
+            }
+
+            return 'Deze OpenAI API-sleutel heeft geen toegang tot GPT Image 2. Controleer de rechten van het OpenAI-project.';
+        }
+
+        if ($status === 429) {
+            if (str_contains($errorText, 'quota') || str_contains($errorText, 'billing') || str_contains($errorText, 'credit')) {
+                return 'Het OpenAI API-tegoed of de bestedingslimiet is bereikt. Vul het API-tegoed aan en probeer het opnieuw.';
+            }
+
+            return 'OpenAI ontvangt tijdelijk te veel opdrachten. Wacht even en probeer het opnieuw.';
+        }
+
+        if ($status === 400 && (str_contains($errorText, 'image') || str_contains($errorText, 'format'))) {
+            return 'OpenAI kon de aangeleverde foto niet verwerken. Probeer een andere JPG-, PNG- of WEBP-afbeelding.';
+        }
+
+        if ($status >= 500) {
+            return 'OpenAI is tijdelijk niet bereikbaar. Probeer het over enkele minuten opnieuw.';
+        }
+
+        return 'OpenAI accepteerde de opdracht niet. Controleer de AI-koppeling en probeer het opnieuw.';
     }
 
     private function normalizeSource(UploadedFile $source): string

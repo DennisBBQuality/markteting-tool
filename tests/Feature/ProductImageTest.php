@@ -218,7 +218,7 @@ class ProductImageTest extends TestCase
 
         $this->assertSame('failed', $request->refresh()->status);
         $this->assertSame('failed', $request->progress_step);
-        $this->assertNotNull($request->error);
+        $this->assertSame('De beeldservice is momenteel niet bereikbaar.', $request->error);
         Storage::disk('local')->assertMissing($request->source_path);
     }
 

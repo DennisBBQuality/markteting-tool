@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\ProductImageRequest;
+use App\Services\ProductImageGenerationException;
 use App\Services\ProductImageGenerator;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -101,7 +102,9 @@ class GenerateProductImages implements ShouldQueue
         $request->update([
             'status' => 'failed',
             'progress_step' => 'failed',
-            'error' => 'De productfoto\'s konden niet worden gemaakt. Probeer het later opnieuw.',
+            'error' => $exception instanceof ProductImageGenerationException
+                ? $exception->getMessage()
+                : 'De productfoto\'s konden niet worden gemaakt. Probeer het later opnieuw.',
             'completed_at' => now(),
         ]);
     }
