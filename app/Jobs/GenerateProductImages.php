@@ -2,12 +2,14 @@
 
 namespace App\Jobs;
 
+use App\Models\ProductImageAsset;
 use App\Models\ProductImageRequest;
 use App\Services\ProductImageGenerationException;
 use App\Services\ProductImageGenerator;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -117,40 +119,46 @@ class GenerateProductImages implements ShouldQueue
         }
 
         $counts = ['bereid' => 0, 'rauw' => 0];
-        $storedPaths = [];
         $results = [];
+        $assets = [];
 
-        try {
-            foreach ($images as $image) {
-                if (! $this->isValidGeneratedImage($image, $counts)) {
-                    throw new RuntimeException('De beeldservice leverde ongeldige afbeeldingen op.');
-                }
-
-                $status = $image['status'];
-                $counts[$status]++;
-                $filename = $status.'-'.Str::uuid().'.png';
-                $path = 'product-images/'.$request->id.'/'.$filename;
-
-                if (! Storage::disk('local')->put($path, $image['contents'])) {
-                    throw new RuntimeException('De productfoto\'s konden niet veilig worden opgeslagen.');
-                }
-
-                $storedPaths[] = $path;
-                $results[] = [
-                    'status' => $status,
-                    'label' => $status === 'bereid' ? 'Vlees bereid' : 'Vlees rauw',
-                    'variant' => $counts[$status],
-                    'filename' => $filename,
-                ];
+        foreach ($images as $image) {
+            if (! $this->isValidGeneratedImage($image, $counts)) {
+                throw new RuntimeException('De beeldservice leverde ongeldige afbeeldingen op.');
             }
 
-            if ($counts !== ['bereid' => 2, 'rauw' => 2]) {
-                throw new RuntimeException('De beeldservice leverde niet twee bereide en twee rauwe afbeeldingen op.');
-            }
-        } catch (Throwable $exception) {
-            Storage::disk('local')->delete($storedPaths);
-            throw $exception;
+            $status = $image['status'];
+            $counts[$status]++;
+            $filename = $status.'-'.Str::uuid().'.png';
+
+            $assets[] = [
+                'filename' => $filename,
+                'contents_base64' => base64_encode($image['contents']),
+            ];
+            $results[] = [
+                'status' => $status,
+                'label' => $status === 'bereid' ? 'Vlees bereid' : 'Vlees rauw',
+                'variant' => $counts[$status],
+                'filename' => $filename,
+            ];
         }
+
+        if ($counts !== ['bereid' => 2, 'rauw' => 2]) {
+            throw new RuntimeException('De beeldservice leverde niet twee bereide en twee rauwe afbeeldingen op.');
+        }
+
+        DB::transaction(function () use ($request, $assets): void {
+            ProductImageAsset::where('product_image_request_id', $request->id)->delete();
+
+            foreach ($assets as $asset) {
+                ProductImageAsset::create([
+                    'product_image_request_id' => $request->id,
+                    'filename' => $asset['filename'],
+                    'mime_type' => 'image/png',
+                    'contents_base64' => $asset['contents_base64'],
+                ]);
+            }
+        });
 
         return $results;
     }

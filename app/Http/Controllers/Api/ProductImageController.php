@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Jobs\GenerateProductImages;
 use App\Models\ImagePrompt;
+use App\Models\ProductImageAsset;
 use App\Models\ProductImageRequest;
 use App\Services\AiCredentialStore;
 use Illuminate\Http\JsonResponse;
@@ -99,17 +100,33 @@ class ProductImageController extends Controller
             abort(404);
         }
 
-        $path = 'product-images/'.$imageRequest->id.'/'.$safeFilename;
-
-        if (! Storage::disk('local')->exists($path)) {
-            abort(404);
-        }
-
         $headers = [
             'Content-Type' => 'image/png',
             'Cache-Control' => 'private, max-age=86400',
             'X-Content-Type-Options' => 'nosniff',
         ];
+
+        $asset = ProductImageAsset::where('product_image_request_id', $imageRequest->id)
+            ->where('filename', $safeFilename)
+            ->first();
+        if ($asset) {
+            $contents = base64_decode($asset->contents_base64, true);
+            if (! is_string($contents) || $contents === '') {
+                abort(404);
+            }
+
+            if ($request->boolean('download')) {
+                $headers['Content-Disposition'] = 'attachment; filename="'.$safeFilename.'"';
+            }
+
+            return response($contents, 200, $headers);
+        }
+
+        // Keep images from requests created before database-backed storage available.
+        $path = 'product-images/'.$imageRequest->id.'/'.$safeFilename;
+        if (! Storage::disk('local')->exists($path)) {
+            abort(404);
+        }
 
         if ($request->boolean('download')) {
             return Storage::disk('local')->download($path, $safeFilename, $headers);
