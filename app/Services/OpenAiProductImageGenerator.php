@@ -22,7 +22,7 @@ class OpenAiProductImageGenerator implements ProductImageGenerator
 
     public function __construct(private readonly AiCredentialStore $credentials) {}
 
-    public function generate(UploadedFile $source, string $basePrompt): array
+    public function generate(UploadedFile $source, string $basePrompt, ?callable $reportProgress = null): array
     {
         $apiKey = $this->credentials->openAiApiKey() ?? '';
 
@@ -30,10 +30,20 @@ class OpenAiProductImageGenerator implements ProductImageGenerator
             throw new ProductImageGenerationException('De OpenAI API-sleutel is niet ingesteld.');
         }
 
+        if ($reportProgress) {
+            $reportProgress('preparing', 15);
+        }
         $normalizedSource = $this->normalizeSource($source);
         $results = [];
 
         foreach (self::VARIANT_PROMPTS as $status => $variantPrompt) {
+            if ($reportProgress) {
+                $reportProgress(
+                    $status === 'bereid' ? 'generating_prepared' : 'generating_raw',
+                    $status === 'bereid' ? 30 : 60,
+                );
+            }
+
             foreach ($this->requestVariants($normalizedSource, trim($basePrompt)."\n\n".$variantPrompt, $apiKey) as $contents) {
                 $results[] = [
                     'status' => $status,

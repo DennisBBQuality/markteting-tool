@@ -69,11 +69,13 @@ class ProductImageController extends Controller
         $imageRequest = ProductImageRequest::create([
             'user_id' => $request->session()->get('userId'),
             'status' => 'queued',
+            'progress' => 5,
+            'progress_step' => 'queued',
             'source_path' => $sourcePath,
             'prompt' => ImagePrompt::productPhoto()->prompt,
         ]);
         GenerateProductImages::dispatch($imageRequest->id)
-            ->onConnection((string) config('services.product_images.queue_connection', 'background'));
+            ->onConnection((string) config('services.product_images.queue_connection', 'deferred'));
 
         return response()->json($this->requestPayload($imageRequest), 202);
     }
@@ -81,8 +83,9 @@ class ProductImageController extends Controller
     public function status(Request $request, ProductImageRequest $imageRequest): JsonResponse
     {
         $this->ensureOwner($request, $imageRequest);
+        $imageRequest = $this->failIfStalled($imageRequest->refresh());
 
-        return response()->json($this->requestPayload($imageRequest->refresh()));
+        return response()->json($this->requestPayload($imageRequest));
     }
 
     public function show(Request $request, ProductImageRequest $imageRequest, string $filename)
@@ -139,8 +142,53 @@ class ProductImageController extends Controller
         return [
             'request_id' => $imageRequest->id,
             'status' => $imageRequest->status,
+            'progress' => max(0, min(100, (int) $imageRequest->progress)),
+            'progress_step' => $imageRequest->progress_step,
+            'progress_label' => $this->progressLabel($imageRequest->progress_step),
+            'elapsed_seconds' => $imageRequest->created_at
+                ? max(0, (int) $imageRequest->created_at->diffInSeconds($imageRequest->completed_at ?? now()))
+                : 0,
             'results' => $results,
             'error' => $imageRequest->error,
         ];
+    }
+
+    private function failIfStalled(ProductImageRequest $imageRequest): ProductImageRequest
+    {
+        $queuedTooLong = $imageRequest->status === 'queued'
+            && $imageRequest->created_at?->lt(now()->subMinutes(2));
+        $processingTooLong = $imageRequest->status === 'processing'
+            && $imageRequest->updated_at?->lt(now()->subMinutes(12));
+
+        if (! $queuedTooLong && ! $processingTooLong) {
+            return $imageRequest;
+        }
+
+        Storage::disk('local')->delete($imageRequest->source_path);
+        $imageRequest->update([
+            'status' => 'failed',
+            'progress_step' => 'failed',
+            'error' => $queuedTooLong
+                ? 'De achtergrondtaak kon niet starten. Probeer de opdracht opnieuw.'
+                : 'De beeldservice reageerde te lang niet. Probeer de opdracht opnieuw.',
+            'completed_at' => now(),
+        ]);
+
+        return $imageRequest->refresh();
+    }
+
+    private function progressLabel(?string $step): string
+    {
+        return match ($step) {
+            'queued' => 'Opdracht ontvangen',
+            'starting' => 'Beeldgenerator starten',
+            'preparing' => 'Bronfoto voorbereiden',
+            'generating_prepared' => 'Twee bereide productfoto\'s maken',
+            'generating_raw' => 'Twee rauwe productfoto\'s maken',
+            'saving' => 'Afbeeldingen controleren en opslaan',
+            'completed' => 'Vier productfoto\'s zijn klaar',
+            'failed' => 'Opdracht gestopt',
+            default => 'Voortgang wordt bijgewerkt',
+        };
     }
 }
