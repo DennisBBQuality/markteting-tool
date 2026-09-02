@@ -89,14 +89,14 @@ class ProductImageController extends Controller
         return response()->json($this->requestPayload($imageRequest));
     }
 
-    public function show(Request $request, ProductImageRequest $imageRequest, string $filename)
+    public function show(Request $request, ProductImageRequest $imageRequest, string $asset)
     {
         $this->ensureOwner($request, $imageRequest);
-        $safeFilename = basename($filename);
-        $extension = strtolower(pathinfo($safeFilename, PATHINFO_EXTENSION));
+        $safeAsset = basename($asset);
+        $safeFilename = $safeAsset.'.png';
 
         $knownFiles = collect($imageRequest->results ?? [])->pluck('filename');
-        if ($safeFilename !== $filename || $extension !== 'png' || ! $knownFiles->contains($safeFilename)) {
+        if ($safeAsset !== $asset || ! $knownFiles->contains($safeFilename)) {
             abort(404);
         }
 
@@ -145,7 +145,8 @@ class ProductImageController extends Controller
     private function requestPayload(ProductImageRequest $imageRequest): array
     {
         $results = collect($imageRequest->results ?? [])->map(function (array $result) use ($imageRequest) {
-            $url = '/api/images/requests/'.$imageRequest->id.'/generated/'.rawurlencode($result['filename']);
+            $asset = pathinfo($result['filename'], PATHINFO_FILENAME);
+            $url = '/api/images/requests/'.$imageRequest->id.'/generated/'.rawurlencode($asset);
 
             return [
                 'status' => $result['status'],

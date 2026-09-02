@@ -120,7 +120,7 @@ Voor een grotere productieomgeving kan `PRODUCT_IMAGE_QUEUE_CONNECTION=database`
 php artisan queue:work --queue=images --timeout=600 --tries=2
 ```
 
-Gegenereerde afbeeldingen worden afgeschermd in de gedeelde database opgeslagen. Daardoor blijven ze ook bereikbaar wanneer de achtergrondtaak en de website op verschillende serverprocessen draaien. Alleen de ingelogde medewerker die de opdracht heeft gestart kan ze bekijken of downloaden.
+Gegenereerde afbeeldingen worden afgeschermd in de gedeelde database opgeslagen. Daardoor blijven ze ook bereikbaar wanneer de achtergrondtaak en de website op verschillende serverprocessen draaien. De beveiligde afbeeldingslinks zijn bewust extensieloos, zodat de webserver ze niet voor openbare statische bestanden aanziet. Alleen de ingelogde medewerker die de opdracht heeft gestart kan ze bekijken of downloaden.
 
 ## Rollen & Rechten
 

@@ -130,7 +130,9 @@ class ProductImageTest extends TestCase
         Storage::disk('local')->assertMissing($imageRequest->source_path);
 
         foreach ($response->json('results') as $result) {
-            $filename = basename(parse_url($result['url'], PHP_URL_PATH));
+            $asset = basename(parse_url($result['url'], PHP_URL_PATH));
+            $this->assertStringNotContainsString('.', $asset);
+            $filename = $asset.'.png';
             $this->assertDatabaseHas('product_image_assets', [
                 'product_image_request_id' => $imageRequest->id,
                 'filename' => $filename,
@@ -170,7 +172,7 @@ class ProductImageTest extends TestCase
             ->assertOk()
             ->assertHeader('Content-Type', 'image/png');
 
-        $filename = basename(parse_url($result['url'], PHP_URL_PATH));
+        $filename = basename(parse_url($result['url'], PHP_URL_PATH)).'.png';
         $this->assertNotEmpty(ProductImageAsset::where('filename', $filename)->value('contents_base64'));
     }
 

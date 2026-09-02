@@ -101,8 +101,9 @@ Route::middleware('auth.custom')->group(function () {
     Route::put('/api/images/prompt', [ProductImageController::class, 'updatePrompt']);
     Route::post('/api/images/generate', [ProductImageController::class, 'generate'])->middleware('throttle:3,1');
     Route::get('/api/images/requests/{imageRequest}', [ProductImageController::class, 'status']);
-    Route::get('/api/images/requests/{imageRequest}/generated/{filename}', [ProductImageController::class, 'show'])
-        ->where('filename', '[A-Za-z0-9._-]+');
+    // Keep the protected URL extensionless so nginx never mistakes it for a public static PNG.
+    Route::get('/api/images/requests/{imageRequest}/generated/{asset}', [ProductImageController::class, 'show'])
+        ->where('asset', '[A-Za-z0-9_-]+');
 
     // Dashboard
     Route::get('/api/dashboard/stats', [DashboardController::class, 'stats']);
