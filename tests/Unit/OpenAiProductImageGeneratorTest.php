@@ -62,7 +62,7 @@ class OpenAiProductImageGeneratorTest extends TestCase
                 && $fields->get('output_format')['contents'] === 'png'
                 && ! $fields->has('response_format')
                 && $fields->get('quality')['contents'] === 'high'
-                && $fields->get('input_fidelity')['contents'] === 'high'
+                && ! $fields->has('input_fidelity')
                 && $fields->get('background')['contents'] === 'opaque'
                 && str_contains($prompt, 'Create a premium product photo from this reference.')
                 && (str_contains($prompt, 'MANDATORY VARIANT: Show the meat fully prepared')
@@ -109,5 +109,47 @@ class OpenAiProductImageGeneratorTest extends TestCase
         } finally {
             Http::assertNothingSent();
         }
+    }
+
+    public function test_it_reports_when_api_credit_is_exhausted(): void
+    {
+        config()->set('services.product_images.driver', 'openai');
+        config()->set('services.product_images.openai.api_key', 'test-key');
+        Http::fake(['*' => Http::response([
+            'error' => [
+                'code' => 'insufficient_quota',
+                'type' => 'insufficient_quota',
+                'message' => 'You exceeded your current quota.',
+            ],
+        ], 429)]);
+
+        $this->expectException(ProductImageGenerationException::class);
+        $this->expectExceptionMessage('API-tegoed');
+
+        app(OpenAiProductImageGenerator::class)->generate(
+            UploadedFile::fake()->image('reference.jpg'),
+            'Create a product photo from this reference.',
+        );
+    }
+
+    public function test_it_reports_when_organization_verification_is_required(): void
+    {
+        config()->set('services.product_images.driver', 'openai');
+        config()->set('services.product_images.openai.api_key', 'test-key');
+        Http::fake(['*' => Http::response([
+            'error' => [
+                'code' => 'organization_verification_required',
+                'type' => 'invalid_request_error',
+                'message' => 'Your organization must be verified.',
+            ],
+        ], 403)]);
+
+        $this->expectException(ProductImageGenerationException::class);
+        $this->expectExceptionMessage('organisatie moet eerst worden geverifieerd');
+
+        app(OpenAiProductImageGenerator::class)->generate(
+            UploadedFile::fake()->image('reference.jpg'),
+            'Create a product photo from this reference.',
+        );
     }
 }
