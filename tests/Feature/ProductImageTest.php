@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Jobs\GenerateProductImages;
 use App\Models\ImagePrompt;
+use App\Models\ProductImageAsset;
 use App\Models\ProductImageRequest;
 use App\Services\ProductImageGenerationException;
 use App\Services\ProductImageGenerator;
@@ -130,7 +131,11 @@ class ProductImageTest extends TestCase
 
         foreach ($response->json('results') as $result) {
             $filename = basename(parse_url($result['url'], PHP_URL_PATH));
-            Storage::disk('local')->assertExists('product-images/'.$imageRequest->id.'/'.$filename);
+            $this->assertDatabaseHas('product_image_assets', [
+                'product_image_request_id' => $imageRequest->id,
+                'filename' => $filename,
+                'mime_type' => 'image/png',
+            ]);
 
             $this->get($result['url'])
                 ->assertOk()
@@ -141,6 +146,32 @@ class ProductImageTest extends TestCase
                 ->assertOk()
                 ->assertDownload($filename);
         }
+    }
+
+    public function test_generated_images_remain_available_when_local_result_storage_is_empty(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+        $this->actingAsUser();
+
+        $queued = $this->post('/api/images/generate', [
+            'foto' => UploadedFile::fake()->image('brisket.jpg', 1200, 800),
+        ], ['Accept' => 'application/json'])->assertAccepted();
+
+        $imageRequest = ProductImageRequest::findOrFail($queued->json('request_id'));
+        (new GenerateProductImages($imageRequest->id))->handle(app(ProductImageGenerator::class));
+        Storage::disk('local')->assertDirectoryEmpty('product-images');
+
+        $result = $this->getJson('/api/images/requests/'.$imageRequest->id)
+            ->assertOk()
+            ->json('results.0');
+
+        $this->get($result['url'])
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/png');
+
+        $filename = basename(parse_url($result['url'], PHP_URL_PATH));
+        $this->assertNotEmpty(ProductImageAsset::where('filename', $filename)->value('contents_base64'));
     }
 
     public function test_incomplete_generator_output_is_rejected_without_storing_files(): void
