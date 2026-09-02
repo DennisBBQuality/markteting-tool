@@ -88,12 +88,15 @@ class ProductImageTest extends TestCase
         $response
             ->assertAccepted()
             ->assertJsonPath('status', 'queued')
+            ->assertJsonPath('progress', 5)
+            ->assertJsonPath('progress_step', 'queued')
+            ->assertJsonPath('progress_label', 'Opdracht ontvangen')
             ->assertJsonCount(0, 'results');
 
         $imageRequest = ProductImageRequest::findOrFail($response->json('request_id'));
         Storage::disk('local')->assertExists($imageRequest->source_path);
         Queue::assertPushed(GenerateProductImages::class, fn ($job) => $job->requestId === $imageRequest->id
-            && $job->connection === 'background'
+            && $job->connection === 'deferred'
             && $job->queue === 'images'
         );
     }
@@ -115,6 +118,8 @@ class ProductImageTest extends TestCase
         $response
             ->assertOk()
             ->assertJsonPath('status', 'completed')
+            ->assertJsonPath('progress', 100)
+            ->assertJsonPath('progress_step', 'completed')
             ->assertJsonCount(4, 'results')
             ->assertJsonPath('results.0.label', 'Vlees bereid')
             ->assertJsonPath('results.1.label', 'Vlees bereid')
@@ -144,7 +149,7 @@ class ProductImageTest extends TestCase
         $user = $this->actingAsUser();
         $this->app->instance(ProductImageGenerator::class, new class implements ProductImageGenerator
         {
-            public function generate(UploadedFile $source, string $basePrompt): array
+            public function generate(UploadedFile $source, string $basePrompt, ?callable $reportProgress = null): array
             {
                 return [
                     ['status' => 'bereid', 'contents' => 'image', 'extension' => 'png'],
@@ -168,7 +173,7 @@ class ProductImageTest extends TestCase
         $user = $this->actingAsUser();
         $this->app->instance(ProductImageGenerator::class, new class implements ProductImageGenerator
         {
-            public function generate(UploadedFile $source, string $basePrompt): array
+            public function generate(UploadedFile $source, string $basePrompt, ?callable $reportProgress = null): array
             {
                 return [
                     ['status' => 'bereid', 'contents' => '<script>alert(1)</script>', 'extension' => 'png'],
@@ -195,7 +200,7 @@ class ProductImageTest extends TestCase
         $user = $this->actingAsUser();
         $this->app->instance(ProductImageGenerator::class, new class implements ProductImageGenerator
         {
-            public function generate(UploadedFile $source, string $basePrompt): array
+            public function generate(UploadedFile $source, string $basePrompt, ?callable $reportProgress = null): array
             {
                 throw new ProductImageGenerationException('De beeldservice is momenteel niet bereikbaar.');
             }
@@ -212,7 +217,28 @@ class ProductImageTest extends TestCase
         }
 
         $this->assertSame('failed', $request->refresh()->status);
+        $this->assertSame('failed', $request->progress_step);
         $this->assertNotNull($request->error);
+        Storage::disk('local')->assertMissing($request->source_path);
+    }
+
+    public function test_a_request_that_never_started_is_stopped_with_a_clear_retry_message(): void
+    {
+        Storage::fake('local');
+        $user = $this->actingAsUser();
+        $request = $this->storedRequest($user->id);
+        $request->forceFill([
+            'created_at' => now()->subMinutes(3),
+            'updated_at' => now()->subMinutes(3),
+        ])->save();
+
+        $this->getJson('/api/images/requests/'.$request->id)
+            ->assertOk()
+            ->assertJsonPath('status', 'failed')
+            ->assertJsonPath('progress_step', 'failed')
+            ->assertJsonPath('progress_label', 'Opdracht gestopt')
+            ->assertJsonPath('error', 'De achtergrondtaak kon niet starten. Probeer de opdracht opnieuw.');
+
         Storage::disk('local')->assertMissing($request->source_path);
     }
 

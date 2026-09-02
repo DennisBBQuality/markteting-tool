@@ -37,7 +37,7 @@ return [
 
     'product_images' => [
         'driver' => env('PRODUCT_IMAGE_DRIVER', 'fake'),
-        'queue_connection' => env('PRODUCT_IMAGE_QUEUE_CONNECTION', 'background'),
+        'queue_connection' => env('PRODUCT_IMAGE_QUEUE_CONNECTION', 'deferred'),
         'max_output_bytes' => 20 * 1024 * 1024,
         'openai' => [
             'api_key' => env('OPENAI_API_KEY'),

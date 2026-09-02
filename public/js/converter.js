@@ -13,6 +13,7 @@ let productImageState = {
   generating: false,
   requestId: null,
   pollTimer: null,
+  pollFailures: 0,
 };
 
 const PRODUCT_IMAGE_REQUEST_KEY = 'pitboard-product-image-request';
@@ -39,6 +40,7 @@ function renderConverter() {
     generating: Boolean(pendingRequestId),
     requestId: pendingRequestId,
     pollTimer: null,
+    pollFailures: 0,
   };
 
   container.innerHTML = `
@@ -349,7 +351,7 @@ async function startProductImageGeneration() {
 
     productImageState.requestId = data.request_id;
     sessionStorage.setItem(PRODUCT_IMAGE_REQUEST_KEY, data.request_id);
-    showProductImagePendingState();
+    showProductImagePendingState(data);
     pollProductImageRequest(data.request_id);
   } catch (error) {
     toast('De achtergrondtaak kon niet worden gestart.', 'error');
@@ -360,7 +362,7 @@ async function startProductImageGeneration() {
   }
 }
 
-function showProductImagePendingState() {
+function showProductImagePendingState(data = null) {
   const button = document.getElementById('product-image-generate-btn');
   const status = document.getElementById('product-image-status');
   if (!button || !status) return;
@@ -368,8 +370,75 @@ function showProductImagePendingState() {
   productImageState.generating = true;
   button.disabled = true;
   button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Productfoto\'s worden gemaakt...';
+  renderProductImageProgress(data || {
+    status: 'queued',
+    progress: 5,
+    progress_step: 'queued',
+    progress_label: 'Opdracht ontvangen',
+    elapsed_seconds: 0,
+  });
+}
+
+function renderProductImageProgress(data) {
+  const status = document.getElementById('product-image-status');
+  if (!status) return;
+
+  const steps = [
+    { key: 'queued', label: 'Foto ontvangen' },
+    { key: 'preparing', label: 'Foto voorbereiden' },
+    { key: 'generating_prepared', label: 'Bereide foto\'s maken' },
+    { key: 'generating_raw', label: 'Rauwe foto\'s maken' },
+    { key: 'saving', label: 'Controleren en opslaan' },
+  ];
+  const aliases = { starting: 'queued' };
+  const activeKey = aliases[data.progress_step] || data.progress_step || 'queued';
+  const activeIndex = Math.max(0, steps.findIndex(step => step.key === activeKey));
+  const progress = Math.max(0, Math.min(100, Number(data.progress) || 0));
+  const elapsed = formatProductImageElapsed(Number(data.elapsed_seconds) || 0);
+
+  status.classList.remove('hidden', 'is-error');
+  status.innerHTML = `
+    <div class="product-image-progress-content">
+      <div class="product-image-progress-heading">
+        <div>
+          <strong>${escHtml(data.progress_label || 'OpenAI werkt aan je productfoto\'s')}</strong>
+          <span>Verstreken tijd: ${elapsed}. Je mag ondertussen verder werken.</span>
+        </div>
+        <b>${progress}%</b>
+      </div>
+      <div class="product-image-progress-track" aria-label="${progress}% voltooid">
+        <span style="width:${progress}%"></span>
+      </div>
+      <ol class="product-image-progress-steps">
+        ${steps.map((step, index) => {
+          const state = index < activeIndex ? 'done' : index === activeIndex ? 'active' : '';
+          const icon = index < activeIndex ? 'fa-check' : index === activeIndex ? 'fa-spinner fa-spin' : 'fa-circle';
+          return `<li class="${state}"><i class="fas ${icon}"></i><span>${step.label}</span></li>`;
+        }).join('')}
+      </ol>
+    </div>`;
+}
+
+function formatProductImageElapsed(seconds) {
+  if (seconds < 60) return `${Math.max(0, Math.floor(seconds))} seconden`;
+
+  const minutes = Math.floor(seconds / 60);
+  const remainder = Math.floor(seconds % 60);
+  return `${minutes} min ${remainder} sec`;
+}
+
+function showProductImageError(message) {
+  const status = document.getElementById('product-image-status');
+  if (!status) return;
+
   status.classList.remove('hidden');
-  status.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i><div><strong>OpenAI werkt op de achtergrond</strong><span>Je mag naar een ander scherm gaan. Het resultaat wordt hier automatisch geladen.</span></div>';
+  status.classList.add('is-error');
+  status.innerHTML = `
+    <i class="fas fa-triangle-exclamation"></i>
+    <div>
+      <strong>De opdracht is niet afgerond</strong>
+      <span>${escHtml(message)}</span>
+    </div>`;
 }
 
 async function pollProductImageRequest(requestId) {
@@ -385,6 +454,7 @@ async function pollProductImageRequest(requestId) {
     }
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Status ophalen is mislukt.');
+    productImageState.pollFailures = 0;
 
     if (data.status === 'completed') {
       if (!Array.isArray(data.results) || data.results.length !== 4) {
@@ -397,19 +467,30 @@ async function pollProductImageRequest(requestId) {
       return;
     }
     if (data.status === 'failed') {
-      finishProductImageRequest();
-      toast(data.error || 'Productfoto maken is mislukt.', 'error');
+      const message = data.error || 'Productfoto maken is mislukt. Probeer de opdracht opnieuw.';
+      finishProductImageRequest(false);
+      showProductImageError(message);
+      toast(message, 'error');
       return;
     }
 
+    renderProductImageProgress(data);
     productImageState.pollTimer = setTimeout(() => pollProductImageRequest(requestId), 2500);
   } catch (error) {
-    finishProductImageRequest();
-    toast(error.message || 'De voortgang kon niet worden geladen.', 'error');
+    productImageState.pollFailures += 1;
+    if (productImageState.pollFailures <= 3) {
+      productImageState.pollTimer = setTimeout(() => pollProductImageRequest(requestId), 5000);
+      return;
+    }
+
+    const message = error.message || 'De voortgang kon niet worden geladen. Probeer de opdracht opnieuw.';
+    finishProductImageRequest(false);
+    showProductImageError(message);
+    toast(message, 'error');
   }
 }
 
-function finishProductImageRequest() {
+function finishProductImageRequest(hideStatus = true) {
   if (productImageState.pollTimer) clearTimeout(productImageState.pollTimer);
   productImageState.pollTimer = null;
   productImageState.generating = false;
@@ -422,7 +503,7 @@ function finishProductImageRequest() {
     button.disabled = !productImageState.file;
     button.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Maak productfoto';
   }
-  status?.classList.add('hidden');
+  if (hideStatus) status?.classList.add('hidden');
 }
 
 function renderProductImageResults() {

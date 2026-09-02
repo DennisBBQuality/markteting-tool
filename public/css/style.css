@@ -822,10 +822,59 @@ input, select, textarea { font: inherit; }
   background: var(--primary-light);
 }
 
+.product-image-status.is-error {
+  border-color: #F4B7B9;
+  background: #FFF1F1;
+}
+
+.product-image-status.is-error > i { color: #B91C1C; }
 .product-image-status > i { color: var(--primary); font-size: 22px; }
 .product-image-status div { display: flex; flex-direction: column; }
 .product-image-status strong { font-size: 13px; }
 .product-image-status span { color: var(--text-light); font-size: 12px; }
+
+.product-image-progress-content { flex: 1; gap: 12px; min-width: 0; }
+.product-image-progress-heading {
+  display: flex;
+  flex-direction: row !important;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.product-image-progress-heading > div { gap: 3px; }
+.product-image-progress-heading b { flex-shrink: 0; color: var(--primary); font-size: 15px; }
+.product-image-progress-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(234, 72, 75, 0.14);
+}
+.product-image-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+  transition: width 0.35s ease;
+}
+.product-image-progress-steps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.product-image-progress-steps li {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  color: #9A8D86;
+  font-size: 10px;
+}
+.product-image-progress-steps li i { font-size: 9px; }
+.product-image-progress-steps li.active { color: var(--primary); font-weight: 700; }
+.product-image-progress-steps li.done { color: var(--success); }
 
 .product-image-results {
   padding: 26px 28px 30px;
@@ -1591,6 +1640,7 @@ input, select, textarea { font: inherit; }
   .product-image-actions .btn { width: 100%; }
   .product-image-action-hint { text-align: center; }
   .product-image-status { margin: 0 20px 20px; }
+  .product-image-progress-steps { grid-template-columns: 1fr; }
   .product-image-results { padding: 22px 20px; }
   .product-image-results-header { align-items: flex-start; flex-direction: column; }
   .product-image-grid { grid-template-columns: 1fr; }

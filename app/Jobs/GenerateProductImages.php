@@ -35,7 +35,21 @@ class GenerateProductImages implements ShouldQueue
     public function handle(ProductImageGenerator $generator): void
     {
         $request = ProductImageRequest::findOrFail($this->requestId);
-        $request->update(['status' => 'processing', 'error' => null]);
+        if (in_array($request->status, ['completed', 'failed'], true)) {
+            return;
+        }
+
+        if (function_exists('set_time_limit')) {
+            set_time_limit(0);
+        }
+
+        $request->update([
+            'status' => 'processing',
+            'progress' => 10,
+            'progress_step' => 'starting',
+            'error' => null,
+            'started_at' => $request->started_at ?? now(),
+        ]);
 
         $absolutePath = Storage::disk('local')->path($request->source_path);
         if (! is_file($absolutePath)) {
@@ -49,13 +63,29 @@ class GenerateProductImages implements ShouldQueue
             null,
             true,
         );
-        $generatedImages = $generator->generate($source, $request->prompt);
+        $generatedImages = $generator->generate(
+            $source,
+            $request->prompt,
+            function (string $step, int $progress) use ($request): void {
+                $request->update([
+                    'progress' => min(90, max(10, $progress)),
+                    'progress_step' => $step,
+                ]);
+            },
+        );
+        $request->update([
+            'progress' => 90,
+            'progress_step' => 'saving',
+        ]);
         $results = $this->storeValidatedResults($request, $generatedImages);
 
         $request->update([
             'status' => 'completed',
+            'progress' => 100,
+            'progress_step' => 'completed',
             'results' => $results,
             'error' => null,
+            'completed_at' => now(),
         ]);
         Storage::disk('local')->delete($request->source_path);
     }
@@ -70,7 +100,9 @@ class GenerateProductImages implements ShouldQueue
         Storage::disk('local')->delete($request->source_path);
         $request->update([
             'status' => 'failed',
+            'progress_step' => 'failed',
             'error' => 'De productfoto\'s konden niet worden gemaakt. Probeer het later opnieuw.',
+            'completed_at' => now(),
         ]);
     }
 
