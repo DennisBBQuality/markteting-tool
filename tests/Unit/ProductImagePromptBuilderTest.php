@@ -20,9 +20,12 @@ class ProductImagePromptBuilderTest extends TestCase
         $this->assertNotSame($plans[0]['style_reference_id'], $plans[1]['style_reference_id']);
         $this->assertStringContainsString('smoker', $plans[0]['instruction']);
         $this->assertStringContainsString('mahonie', $plans[1]['instruction']);
-        $this->assertStringContainsString('exacte buitencontour en verhoudingen', $plans[2]['instruction']);
+        $this->assertStringContainsString('exacte buitencontour, lengte-breedte-dikteverhouding', $plans[2]['instruction']);
         $this->assertSame('rauw_bbquality_vast', $plans[2]['style_reference_id']);
         $this->assertStringContainsString('volledig egale diepzwarte achterwand', $plans[2]['style']);
+        $this->assertStringContainsString('één grote, hele en ongetrimde brisket', $plans[2]['instruction']);
+        $this->assertStringContainsString('nooit een losse stapel', $plans[2]['instruction']);
+        $this->assertStringContainsString('dezelfde buitenomtrek', $plans[3]['instruction']);
         $this->assertNull($plans[3]['style_reference_id']);
         $this->assertStringContainsString('wasachtig', $plans[3]['instruction']);
     }
@@ -44,9 +47,10 @@ class ProductImagePromptBuilderTest extends TestCase
             'product_reference_count' => 2,
         ], $plans[2]);
 
-        $this->assertStringContainsString('VASTE BBQUALITY-ACHTERGRONDREFERENTIE', $prompt);
+        $this->assertStringContainsString('LEGE VASTE BBQUALITY-ACHTERGRONDREFERENTIE', $prompt);
         $this->assertStringContainsString('zo exact mogelijk over', $prompt);
-        $this->assertStringContainsString('Neem nooit het voorbeeldproduct', $prompt);
+        $this->assertStringContainsString('de enige bron voor de vorm', $prompt);
+        $this->assertStringContainsString('Leid nooit productvorm', $prompt);
     }
 
     public function test_beef_steak_has_one_uncut_and_one_sliced_medium_variant(): void

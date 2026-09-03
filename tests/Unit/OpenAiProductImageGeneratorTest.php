@@ -171,7 +171,8 @@ class OpenAiProductImageGeneratorTest extends TestCase
                 $this->assertStringContainsString('De allerlaatste afbeelding', $prompt);
                 if ($index === 2) {
                     $this->assertTrue($filenames->contains('style-rauw-bbquality-vast.png'));
-                    $this->assertStringContainsString('VASTE BBQUALITY-ACHTERGRONDREFERENTIE', $prompt);
+                    $this->assertStringContainsString('LEGE VASTE BBQUALITY-ACHTERGRONDREFERENTIE', $prompt);
+                    $this->assertStringContainsString('de enige bron voor de vorm', $prompt);
                 }
             } else {
                 $this->assertCount(2, $files);
