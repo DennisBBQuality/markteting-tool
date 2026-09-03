@@ -61,6 +61,7 @@ function renderConverter() {
           <span class="product-image-eyebrow">AI productfotografie</span>
           <h3 id="product-image-title">Productfoto Generator</h3>
           <p>Maak betrouwbare productfoto's vanuit maximaal vijf echte referentiefoto's.</p>
+          <p><i class="fas fa-circle-check" style="color:var(--success);"></i> Goedgekeurde BBQuality-stijlbibliotheek actief: bereide varianten krijgen verschillende sferen.</p>
         </div>
         <button class="btn btn-outline" type="button" onclick="openProductPromptModal()">
           <i class="fas fa-pen"></i> Prompt instellen
