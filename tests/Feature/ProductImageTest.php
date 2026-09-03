@@ -7,6 +7,8 @@ use App\Jobs\RefineProductImage;
 use App\Models\ImagePrompt;
 use App\Models\ProductImageAsset;
 use App\Models\ProductImageRequest;
+use App\Models\ProductImageStyleReference;
+use App\Models\User;
 use App\Services\ProductImageGenerationException;
 use App\Services\ProductImageGenerator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -23,9 +25,31 @@ class ProductImageTest extends TestCase
 
     public function test_product_image_endpoints_require_authentication(): void
     {
+        $user = User::factory()->create();
+        $imageRequest = ProductImageRequest::create([
+            'user_id' => $user->id,
+            'status' => 'completed',
+            'progress' => 100,
+            'source_path' => 'product-images/test/source.png',
+            'prompt' => 'Test prompt voor authenticatie.',
+            'generation_context' => ['product_type' => 'meat'],
+            'results' => [],
+        ]);
+        $asset = ProductImageAsset::create([
+            'product_image_request_id' => $imageRequest->id,
+            'filename' => 'bereid.png',
+            'style_id' => 'bbq_buiten_brisket',
+            'version' => 1,
+            'refinement_status' => 'idle',
+            'mime_type' => 'image/png',
+            'contents_base64' => base64_encode('invalid-but-not-reached'),
+        ]);
+
         $this->getJson('/api/images/prompt')->assertUnauthorized();
         $this->putJson('/api/images/prompt', ['prompt' => str_repeat('a', 20)])->assertUnauthorized();
         $this->postJson('/api/images/generate')->assertUnauthorized();
+        $this->postJson("/api/images/requests/{$imageRequest->id}/assets/{$asset->id}/style-library")
+            ->assertUnauthorized();
     }
 
     public function test_prompt_can_be_read_and_updated(): void
@@ -258,6 +282,53 @@ class ProductImageTest extends TestCase
         $this->assertSame(1, $selected->revisions()->where('version', 1)->count());
         $this->assertSame(1, $untouched->refresh()->version);
         $this->assertSame(0, $untouched->revisions()->count());
+    }
+
+    public function test_a_generated_photo_can_be_saved_and_updated_in_the_style_library(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+        $user = $this->actingAsUser();
+
+        $queued = $this->post('/api/images/generate', [
+            'foto' => UploadedFile::fake()->image('brisket.jpg'),
+            'product_type' => 'meat',
+            'product_name' => 'Black Angus brisket',
+            'quantity' => 1,
+        ], ['Accept' => 'application/json'])->assertAccepted();
+        $imageRequest = ProductImageRequest::findOrFail($queued->json('request_id'));
+        (new GenerateProductImages($imageRequest->id))->handle(app(ProductImageGenerator::class));
+        $asset = ProductImageAsset::where('product_image_request_id', $imageRequest->id)->orderBy('id')->firstOrFail();
+
+        $this->postJson("/api/images/requests/{$imageRequest->id}/assets/{$asset->id}/style-library", [
+            'product_name' => 'Black Angus brisket',
+        ])->assertCreated()
+            ->assertJsonPath('saved', true)
+            ->assertJsonPath('product_name', 'Black Angus brisket')
+            ->assertJsonPath('source_version', 1);
+
+        $this->assertDatabaseHas('product_image_style_references', [
+            'product_key' => 'black-angus-brisket',
+            'status' => 'bereid',
+            'style_id' => $asset->style_id,
+            'source_asset_id' => $asset->id,
+            'source_version' => 1,
+            'created_by' => $user->id,
+        ]);
+        $this->getJson('/api/images/requests/'.$imageRequest->id)
+            ->assertOk()
+            ->assertJsonPath('results.0.in_style_library', true);
+
+        $asset->update(['version' => 2]);
+        $this->getJson('/api/images/requests/'.$imageRequest->id)
+            ->assertOk()
+            ->assertJsonPath('results.0.in_style_library', false);
+        $this->postJson("/api/images/requests/{$imageRequest->id}/assets/{$asset->id}/style-library", [
+            'product_name' => 'Black Angus brisket',
+        ])->assertOk()->assertJsonPath('source_version', 2);
+
+        $this->assertSame(1, ProductImageStyleReference::where('source_asset_id', $asset->id)->count());
+        $this->assertSame(2, ProductImageStyleReference::where('source_asset_id', $asset->id)->value('source_version'));
     }
 
     public function test_incomplete_generator_output_is_rejected_without_storing_files(): void

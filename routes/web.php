@@ -102,6 +102,7 @@ Route::middleware('auth.custom')->group(function () {
     Route::post('/api/images/generate', [ProductImageController::class, 'generate'])->middleware('throttle:3,1');
     Route::get('/api/images/requests/{imageRequest}', [ProductImageController::class, 'status']);
     Route::post('/api/images/requests/{imageRequest}/assets/{asset}/refine', [ProductImageController::class, 'refine'])->middleware('throttle:6,1');
+    Route::post('/api/images/requests/{imageRequest}/assets/{asset}/style-library', [ProductImageController::class, 'addToStyleLibrary'])->middleware('throttle:12,1');
     Route::get('/api/images/requests/{imageRequest}/assets/{asset}/revisions', [ProductImageController::class, 'revisions']);
     Route::post('/api/images/requests/{imageRequest}/assets/{asset}/revisions/{revision}/restore', [ProductImageController::class, 'restore']);
     // Keep the protected URL extensionless so nginx never mistakes it for a public static PNG.

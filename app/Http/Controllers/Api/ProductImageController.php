@@ -9,6 +9,7 @@ use App\Models\ImagePrompt;
 use App\Models\ProductImageAsset;
 use App\Models\ProductImageRevision;
 use App\Models\ProductImageRequest;
+use App\Models\ProductImageStyleReference;
 use App\Services\AiCredentialStore;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -209,6 +210,49 @@ class ProductImageController extends Controller
         ]);
     }
 
+    public function addToStyleLibrary(Request $request, ProductImageRequest $imageRequest, ProductImageAsset $asset): JsonResponse
+    {
+        $this->ensureOwner($request, $imageRequest);
+        $this->ensureAssetBelongsToRequest($imageRequest, $asset);
+        $validated = $request->validate([
+            'product_name' => ['required', 'string', 'min:2', 'max:160'],
+        ]);
+
+        $result = collect($imageRequest->results ?? [])->firstWhere('filename', $asset->filename);
+        if (! is_array($result)) {
+            abort(404);
+        }
+
+        $contents = base64_decode($asset->contents_base64, true);
+        $metadata = is_string($contents) ? @getimagesizefromstring($contents) : false;
+        if (! is_array($metadata) || ($metadata['mime'] ?? null) !== 'image/png') {
+            return response()->json(['error' => 'Deze foto kon niet veilig aan de stijlbibliotheek worden toegevoegd.'], 422);
+        }
+
+        $productName = trim($validated['product_name']);
+        $reference = ProductImageStyleReference::updateOrCreate(
+            ['source_asset_id' => $asset->id],
+            [
+                'product_name' => $productName,
+                'product_key' => ProductImageStyleReference::productKey($productName),
+                'product_type' => (string) ($imageRequest->generation_context['product_type'] ?? 'meat'),
+                'status' => (string) ($result['status'] ?? ''),
+                'style_id' => $asset->style_id ?? ($result['style_id'] ?? null),
+                'source_version' => $asset->version,
+                'created_by' => $request->session()->get('userId'),
+                'mime_type' => 'image/png',
+                'contents_base64' => $asset->contents_base64,
+            ],
+        );
+
+        return response()->json([
+            'saved' => true,
+            'reference_id' => $reference->id,
+            'product_name' => $reference->product_name,
+            'source_version' => $reference->source_version,
+        ], $reference->wasRecentlyCreated ? 201 : 200);
+    }
+
     public function restore(Request $request, ProductImageRequest $imageRequest, ProductImageAsset $asset, ProductImageRevision $revision): JsonResponse
     {
         $this->ensureOwner($request, $imageRequest);
@@ -258,6 +302,11 @@ class ProductImageController extends Controller
                 'version' => $storedAsset?->version ?? 1,
                 'refinement_status' => $storedAsset?->refinement_status ?? 'idle',
                 'refinement_error' => $storedAsset?->refinement_error,
+                'in_style_library' => $storedAsset
+                    ? ProductImageStyleReference::where('source_asset_id', $storedAsset->id)
+                        ->where('source_version', $storedAsset->version)
+                        ->exists()
+                    : false,
                 'needs_label_review' => ($imageRequest->generation_context['product_type'] ?? null) === 'sauce',
                 'url' => $url.'?v='.($storedAsset?->version ?? 1),
                 'download_url' => $url.'?download=1',
