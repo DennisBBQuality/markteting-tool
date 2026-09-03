@@ -15,7 +15,9 @@ class ProductImageRequest extends Model
         'progress',
         'progress_step',
         'source_path',
+        'source_references',
         'prompt',
+        'generation_context',
         'results',
         'error',
         'started_at',
@@ -26,6 +28,8 @@ class ProductImageRequest extends Model
     {
         return [
             'results' => 'array',
+            'source_references' => 'array',
+            'generation_context' => 'array',
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
         ];

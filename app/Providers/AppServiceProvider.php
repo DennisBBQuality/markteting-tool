@@ -6,6 +6,7 @@ use App\Services\AiCredentialStore;
 use App\Services\FakeProductImageGenerator;
 use App\Services\OpenAiProductImageGenerator;
 use App\Services\ProductImageGenerator;
+use App\Services\ProductImageRefiner;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
 
@@ -27,6 +28,7 @@ class AppServiceProvider extends ServiceProvider
                 default => throw new InvalidArgumentException('Onbekende productafbeelding-driver.'),
             };
         });
+        $this->app->bind(ProductImageRefiner::class, fn () => $this->app->make(ProductImageGenerator::class));
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Jobs\GenerateProductImages;
+use App\Jobs\RefineProductImage;
 use App\Models\ImagePrompt;
 use App\Models\ProductImageAsset;
 use App\Models\ProductImageRequest;
@@ -174,6 +175,89 @@ class ProductImageTest extends TestCase
 
         $filename = basename(parse_url($result['url'], PHP_URL_PATH)).'.png';
         $this->assertNotEmpty(ProductImageAsset::where('filename', $filename)->value('contents_base64'));
+    }
+
+    public function test_multiple_references_and_sauce_workflow_return_two_distinct_styles(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+        $this->actingAsUser();
+
+        $queued = $this->post('/api/images/generate', [
+            'fotos' => [
+                UploadedFile::fake()->image('voorkant.jpg', 800, 1000),
+                UploadedFile::fake()->image('achterkant.jpg', 800, 1000),
+            ],
+            'main_index' => 1,
+            'product_type' => 'sauce',
+            'product_name' => 'BBQuality The Original',
+            'quantity' => 1,
+        ], ['Accept' => 'application/json'])->assertAccepted();
+
+        $imageRequest = ProductImageRequest::findOrFail($queued->json('request_id'));
+        $this->assertCount(2, $imageRequest->source_references);
+        $this->assertSame('sauce', $imageRequest->generation_context['product_type']);
+        $this->assertTrue($imageRequest->source_references[0]['is_main']);
+
+        (new GenerateProductImages($imageRequest->id))->handle(app(ProductImageGenerator::class));
+        $results = $this->getJson('/api/images/requests/'.$imageRequest->id)
+            ->assertOk()
+            ->assertJsonCount(2, 'results')
+            ->assertJsonPath('results.0.needs_label_review', true)
+            ->json('results');
+
+        $this->assertSame(['bbquality_buiten', 'bbquality_donker'], array_column($results, 'style_id'));
+        foreach ($imageRequest->source_references as $reference) {
+            Storage::disk('local')->assertMissing($reference['path']);
+        }
+    }
+
+    public function test_no_more_than_five_reference_photos_are_accepted(): void
+    {
+        Storage::fake('local');
+        $this->actingAsUser();
+
+        $this->post('/api/images/generate', [
+            'fotos' => collect(range(1, 6))->map(fn ($number) => UploadedFile::fake()->image("foto-{$number}.jpg"))->all(),
+            'product_type' => 'meat',
+            'product_name' => 'Kogelbiefstuk',
+            'quantity' => 1,
+        ], ['Accept' => 'application/json'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('fotos');
+    }
+
+    public function test_only_the_selected_image_is_refined_and_old_version_is_kept(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+        $this->actingAsUser();
+
+        $queued = $this->post('/api/images/generate', [
+            'foto' => UploadedFile::fake()->image('steak.jpg'),
+            'product_type' => 'meat',
+            'product_name' => 'Angus steak',
+            'quantity' => 1,
+        ], ['Accept' => 'application/json'])->assertAccepted();
+        $imageRequest = ProductImageRequest::findOrFail($queued->json('request_id'));
+        (new GenerateProductImages($imageRequest->id))->handle(app(ProductImageGenerator::class));
+
+        $assets = ProductImageAsset::where('product_image_request_id', $imageRequest->id)->orderBy('id')->get();
+        $selected = $assets[1];
+        $untouched = $assets[0];
+
+        $this->postJson("/api/images/requests/{$imageRequest->id}/assets/{$selected->id}/refine", [
+            'instruction' => 'Maak de korst krokanter en de kern medium.',
+        ])->assertAccepted();
+        Queue::assertPushed(RefineProductImage::class, fn ($job) => $job->assetId === $selected->id);
+
+        (new RefineProductImage($imageRequest->id, $selected->id, 'Maak de korst krokanter en de kern medium.'))
+            ->handle(app(\App\Services\ProductImageRefiner::class));
+
+        $this->assertSame(2, $selected->refresh()->version);
+        $this->assertSame(1, $selected->revisions()->where('version', 1)->count());
+        $this->assertSame(1, $untouched->refresh()->version);
+        $this->assertSame(0, $untouched->revisions()->count());
     }
 
     public function test_incomplete_generator_output_is_rejected_without_storing_files(): void

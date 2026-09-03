@@ -8,7 +8,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-class OpenAiProductImageGenerator implements ProductImageGenerator
+class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImageWorkflowGenerator, ProductImageRefiner
 {
     private const INPUT_CANVAS_SIZE = 1024;
 
@@ -21,7 +21,70 @@ class OpenAiProductImageGenerator implements ProductImageGenerator
         'rauw' => 'MANDATORY VARIANT: Show the meat completely raw and uncooked, outside all packaging. Preserve the natural raw colour, marbling, fat and texture of this exact cut. Create subtle visual variety between the two outputs through camera angle, composition or surface, without adding seasoning, garnish, text or packaging.',
     ];
 
-    public function __construct(private readonly AiCredentialStore $credentials) {}
+    public function __construct(
+        private readonly AiCredentialStore $credentials,
+        private readonly ProductImagePromptBuilder $promptBuilder,
+    ) {}
+
+    public function generateForProduct(
+        array $sources,
+        string $basePrompt,
+        array $context,
+        ?callable $reportProgress = null,
+    ): array {
+        $apiKey = $this->credentials->openAiApiKey() ?? '';
+        if ($apiKey === '') {
+            throw new ProductImageGenerationException('De OpenAI API-sleutel is niet ingesteld.');
+        }
+        if ($sources === []) {
+            throw new ProductImageGenerationException('Er is geen referentiefoto aangeleverd.');
+        }
+
+        if ($reportProgress) {
+            $reportProgress('preparing', 15);
+        }
+        $normalizedSources = array_map(fn (UploadedFile $source) => $this->normalizeSource($source), $sources);
+        $plans = $this->promptBuilder->plans($context);
+        $results = [];
+        $total = count($plans);
+
+        foreach ($plans as $index => $plan) {
+            if ($reportProgress) {
+                $reportProgress(
+                    'generating_'.($plan['status'] === 'bereid' ? 'prepared' : ($plan['status'] === 'rauw' ? 'raw' : 'product')),
+                    20 + (int) floor(($index / max(1, $total)) * 65),
+                );
+            }
+            $contents = $this->requestOne(
+                $normalizedSources,
+                $this->promptBuilder->prompt($basePrompt, $context, $plan),
+                $apiKey,
+            );
+            $results[] = [
+                'status' => $plan['status'],
+                'label' => $plan['label'],
+                'style_id' => $plan['style_id'],
+                'contents' => $contents,
+                'extension' => 'png',
+            ];
+        }
+
+        return $results;
+    }
+
+    public function refine(UploadedFile $source, string $instruction, array $context = []): string
+    {
+        $apiKey = $this->credentials->openAiApiKey() ?? '';
+        if ($apiKey === '') {
+            throw new ProductImageGenerationException('De OpenAI API-sleutel is niet ingesteld.');
+        }
+
+        return $this->requestOne(
+            [$this->normalizeSource($source)],
+            $this->promptBuilder->refinementPrompt($instruction, $context),
+            $apiKey,
+        );
+    }
 
     public function generate(UploadedFile $source, string $basePrompt, ?callable $reportProgress = null): array
     {
@@ -124,6 +187,58 @@ class OpenAiProductImageGenerator implements ProductImageGenerator
         }
 
         return $images;
+    }
+
+    /** @param list<string> $sourcePngs */
+    private function requestOne(array $sourcePngs, string $prompt, string $apiKey): string
+    {
+        $model = (string) config('services.product_images.openai.model');
+        $parameters = [
+            'model' => $model,
+            'prompt' => $prompt,
+            'n' => 1,
+            'size' => (string) config('services.product_images.openai.size'),
+            'output_format' => 'png',
+            'quality' => (string) config('services.product_images.openai.quality', 'high'),
+            'background' => 'opaque',
+        ];
+        if (! str_starts_with($model, 'gpt-image-2')) {
+            $parameters['input_fidelity'] = (string) config('services.product_images.openai.input_fidelity', 'high');
+        }
+
+        try {
+            $pending = Http::withToken($apiKey)
+                ->acceptJson()
+                ->timeout((int) config('services.product_images.openai.timeout', 240))
+                ->connectTimeout(15);
+            $field = count($sourcePngs) > 1 ? 'image[]' : 'image';
+            foreach ($sourcePngs as $index => $sourcePng) {
+                $pending = $pending->attach($field, $sourcePng, 'reference-'.($index + 1).'.png', [
+                    'Content-Type' => 'image/png',
+                ]);
+            }
+            $response = $pending->post((string) config('services.product_images.openai.endpoint'), $parameters);
+        } catch (ConnectionException) {
+            throw new ProductImageGenerationException('De beeldservice is momenteel niet bereikbaar.');
+        }
+
+        if (! $response->successful()) {
+            Log::warning('Product image generation request failed.', [
+                'status' => $response->status(),
+                'request_id' => $response->header('x-request-id'),
+                'error_code' => $response->json('error.code'),
+            ]);
+            throw new ProductImageGenerationException($this->userFacingApiError($response));
+        }
+
+        $encoded = $response->json('data.0.b64_json');
+        $contents = is_string($encoded) ? base64_decode($encoded, true) : false;
+        $maxBytes = (int) config('services.product_images.max_output_bytes', 20 * 1024 * 1024);
+        if (! is_string($contents) || $contents === '' || strlen($contents) > $maxBytes) {
+            throw new ProductImageGenerationException('De beeldservice leverde een ongeldige afbeelding op.');
+        }
+
+        return $contents;
     }
 
     private function userFacingApiError(Response $response): string
