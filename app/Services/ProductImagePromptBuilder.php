@@ -69,8 +69,8 @@ class ProductImagePromptBuilder
             ],
             [
                 'status' => 'rauw', 'label' => 'Vlees rauw', 'style_id' => 'rauw_studio',
-                'scene_family' => 'rauw_donker', 'style_reference_id' => null,
-                'style' => 'Premium slagersfoto op warm donker hout met een rustige donkere achtergrond.',
+                'scene_family' => 'rauw_bbquality_vast', 'style_reference_id' => 'rauw_bbquality_vast',
+                'style' => 'VASTE BBQUALITY-ACHTERGROND: neem de achtergrondopbouw uit het laatste referentiebeeld zo exact mogelijk over. Gebruik een volledig egale diepzwarte achterwand bovenin en dezelfde warme goudbruine houten plaat met grove nerf onderin. Behoud dezelfde zichtbare verhouding tussen zwart en hout, frontale tot licht verhoogde camerahoek, directe belichting en eenvoudige centrale plaatsing. Voeg geen plank, bord, doek, schaaltje, kruiden, verpakking of ander accessoire toe.',
                 'instruction' => 'Verwijder plastic, vacuümzak, schaal, absorptiemat, stickers en etiketten volledig. Toon het product volledig rauw en onbewerkt. Kopieer de exacte buitencontour en verhoudingen uit de hoofdfoto: niet oprollen, samendrukken, verdikken, inkorten, bijsnijden of mooier modelleren. Behoud natuurlijk dieprood spierweefsel, realistische vezelrichting, correcte marmering en dezelfde plaats, dikte en onregelmatigheid van de vetkap.',
             ],
             [
@@ -120,6 +120,10 @@ class ProductImagePromptBuilder
         $count = max(1, (int) ($context['product_reference_count'] ?? 1));
         if (($plan['style_reference_id'] ?? null) === null) {
             return "REFERENTIEROLLEN: afbeelding 1 t/m {$count} zijn uitsluitend productreferenties. Gebruik ze samen om vorm, materiaal, details en hoeveelheid feitelijk vast te stellen.";
+        }
+
+        if (($plan['style_reference_id'] ?? null) === 'rauw_bbquality_vast') {
+            return "REFERENTIEROLLEN: afbeelding 1 t/m {$count} zijn uitsluitend productreferenties en zijn leidend voor het rauwe hoofdproduct. De allerlaatste afbeelding is uitsluitend de VASTE BBQUALITY-ACHTERGRONDREFERENTIE. Neem daarvan het zwarte achtervlak, het warme hout, de vlakverdeling, belichting, camerahoek en kadrering zo exact mogelijk over. Neem nooit het voorbeeldproduct, de voorbeeldhoeveelheid of andere voorwerpen uit die achtergrondreferentie over. Bij conflict winnen de productreferenties altijd.";
         }
 
         return "REFERENTIEROLLEN: afbeelding 1 t/m {$count} zijn uitsluitend productreferenties en zijn leidend voor het hoofdproduct. De allerlaatste afbeelding is uitsluitend een goedgekeurd BBQuality-STIJLVOORBEELD. Neem daarvan alleen fotografie, sfeer, licht, camerastandpunt, kadrering en type omgeving over. Kopieer nooit het vlees, gerecht, aantal, merk, tekst, verpakking of accessoires uit het stijlvoorbeeld. Bij conflict winnen de productreferenties altijd.";

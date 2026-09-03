@@ -129,7 +129,7 @@ class OpenAiProductImageGeneratorTest extends TestCase
         });
     }
 
-    public function test_cooked_variants_append_one_style_reference_but_raw_variants_do_not(): void
+    public function test_styled_variants_append_one_reference_but_the_free_raw_variant_does_not(): void
     {
         config()->set('services.product_images.driver', 'openai');
         config()->set('services.product_images.openai', [
@@ -165,10 +165,14 @@ class OpenAiProductImageGeneratorTest extends TestCase
             $filenames = $files->pluck('filename')->filter()->values();
             $prompt = (string) (collect($request->data())->firstWhere('name', 'prompt')['contents'] ?? '');
 
-            if ($index < 2) {
+            if ($index < 3) {
                 $this->assertCount(3, $files);
                 $this->assertCount(1, $filenames->filter(fn (string $filename) => str_starts_with($filename, 'style-')));
                 $this->assertStringContainsString('De allerlaatste afbeelding', $prompt);
+                if ($index === 2) {
+                    $this->assertTrue($filenames->contains('style-rauw-bbquality-vast.png'));
+                    $this->assertStringContainsString('VASTE BBQUALITY-ACHTERGRONDREFERENTIE', $prompt);
+                }
             } else {
                 $this->assertCount(2, $files);
                 $this->assertCount(0, $filenames->filter(fn (string $filename) => str_starts_with($filename, 'style-')));
