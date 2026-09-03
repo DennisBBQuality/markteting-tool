@@ -24,6 +24,7 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
     public function __construct(
         private readonly AiCredentialStore $credentials,
         private readonly ProductImagePromptBuilder $promptBuilder,
+        private readonly ProductImageStyleLibrary $styleLibrary,
     ) {}
 
     public function generateForProduct(
@@ -43,7 +44,11 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
         if ($reportProgress) {
             $reportProgress('preparing', 15);
         }
-        $normalizedSources = array_map(fn (UploadedFile $source) => $this->normalizeSource($source), $sources);
+        $normalizedSources = array_map(fn (UploadedFile $source, int $index) => [
+            'contents' => $this->normalizeSource($source),
+            'filename' => 'product-reference-'.($index + 1).'.png',
+        ], $sources, array_keys($sources));
+        $context['product_reference_count'] = count($normalizedSources);
         $plans = $this->promptBuilder->plans($context);
         $results = [];
         $total = count($plans);
@@ -55,8 +60,16 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
                     20 + (int) floor(($index / max(1, $total)) * 65),
                 );
             }
+            $requestSources = $normalizedSources;
+            $styleReference = $this->styleLibrary->reference($plan['style_reference_id'] ?? null);
+            if ($styleReference !== null) {
+                $requestSources[] = [
+                    'contents' => $this->normalizeStyleReference($styleReference),
+                    'filename' => $styleReference['filename'],
+                ];
+            }
             $contents = $this->requestOne(
-                $normalizedSources,
+                $requestSources,
                 $this->promptBuilder->prompt($basePrompt, $context, $plan),
                 $apiKey,
             );
@@ -189,7 +202,7 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
         return $images;
     }
 
-    /** @param list<string> $sourcePngs */
+    /** @param list<string|array{contents: string, filename: string}> $sourcePngs */
     private function requestOne(array $sourcePngs, string $prompt, string $apiKey): string
     {
         $model = (string) config('services.product_images.openai.model');
@@ -212,8 +225,10 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
                 ->timeout((int) config('services.product_images.openai.timeout', 240))
                 ->connectTimeout(15);
             $field = count($sourcePngs) > 1 ? 'image[]' : 'image';
-            foreach ($sourcePngs as $index => $sourcePng) {
-                $pending = $pending->attach($field, $sourcePng, 'reference-'.($index + 1).'.png', [
+            foreach ($sourcePngs as $index => $source) {
+                $sourcePng = is_array($source) ? $source['contents'] : $source;
+                $filename = is_array($source) ? $source['filename'] : 'reference-'.($index + 1).'.png';
+                $pending = $pending->attach($field, $sourcePng, $filename, [
                     'Content-Type' => 'image/png',
                 ]);
             }
@@ -346,5 +361,19 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
         }
 
         return $png;
+    }
+
+    /** @param array{path: string, filename: string} $reference */
+    private function normalizeStyleReference(array $reference): string
+    {
+        $source = new UploadedFile(
+            $reference['path'],
+            $reference['filename'],
+            mime_content_type($reference['path']) ?: 'image/png',
+            null,
+            true,
+        );
+
+        return $this->normalizeSource($source);
     }
 }

@@ -129,6 +129,54 @@ class OpenAiProductImageGeneratorTest extends TestCase
         });
     }
 
+    public function test_cooked_variants_append_one_style_reference_but_raw_variants_do_not(): void
+    {
+        config()->set('services.product_images.driver', 'openai');
+        config()->set('services.product_images.openai', [
+            'api_key' => 'test-key',
+            'endpoint' => 'https://api.openai.test/v1/images/edits',
+            'model' => 'gpt-image-2',
+            'size' => '1024x1024',
+            'timeout' => 30,
+        ]);
+        $encoded = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAFAgI/69VZ5QAAAABJRU5ErkJggg==';
+        Http::fake(['*' => Http::response(['data' => [['b64_json' => $encoded]]])]);
+
+        $results = app(OpenAiProductImageGenerator::class)->generateForProduct([
+            UploadedFile::fake()->image('verpakking-voor.jpg', 100, 100),
+            UploadedFile::fake()->image('verpakking-achter.jpg', 100, 100),
+        ], 'Maak een betrouwbare productfoto.', [
+            'product_type' => 'meat',
+            'product_name' => 'Black Angus brisket',
+            'quantity' => 1,
+        ]);
+
+        $this->assertSame(
+            ['bbq_buiten_brisket', 'serveerbeeld_brisket', 'rauw_studio', 'rauw_licht'],
+            array_column($results, 'style_id'),
+        );
+
+        $requests = Http::recorded()->map(fn (array $record) => $record[0]);
+        $this->assertCount(4, $requests);
+
+        foreach ($requests as $index => $request) {
+            $files = collect($request->data())
+                ->filter(fn (array $field) => $field['name'] === 'image[]');
+            $filenames = $files->pluck('filename')->filter()->values();
+            $prompt = (string) (collect($request->data())->firstWhere('name', 'prompt')['contents'] ?? '');
+
+            if ($index < 2) {
+                $this->assertCount(3, $files);
+                $this->assertCount(1, $filenames->filter(fn (string $filename) => str_starts_with($filename, 'style-')));
+                $this->assertStringContainsString('De allerlaatste afbeelding', $prompt);
+            } else {
+                $this->assertCount(2, $files);
+                $this->assertCount(0, $filenames->filter(fn (string $filename) => str_starts_with($filename, 'style-')));
+                $this->assertStringNotContainsString('De allerlaatste afbeelding', $prompt);
+            }
+        }
+    }
+
     public function test_it_never_sends_a_request_without_an_api_key(): void
     {
         config()->set('services.product_images.driver', 'openai');

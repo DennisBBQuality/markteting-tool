@@ -4,14 +4,6 @@ namespace App\Services;
 
 class ProductImagePromptBuilder
 {
-    private const COOKED_STYLES = [
-        ['id' => 'rustiek_binnen', 'text' => 'Rustieke binnenopname op een donkere houten slagersplank, warm zijlicht en geringe scherptediepte.'],
-        ['id' => 'bbq_buiten', 'text' => 'Heldere buitenopname bij een barbecue, warm daglicht, natuurlijke tuin onscherp op de achtergrond.'],
-        ['id' => 'serveerbeeld', 'text' => 'Sfeervol serveerbeeld op hout, subtiele passende garnering en een ambachtelijke BBQ-uitstraling.'],
-        ['id' => 'donkere_studio', 'text' => 'Donkere premium studio-opname met gericht zacht licht, diepe warme tinten en een rustige achtergrond.'],
-        ['id' => 'bereiding', 'text' => 'Ambachtelijke bereidingsscène met snijplank en hoogstens één passend BBQ-hulpmiddel, zonder mensen.'],
-    ];
-
     public function plans(array $context): array
     {
         return match ($context['product_type'] ?? 'meat') {
@@ -31,11 +23,13 @@ class ProductImagePromptBuilder
         $parts = [
             trim($basePrompt),
             "PRODUCT: {$name}.",
-            "HARD AANTALVEREISTE: toon exact {$quantity} exemplaar/exemplaren van het hoofdproduct. Nooit meer en nooit minder.",
-            'De eerste referentiefoto is de hoofdfoto. Gebruik de overige referenties om productdetails, vorm, hoeveelheid en merkuitvoering betrouwbaar vast te stellen.',
+            $this->quantityInstruction($plan['status'], $quantity),
+            'BRONBEHOUD: de eerste referentiefoto is de hoofdfoto. Behoud identiteit, oorspronkelijke lengte-breedte-dikteverhouding, silhouet, snit, vetkap, vetverdeling, marmering en herkenbare onregelmatigheden. Maak een lang of plat product nooit korter, compacter of dikker.',
+            $this->referenceInstruction($context, $plan),
             $plan['instruction'],
             'BEELDSTIJL: '.$plan['style'],
-            'Lever precies één vierkante, fotorealistische afbeelding zonder watermerk, toegevoegde reclametekst of fantasielogo.',
+            'FOTOGRAFISCHE KWALITEIT: echte voedselstructuur, natuurlijke kleur, realistische vezels, vet en vocht. Vermijd plastic, wasachtig, overdreven glad of uniform vlees, uitgebeten hooglichten, kunstmatige glans, gitzwarte korst en generieke stockfoto-uitstraling.',
+            'Lever precies één vierkante, fotorealistische afbeelding zonder watermerk, toegevoegde reclametekst of fantasielogo. Voeg nooit een tweede hoofdproduct toe.',
         ];
 
         if ($notes !== '') {
@@ -57,35 +51,33 @@ class ProductImagePromptBuilder
 
     private function meatPlans(array $context): array
     {
-        $name = strtolower((string) ($context['product_name'] ?? ''));
-        $isBeefSteak = str_contains($name, 'steak') || str_contains($name, 'biefstuk') || str_contains($name, 'picanha');
-        $styles = self::COOKED_STYLES;
-        shuffle($styles);
+        $family = $this->meatFamily((string) ($context['product_name'] ?? ''));
+        [$outdoorInstruction, $servingInstruction, $servingReference] = $this->cookedInstructions($family);
 
         return [
             [
-                'status' => 'bereid', 'label' => 'Vlees bereid', 'style_id' => $styles[0]['id'],
-                'style' => $styles[0]['text'],
-                'instruction' => $isBeefSteak
-                    ? 'Bereid het rundvlees medium. Snijd deze variant open zodat de medium roze kern, een sappige structuur en een krokante donkere korst zichtbaar zijn.'
-                    : 'Bereid dit exacte product op een culinair en producttechnisch geloofwaardige BBQ-manier. Maak een aantrekkelijke, sappige korst en behoud het herkenbare product.',
+                'status' => 'bereid', 'label' => 'Vlees bereid', 'style_id' => 'bbq_buiten_'.$family,
+                'scene_family' => 'buiten_bbq', 'style_reference_id' => $family === 'ribs' ? 'bbq_outdoor_smoker' : 'bbq_outdoor_kamado',
+                'style' => 'Duidelijke BBQ-sfeer buiten in warm natuurlijk daglicht. Toon een geloofwaardige barbecue, kamado of smoker zacht onscherp in de achtergrond, met een ambachtelijke houten serveerplank. Dit is een ruim sfeerbeeld en geen donkere studio-close-up.',
+                'instruction' => $outdoorInstruction,
             ],
             [
-                'status' => 'bereid', 'label' => 'Vlees bereid', 'style_id' => $styles[1]['id'],
-                'style' => $styles[1]['text'],
-                'instruction' => $isBeefSteak
-                    ? 'Bereid het rundvlees geloofwaardig en toon het volledig ongesneden. Geef de buitenkant een krokante, goed aangebraden korst. Deze foto moet duidelijk een andere stijl en achtergrond hebben dan de andere bereide variant.'
-                    : 'Bereid dit exacte product op een tweede geloofwaardige BBQ-manier. Laat het product heel en gebruik nadrukkelijk een andere stijl en achtergrond dan de andere bereide variant.',
+                'status' => 'bereid', 'label' => 'Vlees bereid', 'style_id' => 'serveerbeeld_'.$family,
+                'scene_family' => 'serveermoment', 'style_reference_id' => $servingReference,
+                'style' => 'Rijk maar geloofwaardig serveermoment met duidelijke foodstyling, meer omgeving in beeld en een andere camerahoek, achtergrond en compositie dan de buitenvariant. Een neutraal schaaltje saus, augurk, ingelegde ui, brood of kruiden mag alleen als passende sfeerdecoratie; voeg geen extra vleesproduct of merkartikel toe.',
+                'instruction' => $servingInstruction,
             ],
             [
                 'status' => 'rauw', 'label' => 'Vlees rauw', 'style_id' => 'rauw_studio',
+                'scene_family' => 'rauw_donker', 'style_reference_id' => null,
                 'style' => 'Premium slagersfoto op warm donker hout met een rustige donkere achtergrond.',
-                'instruction' => 'Verwijder plastic, vacuümzak, schaal, absorptiemat, stickers en etiketten volledig. Toon het product volledig rauw. Behoud de natuurlijk dieprode vleeskleur, correcte marmering, vetkap, snit en vorm.',
+                'instruction' => 'Verwijder plastic, vacuümzak, schaal, absorptiemat, stickers en etiketten volledig. Toon het product volledig rauw en onbewerkt. Kopieer de exacte buitencontour en verhoudingen uit de hoofdfoto: niet oprollen, samendrukken, verdikken, inkorten, bijsnijden of mooier modelleren. Behoud natuurlijk dieprood spierweefsel, realistische vezelrichting, correcte marmering en dezelfde plaats, dikte en onregelmatigheid van de vetkap.',
             ],
             [
                 'status' => 'rauw', 'label' => 'Vlees rauw', 'style_id' => 'rauw_licht',
-                'style' => 'Lichtere ambachtelijke productopname op een houten slagersplank, andere hoek en compositie dan de eerste rauwe foto.',
-                'instruction' => 'Verwijder alle verpakking volledig. Toon hetzelfde product volledig rauw, met exact dezelfde hoeveelheid en anatomisch correcte structuur, kleur, marmering en vetverdeling.',
+                'scene_family' => 'rauw_licht', 'style_reference_id' => null,
+                'style' => 'Lichtere ambachtelijke productopname op een houten slagersplank met zacht diffuus daglicht, behoud van detail in zowel rood vlees als wit vet en zonder overbelichting. Gebruik een andere hoek dan de donkere rauwe foto.',
+                'instruction' => 'Verwijder alle verpakking volledig. Toon hetzelfde product volledig rauw en onbewerkt. Behoud exact dezelfde lengte-breedte-dikteverhouding, buitencontour, anatomische structuur, dieprode vleeskleur, vezelrichting, marmering en vetverdeling. Het vet blijft natuurlijk mat en vezelig, nooit glad, roze, wasachtig of plasticachtig.',
             ],
         ];
     }
@@ -95,9 +87,9 @@ class ProductImagePromptBuilder
         $exact = 'Behoud de fles of pot, dop, vorm, verhoudingen, kleuren, het volledige etiket, logo en iedere zichtbare letter exact volgens de referentie. Verander of verzin geen enkel woord. Het product blijft verpakt en staat rechtop als hoofdonderwerp.';
 
         return [
-            ['status' => 'product', 'label' => 'Productfoto', 'style_id' => 'bbquality_buiten', 'instruction' => $exact,
+            ['status' => 'product', 'label' => 'Productfoto', 'style_id' => 'bbquality_buiten', 'scene_family' => 'buiten_bbq', 'style_reference_id' => 'product_buiten_bbquality', 'instruction' => $exact,
                 'style' => 'Vaste BBQuality-huisstijl: warme houten tafel, natuurlijk zonnig licht en een groene tuin zacht onscherp op de achtergrond.'],
-            ['status' => 'product', 'label' => 'Productfoto', 'style_id' => 'bbquality_donker', 'instruction' => $exact,
+            ['status' => 'product', 'label' => 'Productfoto', 'style_id' => 'bbquality_donker', 'scene_family' => 'donkere_studio', 'style_reference_id' => null, 'instruction' => $exact,
                 'style' => 'Donkere premium studio-opname op warm hout met zacht gericht licht; duidelijk anders dan de buitenvariant maar passend binnen dezelfde BBQuality-serie.'],
         ];
     }
@@ -107,10 +99,87 @@ class ProductImagePromptBuilder
         $instruction = 'Maak één totaalbeeld met uitsluitend alle aangeleverde en beschreven onderdelen. Alle eetbare vleesproducten blijven volledig rauw. Behoud van ieder onderdeel het exacte aantal. Verpakte merkproducten behouden hun echte verpakking en etiket; verzin niets.';
 
         return [
-            ['status' => 'totaal', 'label' => 'Totaalbeeld', 'style_id' => 'pakket_bovenaanzicht', 'instruction' => $instruction,
+            ['status' => 'totaal', 'label' => 'Totaalbeeld', 'style_id' => 'pakket_bovenaanzicht', 'scene_family' => 'bovenaanzicht', 'style_reference_id' => 'totaalpakket_rustiek', 'instruction' => $instruction,
                 'style' => 'Geordend premium bovenaanzicht op een grote donkere houten werktafel, met elk onderdeel volledig zichtbaar.'],
-            ['status' => 'totaal', 'label' => 'Totaalbeeld', 'style_id' => 'pakket_hero', 'instruction' => $instruction,
+            ['status' => 'totaal', 'label' => 'Totaalbeeld', 'style_id' => 'pakket_hero', 'scene_family' => 'hero', 'style_reference_id' => null, 'instruction' => $instruction,
                 'style' => 'Lage hero-compositie op rustiek hout met warme studioverlichting, een andere indeling dan het bovenaanzicht en elk onderdeel duidelijk herkenbaar.'],
         ];
+    }
+
+    private function quantityInstruction(string $status, int $quantity): string
+    {
+        if ($status === 'bereid') {
+            return "HARD AANTALVEREISTE: bereid exact {$quantity} oorspronkelijk(e) exemplaar/exemplaren van het hoofdproduct. Sneden of plakken blijven aantoonbaar delen van diezelfde {$quantity} exemplaar/exemplaren en zijn geen extra producten. Nooit vlees dupliceren.";
+        }
+
+        return "HARD AANTALVEREISTE: toon exact {$quantity} exemplaar/exemplaren van het hoofdproduct. Nooit meer en nooit minder.";
+    }
+
+    private function referenceInstruction(array $context, array $plan): string
+    {
+        $count = max(1, (int) ($context['product_reference_count'] ?? 1));
+        if (($plan['style_reference_id'] ?? null) === null) {
+            return "REFERENTIEROLLEN: afbeelding 1 t/m {$count} zijn uitsluitend productreferenties. Gebruik ze samen om vorm, materiaal, details en hoeveelheid feitelijk vast te stellen.";
+        }
+
+        return "REFERENTIEROLLEN: afbeelding 1 t/m {$count} zijn uitsluitend productreferenties en zijn leidend voor het hoofdproduct. De allerlaatste afbeelding is uitsluitend een goedgekeurd BBQuality-STIJLVOORBEELD. Neem daarvan alleen fotografie, sfeer, licht, camerastandpunt, kadrering en type omgeving over. Kopieer nooit het vlees, gerecht, aantal, merk, tekst, verpakking of accessoires uit het stijlvoorbeeld. Bij conflict winnen de productreferenties altijd.";
+    }
+
+    /** @return array{string, string, string} */
+    private function cookedInstructions(string $family): array
+    {
+        return match ($family) {
+            'steak' => [
+                'Bereid het rundvlees medium en toon het volledig ongesneden. Geef het een natuurlijke donkerbruine, krokant aangebraden korst met subtiele grillsporen; geen zwarte of lakachtige buitenkant.',
+                'Bereid hetzelfde rundvlees medium en snijd uitsluitend deze variant open. Toon een sappige warme roze kern, geloofwaardige spiervezels en een krokant aangebraden buitenkant. De plakken blijven duidelijk afkomstig van het ene oorspronkelijke product.',
+                'serveer_steak_rustiek',
+            ],
+            'brisket' => [
+                'Rook deze exacte brisket geloofwaardig. Toon één volledige brisket buiten bij de smoker, eventueel met slechts enkele plakken die zichtbaar van hetzelfde stuk zijn afgesneden. Maak een droge, diepbruine mahonie bark met onregelmatige specerijen; nooit egaal zwart, nat gelakt of verbrand.',
+                'Maak van dezelfde ene brisket een sfeervol serveerbeeld op een plank: netjes tegen de draad gesneden plakken met zichtbare sappige vezels en een natuurlijke smoke ring. Houd een herkenbaar deel van het hele oorspronkelijke stuk in beeld. De bark is donker mahoniebruin en krokant, niet gitzwart of glanzend plastic.',
+                'serveer_brisket_plank',
+            ],
+            'moink' => [
+                'Bereid exact hetzelfde aantal MOINK balls buiten bij de barbecue. Behoud bij iedere bal de herkenbare spekband, maak het spek krokant en de glaze glanzend maar niet plasticachtig.',
+                'Serveer exact hetzelfde aantal geglaceerde MOINK balls in een gezellige BBQ-compositie. Hoogstens één bal mag worden doorgesneden om de sappige gehaktstructuur te tonen; beide helften tellen samen als die ene bal.',
+                'serveer_moink_balls',
+            ],
+            'burger' => [
+                'Grill exact hetzelfde aantal burgers of patties buiten op of naast de barbecue. Behoud maat, dikte en grove vleestextuur en maak een natuurlijke bruine korst zonder het aantal te veranderen.',
+                'Maak een rijk maar geloofwaardig serveerbeeld met exact hetzelfde aantal bereide burgers of patties. Brood en neutrale toppings mogen alleen als presentatie, maar het aantal vleeselementen blijft exact gelijk.',
+                'serveer_brisket_broodje',
+            ],
+            'ribs' => [
+                'Bereid exact hetzelfde aantal hele ribrekken buiten bij een smoker. Behoud botstructuur, lengte en breedte. Maak een natuurlijke roodbruine BBQ-korst met lichte karamellisatie, niet zwart of kunstmatig glanzend.',
+                'Serveer dezelfde ribrekken op een houten plank in een andere, rijkere compositie. Enkele ribben mogen losgesneden zijn als duidelijk blijft dat ze uit hetzelfde aantal aangeleverde rekken komen.',
+                'serveer_brisket_plank',
+            ],
+            default => [
+                'Bereid exact dit product buiten op een culinair en producttechnisch geloofwaardige BBQ-manier. Behoud herkenbare vorm, structuur en hoeveelheid en maak een natuurlijke aangebraden korst.',
+                'Maak een sfeervol serveerbeeld van exact hetzelfde bereide product met passende neutrale foodstyling. Gebruik een andere camerahoek en compositie dan de buitenvariant en behoud productidentiteit en hoeveelheid.',
+                'serveer_brisket_plank',
+            ],
+        };
+    }
+
+    private function meatFamily(string $productName): string
+    {
+        $name = strtolower($productName);
+
+        foreach ([
+            'brisket' => ['brisket', 'runderborst', 'borststuk'],
+            'moink' => ['moink', 'gehaktbal', 'meatball'],
+            'burger' => ['burger', 'patty', 'hamburger'],
+            'ribs' => ['sparerib', 'spare rib', 'ribs', 'ribfinger', 'rib finger'],
+            'steak' => ['steak', 'biefstuk', 'picanha', 'ribeye', 'entrecote', 'tomahawk', 't-bone', 'côte de boeuf'],
+        ] as $family => $terms) {
+            foreach ($terms as $term) {
+                if (str_contains($name, $term)) {
+                    return $family;
+                }
+            }
+        }
+
+        return 'algemeen';
     }
 }
