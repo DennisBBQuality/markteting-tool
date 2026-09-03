@@ -33,7 +33,7 @@ class ProductImageStyleLibrary
         ],
         'rauw_bbquality_vast' => [
             'file' => 'rauw-bbquality-vast.png',
-            'label' => 'Vaste BBQuality-achtergrond voor één rauwe variant',
+            'label' => 'Lege vaste BBQuality-achtergrond voor één rauwe variant',
         ],
         'product_buiten_bbquality' => [
             'file' => 'product-buiten-bbquality.png',

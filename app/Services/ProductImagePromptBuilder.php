@@ -53,6 +53,7 @@ class ProductImagePromptBuilder
     {
         $family = $this->meatFamily((string) ($context['product_name'] ?? ''));
         [$outdoorInstruction, $servingInstruction, $servingReference] = $this->cookedInstructions($family);
+        $rawShapeInstruction = $this->rawShapeInstruction($family);
 
         return [
             [
@@ -71,13 +72,13 @@ class ProductImagePromptBuilder
                 'status' => 'rauw', 'label' => 'Vlees rauw', 'style_id' => 'rauw_studio',
                 'scene_family' => 'rauw_bbquality_vast', 'style_reference_id' => 'rauw_bbquality_vast',
                 'style' => 'VASTE BBQUALITY-ACHTERGROND: neem de achtergrondopbouw uit het laatste referentiebeeld zo exact mogelijk over. Gebruik een volledig egale diepzwarte achterwand bovenin en dezelfde warme goudbruine houten plaat met grove nerf onderin. Behoud dezelfde zichtbare verhouding tussen zwart en hout, frontale tot licht verhoogde camerahoek, directe belichting en eenvoudige centrale plaatsing. Voeg geen plank, bord, doek, schaaltje, kruiden, verpakking of ander accessoire toe.',
-                'instruction' => 'Verwijder plastic, vacuümzak, schaal, absorptiemat, stickers en etiketten volledig. Toon het product volledig rauw en onbewerkt. Kopieer de exacte buitencontour en verhoudingen uit de hoofdfoto: niet oprollen, samendrukken, verdikken, inkorten, bijsnijden of mooier modelleren. Behoud natuurlijk dieprood spierweefsel, realistische vezelrichting, correcte marmering en dezelfde plaats, dikte en onregelmatigheid van de vetkap.',
+                'instruction' => 'Verwijder uitsluitend plastic, vacuümzak, schaal, absorptiemat, stickers en etiketten. Behandel dit als vrijleggen van hetzelfde product, niet als het opnieuw ontwerpen of anatomisch reconstrueren ervan. Kopieer de exacte buitencontour, lengte-breedte-dikteverhouding, oriëntatie en grote herkenbare uitstulpingen of inkepingen die door de verpakking zichtbaar zijn. Niet oprollen, openvouwen, samendrukken, verdikken, inkorten, bijsnijden, splitsen of mooier modelleren. Toon het product volledig rauw en onbewerkt met natuurlijk dieprood spierweefsel, realistische vezelrichting, correcte marmering en dezelfde plaats, dikte en onregelmatigheid van de vetkap. '.$rawShapeInstruction,
             ],
             [
                 'status' => 'rauw', 'label' => 'Vlees rauw', 'style_id' => 'rauw_licht',
                 'scene_family' => 'rauw_licht', 'style_reference_id' => null,
                 'style' => 'Lichtere ambachtelijke productopname op een houten slagersplank met zacht diffuus daglicht, behoud van detail in zowel rood vlees als wit vet en zonder overbelichting. Gebruik een andere hoek dan de donkere rauwe foto.',
-                'instruction' => 'Verwijder alle verpakking volledig. Toon hetzelfde product volledig rauw en onbewerkt. Behoud exact dezelfde lengte-breedte-dikteverhouding, buitencontour, anatomische structuur, dieprode vleeskleur, vezelrichting, marmering en vetverdeling. Het vet blijft natuurlijk mat en vezelig, nooit glad, roze, wasachtig of plasticachtig.',
+                'instruction' => 'Verwijder uitsluitend de verpakking. Toon exact hetzelfde product volledig rauw en onbewerkt; behandel dit niet als een nieuw of ideaal gevormd stuk vlees. Behoud exact dezelfde lengte-breedte-dikteverhouding, buitencontour, oriëntatie, grote uitstulpingen en inkepingen, anatomische structuur, dieprode vleeskleur, vezelrichting, marmering en vetverdeling. Niet openvouwen, oprollen, splitsen, inkorten of verdikken. Het vet blijft natuurlijk mat en vezelig, nooit glad, roze, wasachtig of plasticachtig. '.$rawShapeInstruction,
             ],
         ];
     }
@@ -123,7 +124,7 @@ class ProductImagePromptBuilder
         }
 
         if (($plan['style_reference_id'] ?? null) === 'rauw_bbquality_vast') {
-            return "REFERENTIEROLLEN: afbeelding 1 t/m {$count} zijn uitsluitend productreferenties en zijn leidend voor het rauwe hoofdproduct. De allerlaatste afbeelding is uitsluitend de VASTE BBQUALITY-ACHTERGRONDREFERENTIE. Neem daarvan het zwarte achtervlak, het warme hout, de vlakverdeling, belichting, camerahoek en kadrering zo exact mogelijk over. Neem nooit het voorbeeldproduct, de voorbeeldhoeveelheid of andere voorwerpen uit die achtergrondreferentie over. Bij conflict winnen de productreferenties altijd.";
+            return "REFERENTIEROLLEN: afbeelding 1 t/m {$count} zijn uitsluitend productreferenties en zijn de enige bron voor de vorm van het rauwe hoofdproduct. De allerlaatste afbeelding is een LEGE VASTE BBQUALITY-ACHTERGRONDREFERENTIE zonder product. Neem daarvan uitsluitend het zwarte achtervlak, het warme hout, de vlakverdeling, belichting, camerahoek en kadrering zo exact mogelijk over. Leid nooit productvorm, dikte, snit, vet of hoeveelheid af uit de achtergrondreferentie. Bij ieder conflict winnen de productreferenties altijd.";
         }
 
         return "REFERENTIEROLLEN: afbeelding 1 t/m {$count} zijn uitsluitend productreferenties en zijn leidend voor het hoofdproduct. De allerlaatste afbeelding is uitsluitend een goedgekeurd BBQuality-STIJLVOORBEELD. Neem daarvan alleen fotografie, sfeer, licht, camerastandpunt, kadrering en type omgeving over. Kopieer nooit het vlees, gerecht, aantal, merk, tekst, verpakking of accessoires uit het stijlvoorbeeld. Bij conflict winnen de productreferenties altijd.";
@@ -163,6 +164,16 @@ class ProductImagePromptBuilder
                 'Maak een sfeervol serveerbeeld van exact hetzelfde bereide product met passende neutrale foodstyling. Gebruik een andere camerahoek en compositie dan de buitenvariant en behoud productidentiteit en hoeveelheid.',
                 'serveer_brisket_plank',
             ],
+        };
+    }
+
+    private function rawShapeInstruction(string $family): string
+    {
+        return match ($family) {
+            'brisket' => 'PRODUCTVORM BRISKET: dit is één grote, hele en ongetrimde brisket. Behoud de lange, brede, aaneengesloten vorm van het verpakte stuk en de zichtbare verhouding tussen het plattere en dikkere deel. Maak er nooit een losse stapel, platte lap, compact blok, opengevouwen of gevlinderd stuk van. Alle spier- en vetdelen blijven verbonden binnen precies dezelfde buitenomtrek als op de echte productreferenties.',
+            'ribs' => 'PRODUCTVORM RIBS: behoud het volledige lange ribrek als één aaneengesloten product, met hetzelfde aantal zichtbare botposities, dezelfde kromming, lengte en breedte. Maak er geen losse ribben of compact blok van.',
+            'steak' => 'PRODUCTVORM STEAK: behoud exact de oorspronkelijke snit, dikte, omtrek en positie van vetkap of vetrand. Maak de steak niet ronder, hoger, symmetrischer of compacter.',
+            default => 'PRODUCTVORM: behoud het product als hetzelfde aantal aaneengesloten stukken met exact dezelfde individuele omtrek en onderlinge plaatsing als op de echte productreferenties.',
         };
     }
 
