@@ -92,6 +92,43 @@ class OpenAiProductImageGeneratorTest extends TestCase
         );
     }
 
+    public function test_new_workflow_uses_multiple_references_and_one_request_per_distinct_style(): void
+    {
+        config()->set('services.product_images.driver', 'openai');
+        config()->set('services.product_images.openai', [
+            'api_key' => 'test-key',
+            'endpoint' => 'https://api.openai.test/v1/images/edits',
+            'model' => 'gpt-image-2',
+            'size' => '1024x1024',
+            'timeout' => 30,
+        ]);
+        $encoded = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAFAgI/69VZ5QAAAABJRU5ErkJggg==';
+        Http::fake(['*' => Http::response(['data' => [['b64_json' => $encoded]]])]);
+
+        $results = app(OpenAiProductImageGenerator::class)->generateForProduct([
+            UploadedFile::fake()->image('voor.jpg', 100, 100),
+            UploadedFile::fake()->image('zij.jpg', 100, 100),
+        ], 'Maak een betrouwbare productfoto.', [
+            'product_type' => 'sauce',
+            'product_name' => 'BBQuality The Original',
+            'quantity' => 1,
+        ]);
+
+        $this->assertCount(2, $results);
+        $this->assertSame(['bbquality_buiten', 'bbquality_donker'], array_column($results, 'style_id'));
+        Http::assertSentCount(2);
+        Http::assertSent(function (Request $request) {
+            $data = collect($request->data());
+            $names = $data->pluck('name');
+            $prompt = (string) ($data->firstWhere('name', 'prompt')['contents'] ?? '');
+
+            return $names->filter(fn ($name) => $name === 'image[]')->count() === 2
+                && str_contains($prompt, 'HARD AANTALVEREISTE')
+                && str_contains($prompt, 'Verander of verzin geen enkel woord')
+                && ($data->firstWhere('name', 'n')['contents'] ?? null) === 1;
+        });
+    }
+
     public function test_it_never_sends_a_request_without_an_api_key(): void
     {
         config()->set('services.product_images.driver', 'openai');

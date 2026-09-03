@@ -6,6 +6,7 @@ use App\Models\ProductImageAsset;
 use App\Models\ProductImageRequest;
 use App\Services\ProductImageGenerationException;
 use App\Services\ProductImageGenerator;
+use App\Services\ProductImageWorkflowGenerator;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Http\UploadedFile;
@@ -54,28 +55,16 @@ class GenerateProductImages implements ShouldQueue
             'started_at' => $request->started_at ?? now(),
         ]);
 
-        $absolutePath = Storage::disk('local')->path($request->source_path);
-        if (! is_file($absolutePath)) {
-            throw new RuntimeException('De geüploade bronfoto ontbreekt.');
-        }
-
-        $source = new UploadedFile(
-            $absolutePath,
-            basename($request->source_path),
-            mime_content_type($absolutePath) ?: null,
-            null,
-            true,
-        );
-        $generatedImages = $generator->generate(
-            $source,
-            $request->prompt,
-            function (string $step, int $progress) use ($request): void {
+        $sources = $this->uploadedSources($request);
+        $progress = function (string $step, int $progress) use ($request): void {
                 $request->update([
                     'progress' => min(90, max(10, $progress)),
                     'progress_step' => $step,
                 ]);
-            },
-        );
+            };
+        $generatedImages = $generator instanceof ProductImageWorkflowGenerator && is_array($request->generation_context)
+            ? $generator->generateForProduct($sources, $request->prompt, $request->generation_context, $progress)
+            : $generator->generate($sources[0], $request->prompt, $progress);
         $request->update([
             'progress' => 90,
             'progress_step' => 'saving',
@@ -90,7 +79,7 @@ class GenerateProductImages implements ShouldQueue
             'error' => null,
             'completed_at' => now(),
         ]);
-        Storage::disk('local')->delete($request->source_path);
+        $this->deleteSources($request);
     }
 
     public function failed(?Throwable $exception): void
@@ -100,7 +89,7 @@ class GenerateProductImages implements ShouldQueue
             return;
         }
 
-        Storage::disk('local')->delete($request->source_path);
+        $this->deleteSources($request);
         $request->update([
             'status' => 'failed',
             'progress_step' => 'failed',
@@ -114,36 +103,40 @@ class GenerateProductImages implements ShouldQueue
     /** @param mixed $images */
     private function storeValidatedResults(ProductImageRequest $request, $images): array
     {
-        if (! is_array($images) || count($images) !== 4) {
-            throw new RuntimeException('De beeldservice leverde niet exact vier afbeeldingen op.');
+        $expected = ($request->generation_context['product_type'] ?? 'meat') === 'meat' ? 4 : 2;
+        if (! is_array($images) || count($images) !== $expected) {
+            throw new RuntimeException("De beeldservice leverde niet exact {$expected} afbeeldingen op.");
         }
 
-        $counts = ['bereid' => 0, 'rauw' => 0];
+        $counts = [];
         $results = [];
         $assets = [];
 
         foreach ($images as $image) {
-            if (! $this->isValidGeneratedImage($image, $counts)) {
+            if (! $this->isValidGeneratedImage($image)) {
                 throw new RuntimeException('De beeldservice leverde ongeldige afbeeldingen op.');
             }
 
             $status = $image['status'];
+            $counts[$status] = $counts[$status] ?? 0;
             $counts[$status]++;
             $filename = $status.'-'.Str::uuid().'.png';
 
             $assets[] = [
                 'filename' => $filename,
+                'style_id' => $image['style_id'] ?? null,
                 'contents_base64' => base64_encode($image['contents']),
             ];
             $results[] = [
                 'status' => $status,
-                'label' => $status === 'bereid' ? 'Vlees bereid' : 'Vlees rauw',
+                'label' => $image['label'] ?? ($status === 'bereid' ? 'Vlees bereid' : 'Vlees rauw'),
                 'variant' => $counts[$status],
                 'filename' => $filename,
+                'style_id' => $image['style_id'] ?? null,
             ];
         }
 
-        if ($counts !== ['bereid' => 2, 'rauw' => 2]) {
+        if ($expected === 4 && (($counts['bereid'] ?? 0) !== 2 || ($counts['rauw'] ?? 0) !== 2)) {
             throw new RuntimeException('De beeldservice leverde niet twee bereide en twee rauwe afbeeldingen op.');
         }
 
@@ -154,6 +147,7 @@ class GenerateProductImages implements ShouldQueue
                 ProductImageAsset::create([
                     'product_image_request_id' => $request->id,
                     'filename' => $asset['filename'],
+                    'style_id' => $asset['style_id'],
                     'mime_type' => 'image/png',
                     'contents_base64' => $asset['contents_base64'],
                 ]);
@@ -164,12 +158,13 @@ class GenerateProductImages implements ShouldQueue
     }
 
     /** @param mixed $image */
-    private function isValidGeneratedImage($image, array $counts): bool
+    private function isValidGeneratedImage($image): bool
     {
         if (
             ! is_array($image)
             || ! isset($image['status'], $image['contents'], $image['extension'])
-            || ! array_key_exists($image['status'], $counts)
+            || ! is_string($image['status'])
+            || ! in_array($image['status'], ['bereid', 'rauw', 'product', 'totaal'], true)
             || $image['extension'] !== 'png'
             || ! is_string($image['contents'])
             || $image['contents'] === ''
@@ -181,5 +176,41 @@ class GenerateProductImages implements ShouldQueue
         $metadata = @getimagesizefromstring($image['contents']);
 
         return is_array($metadata) && ($metadata['mime'] ?? null) === 'image/png';
+    }
+
+    /** @return list<UploadedFile> */
+    private function uploadedSources(ProductImageRequest $request): array
+    {
+        $references = $request->source_references ?: [['path' => $request->source_path]];
+        $sources = [];
+        foreach ($references as $reference) {
+            $path = $reference['path'] ?? null;
+            if (! is_string($path)) {
+                continue;
+            }
+            $absolutePath = Storage::disk('local')->path($path);
+            if (! is_file($absolutePath)) {
+                throw new RuntimeException('Een geüploade referentiefoto ontbreekt.');
+            }
+            $sources[] = new UploadedFile(
+                $absolutePath,
+                basename($path),
+                mime_content_type($absolutePath) ?: null,
+                null,
+                true,
+            );
+        }
+        if ($sources === []) {
+            throw new RuntimeException('De geüploade bronfoto ontbreekt.');
+        }
+
+        return $sources;
+    }
+
+    private function deleteSources(ProductImageRequest $request): void
+    {
+        $paths = collect($request->source_references ?: [])->pluck('path')->filter()->all();
+        $paths[] = $request->source_path;
+        Storage::disk('local')->delete(array_values(array_unique($paths)));
     }
 }
