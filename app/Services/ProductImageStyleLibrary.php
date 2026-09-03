@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\ProductImageStyleReference;
+use Illuminate\Support\Facades\Schema;
 use RuntimeException;
 
 class ProductImageStyleLibrary
@@ -70,5 +72,39 @@ class ProductImageStyleLibrary
     public function ids(): array
     {
         return array_keys(self::REFERENCES);
+    }
+
+    /** @return array{id: string, contents_base64: string, filename: string, label: string}|null */
+    public function approvedReference(array $context, array $plan): ?array
+    {
+        if (! Schema::hasTable('product_image_style_references')) {
+            return null;
+        }
+
+        $productKey = ProductImageStyleReference::productKey((string) ($context['product_name'] ?? ''));
+        $status = (string) ($plan['status'] ?? '');
+        $styleId = $plan['style_id'] ?? null;
+        if ($productKey === '' || $status === '' || ! is_string($styleId) || $styleId === '') {
+            return null;
+        }
+
+        $reference = ProductImageStyleReference::query()
+            ->where('product_key', $productKey)
+            ->where('product_type', (string) ($context['product_type'] ?? 'meat'))
+            ->where('status', $status)
+            ->where('style_id', $styleId)
+            ->latest('updated_at')
+            ->first();
+
+        if (! $reference) {
+            return null;
+        }
+
+        return [
+            'id' => $reference->id,
+            'contents_base64' => $reference->contents_base64,
+            'filename' => 'approved-'.$reference->id.'.png',
+            'label' => 'Goedgekeurde '.$reference->product_name.'-referentie',
+        ];
     }
 }

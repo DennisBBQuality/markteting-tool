@@ -11,6 +11,7 @@ let productImageState = {
   previewUrls: [],
   mainIndex: 0,
   productType: 'meat',
+  context: null,
   results: [],
   generating: false,
   requestId: null,
@@ -41,6 +42,7 @@ function renderConverter() {
     previewUrls: [],
     mainIndex: 0,
     productType: 'meat',
+    context: null,
     results: [],
     generating: Boolean(pendingRequestId),
     requestId: pendingRequestId,
@@ -527,6 +529,7 @@ async function pollProductImageRequest(requestId) {
         throw new Error(`De beeldservice leverde niet de verwachte ${expected} productfoto's op.`);
       }
       productImageState.results = data.results;
+      productImageState.context = data.context || null;
       productImageState.completedRequestId = requestId;
       finishProductImageRequest();
       renderProductImageResults();
@@ -599,6 +602,7 @@ function renderProductImageResults() {
               <span>Variant ${Number(result.variant)} · versie ${Number(result.version || 1)}</span>
             </div>
             <div class="product-result-buttons">
+              <button class="btn btn-outline btn-sm" type="button" onclick="openAddProductImageStyle(${Number(result.asset_id)})" ${result.in_style_library ? 'disabled' : ''}><i class="fas ${result.in_style_library ? 'fa-circle-check' : 'fa-bookmark'}"></i> ${result.in_style_library ? 'In stijlbibliotheek' : 'Voeg toe aan stijlbibliotheek'}</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="toggleProductImageRefinement(${Number(result.asset_id)})" ${result.refinement_status !== 'idle' ? 'disabled' : ''}><i class="fas ${result.refinement_status !== 'idle' ? 'fa-spinner fa-spin' : 'fa-pen'}"></i> ${result.refinement_status !== 'idle' ? 'Wordt aangepast…' : 'Deze foto aanpassen'}</button>
               <a class="btn btn-primary btn-sm" href="${escHtml(result.download_url)}" ${result.needs_label_review ? `onclick="return confirmProductLabelReview(event, ${Number(result.asset_id)})"` : ''}><i class="fas fa-download"></i> Download</a>
             </div>
@@ -614,6 +618,71 @@ function renderProductImageResults() {
       `).join('')}
     </div>`;
   container.classList.remove('hidden');
+}
+
+function openAddProductImageStyle(assetId) {
+  const result = productImageState.results.find(item => Number(item.asset_id) === Number(assetId));
+  if (!result || result.in_style_library) return;
+
+  if (result.needs_label_review && !document.getElementById(`product-label-approved-${assetId}`)?.checked) {
+    toast('Controleer eerst het volledige etiket en vink de controle aan.', 'error');
+    return;
+  }
+
+  const productName = productImageState.context?.product_name
+    || document.getElementById('product-image-name')?.value.trim()
+    || '';
+  openModal('Toevoegen aan stijlbibliotheek', `
+    <div class="product-style-library-intro">
+      <i class="fas fa-bookmark"></i>
+      <div><strong>Gebruik deze perfecte foto bij volgende opdrachten</strong><p>De foto wordt alleen hergebruikt voor hetzelfde product, dezelfde beeldsoort en dezelfde variantstijl. De actuele echte productfoto blijft leidend voor vorm en hoeveelheid.</p></div>
+    </div>
+    <div class="form-group">
+      <label for="product-style-library-name">Productnaam *</label>
+      <input id="product-style-library-name" type="text" maxlength="160" value="${escHtml(productName)}" placeholder="Bijvoorbeeld Black Angus brisket">
+      <small>${escHtml(result.label)} · variant ${Number(result.variant)} · versie ${Number(result.version || 1)}</small>
+    </div>
+  `, `
+    <button class="btn btn-outline" type="button" onclick="closeModal()">Annuleren</button>
+    <button class="btn btn-primary" id="save-product-style-reference" type="button" onclick="saveProductImageStyle(${assetId})"><i class="fas fa-bookmark"></i> Toevoegen</button>
+  `);
+  document.getElementById('product-style-library-name')?.focus();
+}
+
+async function saveProductImageStyle(assetId) {
+  const requestId = productImageState.completedRequestId;
+  const input = document.getElementById('product-style-library-name');
+  const button = document.getElementById('save-product-style-reference');
+  const productName = input?.value.trim() || '';
+  if (!requestId || productName.length < 2) {
+    toast('Vul een geldige productnaam in.', 'error');
+    input?.focus();
+    return;
+  }
+
+  if (button) {
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Toevoegen…';
+  }
+
+  try {
+    const saved = await api(`/api/images/requests/${encodeURIComponent(requestId)}/assets/${assetId}/style-library`, {
+      method: 'POST', body: { product_name: productName },
+    });
+    if (!saved?.saved) return;
+
+    const result = productImageState.results.find(item => Number(item.asset_id) === Number(assetId));
+    if (result) result.in_style_library = true;
+    closeModal();
+    renderProductImageResults();
+    toast(`Foto toegevoegd aan de stijlbibliotheek voor ${productName}.`, 'success');
+  } catch (error) {
+    toast(error.message || 'De foto kon niet aan de stijlbibliotheek worden toegevoegd.', 'error');
+    if (button) {
+      button.disabled = false;
+      button.innerHTML = '<i class="fas fa-bookmark"></i> Toevoegen';
+    }
+  }
 }
 
 function toggleProductImageRefinement(assetId) {

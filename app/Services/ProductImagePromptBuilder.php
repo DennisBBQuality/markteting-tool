@@ -119,7 +119,22 @@ class ProductImagePromptBuilder
     private function referenceInstruction(array $context, array $plan): string
     {
         $count = max(1, (int) ($context['product_reference_count'] ?? 1));
-        if (($plan['style_reference_id'] ?? null) === null) {
+        $approvedAdded = (bool) ($plan['approved_reference_added'] ?? false);
+        $bundledAdded = array_key_exists('bundled_reference_added', $plan)
+            ? (bool) $plan['bundled_reference_added']
+            : ($plan['style_reference_id'] ?? null) !== null;
+
+        if ($approvedAdded && $bundledAdded) {
+            $approvedIndex = $count + 1;
+
+            return "REFERENTIEROLLEN: afbeelding 1 t/m {$count} zijn de actuele echte productreferenties en blijven de enige bron voor exacte vorm en hoeveelheid. Afbeelding {$approvedIndex} is een door BBQuality goedgekeurde eerdere foto van precies dit product en deze variantstijl; gebruik die voor realistische productuitstraling, bereiding, structuur en fotografische kwaliteit, maar kopieer nooit het aantal of afwijkende vormdetails. De allerlaatste afbeelding is uitsluitend de LEGE VASTE BBQUALITY-ACHTERGRONDREFERENTIE. Neem daarvan alleen zwart vlak, hout, vlakverdeling, licht, camerahoek en kadrering over. Bij conflict winnen altijd de actuele echte productreferenties.";
+        }
+
+        if ($approvedAdded) {
+            return "REFERENTIEROLLEN: afbeelding 1 t/m {$count} zijn de actuele echte productreferenties en blijven leidend voor exacte vorm en hoeveelheid. De allerlaatste afbeelding is een door BBQuality goedgekeurde eerdere foto van precies dit product en dezelfde variantstijl. Gebruik die als kwaliteitsanker voor realistische bereiding, korst, voedselstructuur, sfeer, licht en compositie. Kopieer nooit het aantal, een ontbrekend productdeel of vormdetails die afwijken van de actuele echte productreferenties.";
+        }
+
+        if (! $bundledAdded) {
             return "REFERENTIEROLLEN: afbeelding 1 t/m {$count} zijn uitsluitend productreferenties. Gebruik ze samen om vorm, materiaal, details en hoeveelheid feitelijk vast te stellen.";
         }
 
@@ -140,8 +155,8 @@ class ProductImagePromptBuilder
                 'serveer_steak_rustiek',
             ],
             'brisket' => [
-                'Rook deze exacte brisket geloofwaardig. Toon één volledige brisket buiten bij de smoker, eventueel met slechts enkele plakken die zichtbaar van hetzelfde stuk zijn afgesneden. Maak een droge, diepbruine mahonie bark met onregelmatige specerijen; nooit egaal zwart, nat gelakt of verbrand.',
-                'Maak van dezelfde ene brisket een sfeervol serveerbeeld op een plank: netjes tegen de draad gesneden plakken met zichtbare sappige vezels en een natuurlijke smoke ring. Houd een herkenbaar deel van het hele oorspronkelijke stuk in beeld. De bark is donker mahoniebruin en krokant, niet gitzwart of glanzend plastic.',
+                'Rook deze exacte brisket geloofwaardig. Toon één volledige brisket buiten bij de smoker, met hoogstens enkele plakken die aantoonbaar uitsluitend van één uiteinde van datzelfde stuk zijn afgesneden. FYSIEKE CONTINUÏTEIT: de snijvlakken van de losse plakken moeten exact aansluiten op het snijvlak van het resterende stuk; samen reconstrueren ze het oorspronkelijke volume en silhouet. Laat nooit een hap, wig, hoek of zijstuk uit de zijkant van de resterende brisket verdwijnen. Maak een droge, diepbruine mahonie bark met onregelmatige specerijen; nooit egaal zwart, nat gelakt of verbrand.',
+                'Maak van dezelfde ene brisket een geloofwaardig BBQuality-serveerbeeld op een volledig zichtbare houten plank, met genoeg omgeving en ademruimte. Snijd een natuurlijk aantal licht onregelmatige plakken tegen de draad; varieer dikte, vezels en snijranden subtiel en stapel ze losjes. Houd een herkenbaar deel van het hele oorspronkelijke stuk in beeld. FYSIEKE CONTINUÏTEIT: iedere plak komt zichtbaar van één snijzijde en het resterende stuk mist nergens een onverklaarbare hap, wig, hoek of zijdeel. De bark is droog donker mahoniebruin met natuurlijke variatie. De smoke ring is dun, subtiel en plaatselijk onderbroken, nooit een felroze uniforme lijn rond iedere plak. Het vlees is vezelig en sappig maar grotendeels mat, zonder plastic glans, herhaalde patronen, identieke plakken of generieke AI-perfectie. Gebruik een ruimere websitewaardige compositie en geen beeldvullende macro-opname.',
                 'serveer_brisket_plank',
             ],
             'moink' => [

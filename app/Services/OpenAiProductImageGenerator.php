@@ -61,16 +61,33 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
                 );
             }
             $requestSources = $normalizedSources;
+            $effectivePlan = $plan;
+            $approvedReference = $this->styleLibrary->approvedReference($context, $plan);
             $styleReference = $this->styleLibrary->reference($plan['style_reference_id'] ?? null);
-            if ($styleReference !== null) {
+
+            if ($approvedReference !== null) {
+                $requestSources[] = [
+                    'contents' => $this->normalizeStyleReference($approvedReference),
+                    'filename' => $approvedReference['filename'],
+                ];
+            }
+
+            // Keep the empty fixed background next to an approved raw product example.
+            // For all other variants the approved exact-style example replaces the bundled example.
+            $appendBundledReference = $styleReference !== null
+                && ($approvedReference === null || $plan['status'] === 'rauw');
+            if ($appendBundledReference) {
                 $requestSources[] = [
                     'contents' => $this->normalizeStyleReference($styleReference),
                     'filename' => $styleReference['filename'],
                 ];
             }
+
+            $effectivePlan['approved_reference_added'] = $approvedReference !== null;
+            $effectivePlan['bundled_reference_added'] = $appendBundledReference;
             $contents = $this->requestOne(
                 $requestSources,
-                $this->promptBuilder->prompt($basePrompt, $context, $plan),
+                $this->promptBuilder->prompt($basePrompt, $context, $effectivePlan),
                 $apiKey,
             );
             $results[] = [
@@ -363,9 +380,37 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
         return $png;
     }
 
-    /** @param array{path: string, filename: string} $reference */
+    /** @param array{filename: string, path?: string, contents_base64?: string} $reference */
     private function normalizeStyleReference(array $reference): string
     {
+        if (isset($reference['contents_base64'])) {
+            $contents = base64_decode($reference['contents_base64'], true);
+            if (! is_string($contents) || $contents === '') {
+                throw new ProductImageGenerationException('De opgeslagen stijlbibliotheekfoto kon niet worden gelezen.');
+            }
+
+            $temporary = tempnam(sys_get_temp_dir(), 'pitboard-style-');
+            if (! is_string($temporary) || file_put_contents($temporary, $contents) === false) {
+                throw new ProductImageGenerationException('De opgeslagen stijlbibliotheekfoto kon niet worden voorbereid.');
+            }
+
+            try {
+                return $this->normalizeSource(new UploadedFile(
+                    $temporary,
+                    $reference['filename'],
+                    'image/png',
+                    null,
+                    true,
+                ));
+            } finally {
+                @unlink($temporary);
+            }
+        }
+
+        if (! isset($reference['path'])) {
+            throw new ProductImageGenerationException('De stijlbibliotheekfoto ontbreekt.');
+        }
+
         $source = new UploadedFile(
             $reference['path'],
             $reference['filename'],

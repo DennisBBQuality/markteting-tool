@@ -2,8 +2,10 @@
 
 namespace Tests\Unit;
 
+use App\Models\ProductImageStyleReference;
 use App\Services\OpenAiProductImageGenerator;
 use App\Services\ProductImageGenerationException;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
@@ -11,6 +13,8 @@ use Tests\TestCase;
 
 class OpenAiProductImageGeneratorTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_it_requests_two_prepared_and_two_raw_variants(): void
     {
         config()->set('services.product_images.driver', 'openai');
@@ -23,7 +27,8 @@ class OpenAiProductImageGeneratorTest extends TestCase
             'timeout' => 30,
         ]);
 
-        $encoded = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAFAgI/69VZ5QAAAABJRU5ErkJggg==';
+        $approvedPhoto = UploadedFile::fake()->image('approved.png', 100, 100);
+        $encoded = base64_encode((string) file_get_contents($approvedPhoto->getRealPath()));
         Http::fakeSequence()
             ->push(['data' => [['b64_json' => $encoded], ['b64_json' => $encoded]]])
             ->push(['data' => [['b64_json' => $encoded], ['b64_json' => $encoded]]]);
@@ -180,6 +185,50 @@ class OpenAiProductImageGeneratorTest extends TestCase
                 $this->assertStringNotContainsString('De allerlaatste afbeelding', $prompt);
             }
         }
+    }
+
+    public function test_an_approved_matching_photo_replaces_the_bundled_cooked_style_reference(): void
+    {
+        config()->set('services.product_images.driver', 'openai');
+        config()->set('services.product_images.openai', [
+            'api_key' => 'test-key',
+            'endpoint' => 'https://api.openai.test/v1/images/edits',
+            'model' => 'gpt-image-2',
+            'size' => '1024x1024',
+            'timeout' => 30,
+        ]);
+        $approvedPhoto = UploadedFile::fake()->image('approved.png', 100, 100);
+        $encoded = base64_encode((string) file_get_contents($approvedPhoto->getRealPath()));
+        ProductImageStyleReference::create([
+            'product_name' => 'Black Angus brisket',
+            'product_key' => 'black-angus-brisket',
+            'product_type' => 'meat',
+            'status' => 'bereid',
+            'style_id' => 'bbq_buiten_brisket',
+            'source_version' => 1,
+            'mime_type' => 'image/png',
+            'contents_base64' => $encoded,
+        ]);
+        Http::fake(['*' => Http::response(['data' => [['b64_json' => $encoded]]])]);
+
+        app(OpenAiProductImageGenerator::class)->generateForProduct([
+            UploadedFile::fake()->image('brisket.jpg', 100, 100),
+        ], 'Maak een betrouwbare productfoto.', [
+            'product_type' => 'meat',
+            'product_name' => 'Black Angus brisket',
+            'quantity' => 1,
+        ]);
+
+        $firstRequest = Http::recorded()->first()[0];
+        $data = collect($firstRequest->data());
+        $filenames = $data->where('name', 'image[]')->pluck('filename')->filter();
+        $prompt = (string) ($data->firstWhere('name', 'prompt')['contents'] ?? '');
+
+        $this->assertCount(2, $filenames);
+        $this->assertCount(1, $filenames->filter(fn (string $filename) => str_starts_with($filename, 'approved-')));
+        $this->assertFalse($filenames->contains('style-bbq-outdoor-kamado.png'));
+        $this->assertStringContainsString('door BBQuality goedgekeurde eerdere foto', $prompt);
+        $this->assertStringContainsString('actuele echte productreferenties', $prompt);
     }
 
     public function test_it_never_sends_a_request_without_an_api_key(): void

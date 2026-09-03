@@ -19,7 +19,12 @@ class ProductImagePromptBuilderTest extends TestCase
         $this->assertSame(['bbq_outdoor_kamado', 'serveer_brisket_plank'], array_column(array_slice($plans, 0, 2), 'style_reference_id'));
         $this->assertNotSame($plans[0]['style_reference_id'], $plans[1]['style_reference_id']);
         $this->assertStringContainsString('smoker', $plans[0]['instruction']);
+        $this->assertStringContainsString('samen reconstrueren ze het oorspronkelijke volume en silhouet', $plans[0]['instruction']);
+        $this->assertStringContainsString('nooit een hap, wig, hoek of zijstuk', $plans[0]['instruction']);
         $this->assertStringContainsString('mahonie', $plans[1]['instruction']);
+        $this->assertStringContainsString('smoke ring is dun, subtiel en plaatselijk onderbroken', $plans[1]['instruction']);
+        $this->assertStringContainsString('zonder plastic glans, herhaalde patronen, identieke plakken', $plans[1]['instruction']);
+        $this->assertStringContainsString('geen beeldvullende macro-opname', $plans[1]['instruction']);
         $this->assertStringContainsString('exacte buitencontour, lengte-breedte-dikteverhouding', $plans[2]['instruction']);
         $this->assertSame('rauw_bbquality_vast', $plans[2]['style_reference_id']);
         $this->assertStringContainsString('volledig egale diepzwarte achterwand', $plans[2]['style']);
@@ -114,5 +119,27 @@ class ProductImagePromptBuilderTest extends TestCase
         $this->assertStringContainsString('Kopieer nooit het vlees, gerecht, aantal', $prompt);
         $this->assertStringContainsString('Sneden of plakken blijven aantoonbaar delen', $prompt);
         $this->assertStringContainsString('Bij conflict winnen de productreferenties altijd', $prompt);
+    }
+
+    public function test_prompt_explains_how_an_approved_product_photo_may_be_reused(): void
+    {
+        $builder = new ProductImagePromptBuilder;
+        $plan = $builder->plans([
+            'product_type' => 'meat',
+            'product_name' => 'Black Angus brisket',
+        ])[0];
+        $plan['approved_reference_added'] = true;
+        $plan['bundled_reference_added'] = false;
+
+        $prompt = $builder->prompt('Maak een betrouwbare productfoto.', [
+            'product_name' => 'Black Angus brisket',
+            'quantity' => 1,
+            'product_reference_count' => 2,
+        ], $plan);
+
+        $this->assertStringContainsString('door BBQuality goedgekeurde eerdere foto', $prompt);
+        $this->assertStringContainsString('kwaliteitsanker', $prompt);
+        $this->assertStringContainsString('actuele echte productreferenties', $prompt);
+        $this->assertStringContainsString('Kopieer nooit het aantal', $prompt);
     }
 }
