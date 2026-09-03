@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
@@ -10,6 +11,8 @@ use Illuminate\Support\Facades\Log;
 
 class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImageWorkflowGenerator, ProductImageRefiner
 {
+    private const MAX_CONCURRENT_IMAGE_REQUESTS = 2;
+
     private const INPUT_CANVAS_SIZE = 1024;
 
     private const INPUT_CONTENT_SIZE = 960;
@@ -50,16 +53,9 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
         ], $sources, array_keys($sources));
         $context['product_reference_count'] = count($normalizedSources);
         $plans = $this->promptBuilder->plans($context);
-        $results = [];
-        $total = count($plans);
+        $requests = [];
 
         foreach ($plans as $index => $plan) {
-            if ($reportProgress) {
-                $reportProgress(
-                    'generating_'.($plan['status'] === 'bereid' ? 'prepared' : ($plan['status'] === 'rauw' ? 'raw' : 'product')),
-                    20 + (int) floor(($index / max(1, $total)) * 65),
-                );
-            }
             $requestSources = $normalizedSources;
             $effectivePlan = $plan;
             $approvedReference = $this->styleLibrary->approvedReference($context, $plan);
@@ -85,21 +81,71 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
 
             $effectivePlan['approved_reference_added'] = $approvedReference !== null;
             $effectivePlan['bundled_reference_added'] = $appendBundledReference;
-            $contents = $this->requestOne(
-                $requestSources,
-                $this->promptBuilder->prompt($basePrompt, $context, $effectivePlan),
-                $apiKey,
-            );
+            $requests[$index] = [
+                'sources' => $requestSources,
+                'prompt' => $this->promptBuilder->prompt($basePrompt, $context, $effectivePlan),
+            ];
+        }
+
+        if ($reportProgress) {
+            $reportProgress('generating_product', 20);
+        }
+
+        $generatedImages = $this->requestConcurrently($requests, $apiKey);
+        $results = [];
+        foreach ($plans as $index => $plan) {
             $results[] = [
                 'status' => $plan['status'],
                 'label' => $plan['label'],
                 'style_id' => $plan['style_id'],
-                'contents' => $contents,
+                'contents' => $generatedImages[$index],
                 'extension' => 'png',
             ];
         }
 
         return $results;
+    }
+
+    /**
+     * @param  array<int, array{sources: list<string|array{contents: string, filename: string}>, prompt: string}>  $requests
+     * @return array<int, string>
+     */
+    private function requestConcurrently(array $requests, string $apiKey): array
+    {
+        $responses = Http::pool(function (Pool $pool) use ($requests, $apiKey): void {
+            foreach ($requests as $index => $request) {
+                $pending = $pool->as((string) $index)
+                    ->withToken($apiKey)
+                    ->acceptJson()
+                    ->timeout((int) config('services.product_images.openai.timeout', 240))
+                    ->connectTimeout(15);
+                $field = count($request['sources']) > 1 ? 'image[]' : 'image';
+                foreach ($request['sources'] as $sourceIndex => $source) {
+                    $sourcePng = is_array($source) ? $source['contents'] : $source;
+                    $filename = is_array($source) ? $source['filename'] : 'reference-'.($sourceIndex + 1).'.png';
+                    $pending = $pending->attach($field, $sourcePng, $filename, [
+                        'Content-Type' => 'image/png',
+                    ]);
+                }
+
+                $pending->post(
+                    (string) config('services.product_images.openai.endpoint'),
+                    $this->requestParameters($request['prompt']),
+                );
+            }
+        }, self::MAX_CONCURRENT_IMAGE_REQUESTS);
+
+        $images = [];
+        foreach (array_keys($requests) as $index) {
+            $response = $responses[(string) $index] ?? null;
+            if (! $response instanceof Response) {
+                throw new ProductImageGenerationException('De beeldservice is momenteel niet bereikbaar.');
+            }
+
+            $images[$index] = $this->contentsFromSingleResponse($response);
+        }
+
+        return $images;
     }
 
     public function refine(UploadedFile $source, string $instruction, array $context = []): string
@@ -222,6 +268,33 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
     /** @param list<string|array{contents: string, filename: string}> $sourcePngs */
     private function requestOne(array $sourcePngs, string $prompt, string $apiKey): string
     {
+        try {
+            $pending = Http::withToken($apiKey)
+                ->acceptJson()
+                ->timeout((int) config('services.product_images.openai.timeout', 240))
+                ->connectTimeout(15);
+            $field = count($sourcePngs) > 1 ? 'image[]' : 'image';
+            foreach ($sourcePngs as $index => $source) {
+                $sourcePng = is_array($source) ? $source['contents'] : $source;
+                $filename = is_array($source) ? $source['filename'] : 'reference-'.($index + 1).'.png';
+                $pending = $pending->attach($field, $sourcePng, $filename, [
+                    'Content-Type' => 'image/png',
+                ]);
+            }
+            $response = $pending->post(
+                (string) config('services.product_images.openai.endpoint'),
+                $this->requestParameters($prompt),
+            );
+        } catch (ConnectionException) {
+            throw new ProductImageGenerationException('De beeldservice is momenteel niet bereikbaar.');
+        }
+
+        return $this->contentsFromSingleResponse($response);
+    }
+
+    /** @return array<string, int|string> */
+    private function requestParameters(string $prompt): array
+    {
         $model = (string) config('services.product_images.openai.model');
         $parameters = [
             'model' => $model,
@@ -236,24 +309,11 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
             $parameters['input_fidelity'] = (string) config('services.product_images.openai.input_fidelity', 'high');
         }
 
-        try {
-            $pending = Http::withToken($apiKey)
-                ->acceptJson()
-                ->timeout((int) config('services.product_images.openai.timeout', 240))
-                ->connectTimeout(15);
-            $field = count($sourcePngs) > 1 ? 'image[]' : 'image';
-            foreach ($sourcePngs as $index => $source) {
-                $sourcePng = is_array($source) ? $source['contents'] : $source;
-                $filename = is_array($source) ? $source['filename'] : 'reference-'.($index + 1).'.png';
-                $pending = $pending->attach($field, $sourcePng, $filename, [
-                    'Content-Type' => 'image/png',
-                ]);
-            }
-            $response = $pending->post((string) config('services.product_images.openai.endpoint'), $parameters);
-        } catch (ConnectionException) {
-            throw new ProductImageGenerationException('De beeldservice is momenteel niet bereikbaar.');
-        }
+        return $parameters;
+    }
 
+    private function contentsFromSingleResponse(Response $response): string
+    {
         if (! $response->successful()) {
             Log::warning('Product image generation request failed.', [
                 'status' => $response->status(),

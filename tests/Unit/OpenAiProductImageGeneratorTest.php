@@ -5,8 +5,10 @@ namespace Tests\Unit;
 use App\Models\ProductImageStyleReference;
 use App\Services\OpenAiProductImageGenerator;
 use App\Services\ProductImageGenerationException;
+use GuzzleHttp\Psr7\Response as PsrResponse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
+use Illuminate\Http\Client\Response as ClientResponse;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -14,6 +16,42 @@ use Tests\TestCase;
 class OpenAiProductImageGeneratorTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_product_workflow_never_runs_more_than_two_image_requests_at_once(): void
+    {
+        config()->set('services.product_images.driver', 'openai');
+        config()->set('services.product_images.openai', [
+            'api_key' => 'test-key',
+            'endpoint' => 'https://api.openai.test/v1/images/edits',
+            'model' => 'gpt-image-2',
+            'size' => '1024x1024',
+            'quality' => 'high',
+            'timeout' => 30,
+        ]);
+        $encoded = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAFAgI/69VZ5QAAAABJRU5ErkJggg==';
+        $responses = [];
+        foreach (range(0, 3) as $index) {
+            $responses[(string) $index] = new ClientResponse(new PsrResponse(
+                200,
+                ['Content-Type' => 'application/json'],
+                json_encode(['data' => [['b64_json' => $encoded]]], JSON_THROW_ON_ERROR),
+            ));
+        }
+        Http::shouldReceive('pool')
+            ->once()
+            ->withArgs(fn ($callback, $concurrency) => is_callable($callback) && $concurrency === 2)
+            ->andReturn($responses);
+
+        $results = app(OpenAiProductImageGenerator::class)->generateForProduct([
+            UploadedFile::fake()->image('brisket.jpg', 100, 100),
+        ], 'Maak een betrouwbare productfoto.', [
+            'product_type' => 'meat',
+            'product_name' => 'Black Angus brisket',
+            'quantity' => 1,
+        ]);
+
+        $this->assertCount(4, $results);
+    }
 
     public function test_it_requests_two_prepared_and_two_raw_variants(): void
     {
@@ -72,6 +110,40 @@ class OpenAiProductImageGeneratorTest extends TestCase
                 && str_contains($prompt, 'Create a premium product photo from this reference.')
                 && (str_contains($prompt, 'MANDATORY VARIANT: Show the meat fully prepared')
                     || str_contains($prompt, 'MANDATORY VARIANT: Show the meat completely raw'));
+        });
+    }
+
+    public function test_concurrent_product_workflow_keeps_high_quality_for_every_variant(): void
+    {
+        config()->set('services.product_images.driver', 'openai');
+        config()->set('services.product_images.openai', [
+            'api_key' => 'test-key',
+            'endpoint' => 'https://api.openai.test/v1/images/edits',
+            'model' => 'gpt-image-2',
+            'size' => '1024x1024',
+            'quality' => 'high',
+            'timeout' => 30,
+        ]);
+        $encoded = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAFAgI/69VZ5QAAAABJRU5ErkJggg==';
+        Http::fake(['*' => Http::response(['data' => [['b64_json' => $encoded]]])]);
+
+        $results = app(OpenAiProductImageGenerator::class)->generateForProduct([
+            UploadedFile::fake()->image('brisket.jpg', 100, 100),
+        ], 'Maak een betrouwbare productfoto.', [
+            'product_type' => 'meat',
+            'product_name' => 'Black Angus brisket',
+            'quantity' => 1,
+        ]);
+
+        $this->assertCount(4, $results);
+        Http::assertSentCount(4);
+        Http::assertSent(function (Request $request) {
+            $fields = collect($request->data())->keyBy('name');
+
+            return ($fields->get('quality')['contents'] ?? null) === 'high'
+                && ($fields->get('size')['contents'] ?? null) === '1024x1024'
+                && ($fields->get('output_format')['contents'] ?? null) === 'png'
+                && ($fields->get('n')['contents'] ?? null) === 1;
         });
     }
 
