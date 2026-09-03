@@ -24,6 +24,9 @@ class ProductImagePromptBuilderTest extends TestCase
         $this->assertSame('rauw_bbquality_vast', $plans[2]['style_reference_id']);
         $this->assertStringContainsString('volledig egale diepzwarte achterwand', $plans[2]['style']);
         $this->assertStringContainsString('één grote, hele en ongetrimde brisket', $plans[2]['instruction']);
+        $this->assertStringContainsString('altijd natuurlijk en stabiel plat op de breedste zijde', $plans[2]['instruction']);
+        $this->assertStringContainsString('mag nooit staan, rechtop worden gezet', $plans[2]['instruction']);
+        $this->assertStringContainsString('lange as overwegend horizontaal', $plans[3]['instruction']);
         $this->assertStringContainsString('nooit een losse stapel', $plans[2]['instruction']);
         $this->assertStringContainsString('dezelfde buitenomtrek', $plans[3]['instruction']);
         $this->assertNull($plans[3]['style_reference_id']);
