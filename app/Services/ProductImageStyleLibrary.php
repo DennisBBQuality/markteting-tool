@@ -31,6 +31,10 @@ class ProductImageStyleLibrary
             'file' => 'serveer-brisket-plank.png',
             'label' => 'Brisket op een rijk opgemaakte serveerplank',
         ],
+        'rauw_bbquality_vast' => [
+            'file' => 'rauw-bbquality-vast.png',
+            'label' => 'Vaste BBQuality-achtergrond voor één rauwe variant',
+        ],
         'product_buiten_bbquality' => [
             'file' => 'product-buiten-bbquality.png',
             'label' => 'Vaste BBQuality-buitenstijl voor fles of pot',

@@ -21,7 +21,32 @@ class ProductImagePromptBuilderTest extends TestCase
         $this->assertStringContainsString('smoker', $plans[0]['instruction']);
         $this->assertStringContainsString('mahonie', $plans[1]['instruction']);
         $this->assertStringContainsString('exacte buitencontour en verhoudingen', $plans[2]['instruction']);
+        $this->assertSame('rauw_bbquality_vast', $plans[2]['style_reference_id']);
+        $this->assertStringContainsString('volledig egale diepzwarte achterwand', $plans[2]['style']);
+        $this->assertNull($plans[3]['style_reference_id']);
         $this->assertStringContainsString('wasachtig', $plans[3]['instruction']);
+    }
+
+    public function test_fixed_raw_background_reference_is_never_used_for_cooked_variants(): void
+    {
+        $plans = (new ProductImagePromptBuilder)->plans([
+            'product_type' => 'meat',
+            'product_name' => 'Black Angus brisket',
+        ]);
+
+        $this->assertNotSame('rauw_bbquality_vast', $plans[0]['style_reference_id']);
+        $this->assertNotSame('rauw_bbquality_vast', $plans[1]['style_reference_id']);
+        $this->assertSame('rauw_bbquality_vast', $plans[2]['style_reference_id']);
+
+        $prompt = (new ProductImagePromptBuilder)->prompt('Maak een betrouwbare productfoto.', [
+            'product_name' => 'Black Angus brisket',
+            'quantity' => 1,
+            'product_reference_count' => 2,
+        ], $plans[2]);
+
+        $this->assertStringContainsString('VASTE BBQUALITY-ACHTERGRONDREFERENTIE', $prompt);
+        $this->assertStringContainsString('zo exact mogelijk over', $prompt);
+        $this->assertStringContainsString('Neem nooit het voorbeeldproduct', $prompt);
     }
 
     public function test_beef_steak_has_one_uncut_and_one_sliced_medium_variant(): void

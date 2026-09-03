@@ -11,7 +11,7 @@ class ProductImageStyleLibraryTest extends TestCase
     {
         $library = new ProductImageStyleLibrary;
 
-        $this->assertCount(8, $library->ids());
+        $this->assertCount(9, $library->ids());
 
         foreach ($library->ids() as $id) {
             $reference = $library->reference($id);
