@@ -210,12 +210,14 @@ function handleProductImageDropzoneKeydown(event) {
 }
 
 function handleProductImageFiles(fileList) {
+  // FileList is live in browsers: copy it before resetting the input.
+  const selectedFiles = Array.from(fileList || []);
   const input = document.getElementById('product-image-file-input');
   if (input) input.value = '';
-  if (!fileList?.length) return;
+  if (selectedFiles.length === 0) return;
 
   const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-  for (const file of Array.from(fileList)) {
+  for (const file of selectedFiles) {
     if (productImageState.files.length >= 5) {
       toast('Je kunt maximaal vijf referentiefoto\'s gebruiken.', 'error');
       break;
