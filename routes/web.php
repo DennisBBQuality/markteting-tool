@@ -14,6 +14,8 @@ use App\Http\Controllers\Api\CustomerService\TicketPriorityController;
 use App\Http\Controllers\Api\CustomerService\TicketStatusController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\NoteController;
+use App\Http\Controllers\Api\ProductDossierController;
+use App\Http\Controllers\Api\ProductDossierOptionController;
 use App\Http\Controllers\Api\ProductImageController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\TaskController;
@@ -109,6 +111,26 @@ Route::middleware('auth.custom')->group(function () {
     Route::get('/api/images/requests/{imageRequest}/generated/{asset}', [ProductImageController::class, 'show'])
         ->where('asset', '[A-Za-z0-9_-]+');
 
+    // Product dossiers (uitsluitend concepten; WordPress-publicatie volgt later)
+    Route::get('/api/product-dossiers/ai-status', [ProductDossierController::class, 'aiStatus']);
+    Route::post('/api/images/requests/{imageRequest}/link-dossier', [ProductImageController::class, 'linkDossier']);
+    Route::get('/api/product-dossiers/tone-profile', [ProductDossierController::class, 'toneProfile']);
+    Route::get('/api/product-dossiers', [ProductDossierController::class, 'index']);
+    Route::post('/api/product-dossiers', [ProductDossierController::class, 'store']);
+    Route::get('/api/product-dossiers/{productDossier}', [ProductDossierController::class, 'show']);
+    Route::put('/api/product-dossiers/{productDossier}', [ProductDossierController::class, 'update']);
+    Route::get('/api/product-dossiers/{productDossier}/labels/{index}', [ProductDossierController::class, 'labelImage'])->whereNumber('index');
+    Route::get('/api/product-dossiers/{productDossier}/export', [ProductDossierController::class, 'export']);
+    Route::get('/api/product-dossiers/{productDossier}/expert-assets/{kind}', [ProductDossierController::class, 'expertAsset']);
+    Route::post('/api/product-dossiers/{productDossier}/expert-assets/{kind}', [ProductDossierController::class, 'uploadExpertAsset'])->middleware('throttle:12,1');
+    Route::post('/api/product-dossiers/{productDossier}/labels', [ProductDossierController::class, 'uploadLabels'])->middleware('throttle:12,1');
+    Route::post('/api/product-dossiers/{productDossier}/analyze', [ProductDossierController::class, 'analyze'])->middleware('throttle:6,1');
+    Route::post('/api/product-dossiers/{productDossier}/estimate-nutrition', [ProductDossierController::class, 'estimateNutrition'])->middleware('throttle:6,1');
+    Route::post('/api/product-dossiers/{productDossier}/generate-page', [ProductDossierController::class, 'generatePage'])->middleware('throttle:10,1');
+    Route::get('/api/product-dossier-options', [ProductDossierOptionController::class, 'index']);
+    Route::post('/api/product-dossier-options', [ProductDossierOptionController::class, 'store']);
+    Route::delete('/api/product-dossier-options/{productDossierOption}', [ProductDossierOptionController::class, 'destroy']);
+
     // Dashboard
     Route::get('/api/dashboard/stats', [DashboardController::class, 'stats']);
 
@@ -131,6 +153,11 @@ Route::middleware('auth.custom')->group(function () {
         return response()->file(Storage::disk('local')->path($relativePath), $headers);
     });
 });
+
+// Unknown API endpoints must never fall through to the HTML app shell.
+Route::get('/api/{any}', fn () => response()->json([
+    'error' => 'Deze API-route bestaat niet.',
+], 404))->where('any', '.*');
 
 // SPA fallback - serve index.html for all non-API routes
 Route::get('/{any?}', function () {

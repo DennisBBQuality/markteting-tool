@@ -64,12 +64,22 @@ async function readApiResponse(response) {
 
   if (response.status === 204) return {};
 
+  const text = await response.text();
+  if (!text) return {};
+
   if (contentType.includes('application/json')) {
-    return await response.json();
+    try {
+      return JSON.parse(text);
+    } catch (error) {
+      return { message: 'De server gaf een ongeldig antwoord. Je invoer is niet verwijderd; probeer het opnieuw.' };
+    }
   }
 
-  const text = await response.text();
-  return text ? { message: text } : {};
+  if (/^\s*</.test(text)) {
+    return { message: 'De beveiligde verbinding is verlopen. Je invoer is niet verwijderd; probeer het opnieuw.' };
+  }
+
+  return { message: text };
 }
 
 async function api(url, options = {}) {
@@ -113,13 +123,20 @@ async function api(url, options = {}) {
 
     const data = await readApiResponse(res);
     if (!res.ok) {
-      toast(data.error || data.message || 'Er ging iets mis', 'error');
+      const retryAfter = Number(res.headers.get('Retry-After') || 0);
+      const message = res.status === 429
+        ? `Deze opdracht is te vaak kort achter elkaar gestart. ${retryAfter > 0 ? `Probeer het over ${retryAfter} seconden opnieuw.` : 'Wacht even en probeer het opnieuw.'}`
+        : (data.error || data.message || 'Er ging iets mis');
+      options.onError?.(message);
+      if (!options.silentError) toast(message, 'error');
       return null;
     }
 
     return data;
   } catch (error) {
-    toast(error.message || 'De server is niet bereikbaar. Probeer het opnieuw.', 'error');
+    const message = error.message || 'De server is niet bereikbaar. Probeer het opnieuw.';
+    options.onError?.(message);
+    if (!options.silentError) toast(message, 'error');
     return null;
   }
 }
@@ -147,9 +164,18 @@ async function apiUpload(url, formData) {
       res = await sendRequest();
     }
 
+    if (res.status === 413) {
+      toast('De geselecteerde foto is te groot voor de server. Kies een foto kleiner dan 10 MB en probeer het opnieuw.', 'error');
+      return null;
+    }
+
     const data = await readApiResponse(res);
     if (!res.ok) {
-      toast(data.error || data.message || 'Upload mislukt', 'error');
+      const retryAfter = Number(res.headers.get('Retry-After') || 0);
+      const message = res.status === 429
+        ? `De upload is te vaak kort achter elkaar gestart. ${retryAfter > 0 ? `Probeer het over ${retryAfter} seconden opnieuw.` : 'Wacht even en probeer het opnieuw.'}`
+        : (data.error || data.message || 'Upload mislukt');
+      toast(message, 'error');
       return null;
     }
 
@@ -204,6 +230,11 @@ async function loadGlobalData() {
 
 // ========== Navigation ==========
 function navigateTo(view) {
+  if (App.currentView === 'product-dossiers' && view !== 'product-dossiers' && typeof productDossierState !== 'undefined') {
+    if (dossierForegroundBusy()) { toast('Wacht tot het opslaan klaar is.', 'error'); return; }
+    if (productDossierState.pendingLabels.length && !confirm('Je etiketfoto’s zijn nog niet opgeslagen. Toch deze pagina verlaten?')) return;
+    rememberDossierBrowserDraft(); clearTimeout(productDossierState.pollTimer);
+  }
   App.currentView = view;
   document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
   document.getElementById(`view-${view}`).classList.remove('hidden');
@@ -222,6 +253,7 @@ function navigateTo(view) {
     case 'notes': renderNotes(); break;
     case 'customer-service': renderCustomerService(); break;
     case 'converter': renderConverter(); break;
+    case 'product-dossiers': renderProductDossiers(); break;
     case 'settings': renderSettings(); break;
   }
 }
@@ -248,9 +280,18 @@ function toast(msg, type = 'info') {
   const container = document.getElementById('toast-container');
   const el = document.createElement('div');
   el.className = `toast toast-${type}`;
-  el.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i> ${msg}`;
+  el.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i><span class="toast-message"></span><button class="toast-close" type="button" aria-label="Melding sluiten"><i class="fas fa-xmark"></i></button>`;
+  el.querySelector('.toast-message').textContent = String(msg);
   container.appendChild(el);
-  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 3000);
+  let removed = false;
+  const dismiss = () => {
+    if (removed) return;
+    removed = true;
+    el.style.opacity = '0';
+    setTimeout(() => el.remove(), 300);
+  };
+  el.querySelector('.toast-close').addEventListener('click', dismiss);
+  setTimeout(dismiss, type === 'error' ? 15000 : 5000);
 }
 
 // ========== Color Picker HTML ==========

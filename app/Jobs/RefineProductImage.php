@@ -17,8 +17,10 @@ class RefineProductImage implements ShouldQueue
 {
     use Queueable;
 
-    public int $tries = 2;
+    public int $tries = 1;
+
     public int $timeout = 600;
+
     public bool $failOnTimeout = true;
 
     public function __construct(public string $requestId, public int $assetId, public string $instruction)
