@@ -588,12 +588,13 @@ function renderProductImageResults() {
         <h3>Kies je favoriete productfoto</h3>
       </div>
       <span class="product-image-count"><i class="fas fa-check-circle"></i> ${productImageState.results.length} afbeeldingen</span>
+      <button class="btn btn-outline btn-sm" type="button" onclick="linkImagesToDossier()">Koppel aan productdossier</button>
     </div>
     <div class="product-image-grid">
       ${productImageState.results.map(result => `
         <article class="product-image-result-card">
           <div class="product-image-result-visual">
-            <img src="${escHtml(result.url)}" alt="${escHtml(result.label)} variant ${Number(result.variant)}">
+            <img src="${escHtml(result.url)}" alt="${escHtml(result.metadata?.alt || result.label)}">
             <span class="product-image-result-badge ${result.status}">${escHtml(result.label)}</span>
           </div>
           <div class="product-image-result-footer">
@@ -604,7 +605,8 @@ function renderProductImageResults() {
             <div class="product-result-buttons">
               <button class="btn btn-outline btn-sm" type="button" onclick="openAddProductImageStyle(${Number(result.asset_id)})" ${result.in_style_library ? 'disabled' : ''}><i class="fas ${result.in_style_library ? 'fa-circle-check' : 'fa-bookmark'}"></i> ${result.in_style_library ? 'In stijlbibliotheek' : 'Voeg toe aan stijlbibliotheek'}</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="toggleProductImageRefinement(${Number(result.asset_id)})" ${result.refinement_status !== 'idle' ? 'disabled' : ''}><i class="fas ${result.refinement_status !== 'idle' ? 'fa-spinner fa-spin' : 'fa-pen'}"></i> ${result.refinement_status !== 'idle' ? 'Wordt aangepast…' : 'Deze foto aanpassen'}</button>
-              <a class="btn btn-primary btn-sm" href="${escHtml(result.download_url)}" ${result.needs_label_review ? `onclick="return confirmProductLabelReview(event, ${Number(result.asset_id)})"` : ''}><i class="fas fa-download"></i> Download</a>
+              <button class="btn btn-outline btn-sm" type="button" onclick="openProductImageMetadata(${Number(result.asset_id)})">SEO-gegevens</button>
+              <a class="btn btn-primary btn-sm" href="${escHtml(result.download_url)}" ${result.needs_label_review ? `onclick="return confirmProductLabelReview(event, ${Number(result.asset_id)})"` : ''}><i class="fas fa-download"></i> Download WEBP</a>
             </div>
           </div>
           ${result.needs_label_review ? `<label class="product-label-warning"><input type="checkbox" id="product-label-approved-${Number(result.asset_id)}"><span><strong>Etiketcontrole verplicht.</strong> Ik heb iedere letter, het logo en de kleuren vergeleken met de echte referentiefoto.</span></label>` : ''}
@@ -618,6 +620,31 @@ function renderProductImageResults() {
       `).join('')}
     </div>`;
   container.classList.remove('hidden');
+}
+
+function openProductImageMetadata(assetId) {
+  const result = productImageState.results.find(item => Number(item.asset_id) === assetId);
+  const metadata = result?.metadata; if (!metadata) return;
+  const fields = [['filename','Bestandsnaam'],['title','Titel'],['alt','Alt-tekst'],['caption','Bijschrift'],['description','Beschrijving']];
+  openModal('Afbeelding · WEBP en SEO', `<p>De download is verliesvrij WEBP. Het origineel blijft beschikbaar voor bewerkingen.</p>${fields.map(([key,label]) => `<div class="form-group"><label>${label}</label><p>${escHtml(metadata[key])}</p><button class="btn btn-outline btn-sm" onclick="copyProductImageMetadata(${assetId},'${key}')">Kopiëren</button></div>`).join('')}<p>${escHtml(metadata.review_note)}</p>`, `<button class="btn btn-primary" onclick="copyProductImageMetadata(${assetId},'all')">Alle gegevens kopiëren</button><button class="btn btn-outline" onclick="closeModal()">Sluiten</button>`);
+}
+
+async function linkImagesToDossier() {
+  const dossiers = await api('/api/product-dossiers'); if (!Array.isArray(dossiers)) return;
+  if (!dossiers.length) { toast('Maak eerst een productdossier in de Productstudio.', 'error'); return; }
+  openModal('Foto’s koppelen aan een product', `<div class="form-group"><label for="image-link-dossier">Productdossier</label><select id="image-link-dossier">${dossiers.map(item => `<option value="${escHtml(item.id)}">${escHtml(item.product_name)}</option>`).join('')}</select></div><p>De complete fotoset blijft ook in Afbeeldingen beschikbaar.</p>`, '<button class="btn btn-outline" onclick="closeModal()">Annuleren</button><button class="btn btn-primary" onclick="saveImagesDossierLink()">Koppelen</button>');
+}
+
+async function saveImagesDossierLink() {
+  const id = productImageState.completedRequestId || productImageState.requestId;
+  const result = await api(`/api/images/requests/${id}/link-dossier`, {method:'POST',body:{product_dossier_id:document.getElementById('image-link-dossier').value}});
+  if (result) { closeModal(); toast('Fotoset gekoppeld aan het productdossier.', 'success'); }
+}
+
+async function copyProductImageMetadata(assetId, key) {
+  const metadata = productImageState.results.find(item => Number(item.asset_id) === assetId)?.metadata; if (!metadata) return;
+  const value = key === 'all' ? JSON.stringify(metadata, null, 2) : metadata[key];
+  await navigator.clipboard.writeText(value); toast('Afbeeldingsgegevens gekopieerd.', 'success');
 }
 
 function openAddProductImageStyle(assetId) {

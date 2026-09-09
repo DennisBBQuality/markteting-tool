@@ -4,9 +4,9 @@ namespace App\Services;
 
 use Illuminate\Http\UploadedFile;
 
-class FakeProductImageGenerator implements ProductImageGenerator, ProductImageWorkflowGenerator, ProductImageRefiner
+class FakeProductImageGenerator implements ProductImageGenerator, ProductImageRefiner, ProductImageWorkflowGenerator
 {
-    private const PLACEHOLDER_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAFAgI/69VZ5QAAAABJRU5ErkJggg==';
+    private const PLACEHOLDER_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAAFklEQVQImWNcZW7EwMDAxMDAwMDAAAANhgEXu1wcnAAAAABJRU5ErkJggg==';
 
     public function generate(UploadedFile $source, string $basePrompt, ?callable $reportProgress = null): array
     {

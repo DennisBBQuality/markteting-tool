@@ -22,6 +22,205 @@
   --transition: 0.2s ease;
 }
 
+/* ========== Productstudio ========== */
+.product-studio-notice { display:flex; align-items:center; gap:12px; margin-bottom:18px; padding:13px 16px; border:1px solid #BAE6FD; border-radius:10px; background:#F0F9FF; color:#075985; }
+.product-studio-notice > i { font-size:20px; }
+.product-studio-notice div { display:flex; flex-direction:column; gap:2px; }
+.product-studio-notice span { color:#0369A1; font-size:12px; }
+.product-dossier-ai-status { display:flex; align-items:center; gap:11px; margin:-7px 0 18px; padding:12px 15px; border:1px solid; border-radius:10px; }
+.product-dossier-ai-status > i { font-size:18px; }
+.product-dossier-ai-status > div { display:flex; min-width:0; flex:1; flex-direction:column; }
+.product-dossier-ai-status strong { font-size:12px; }
+.product-dossier-ai-status span,.product-dossier-ai-status small { font-size:10px; }
+.product-dossier-ai-status.connected { border-color:#BBF7D0; background:#F0FDF4; color:#166534; }
+.product-dossier-ai-status.disconnected { border-color:#FDE68A; background:#FFFBEB; color:#92400E; }
+.product-dossier-layout { display:grid; grid-template-columns:250px minmax(0,1fr); gap:18px; align-items:start; }
+.product-dossier-sidebar,.product-dossier-editor { border:1px solid var(--border); border-radius:12px; background:#FFF; box-shadow:var(--shadow); }
+.product-dossier-sidebar { position:sticky; top:20px; overflow:hidden; }
+.product-dossier-sidebar-head { display:flex; align-items:center; justify-content:space-between; padding:15px 16px; border-bottom:1px solid var(--border); }
+.product-dossier-sidebar-head strong { font-size:13px; }
+.product-dossier-sidebar-head span { min-width:24px; padding:2px 7px; border-radius:99px; background:var(--bg); color:var(--text-light); font-size:10px; text-align:center; }
+.product-dossier-list { display:flex; max-height:680px; overflow-y:auto; flex-direction:column; }
+.product-dossier-list-empty { display:flex; min-height:150px; padding:25px 16px; align-items:center; justify-content:center; flex-direction:column; color:var(--text-light); text-align:center; }
+.product-dossier-list-empty i { margin-bottom:8px; font-size:23px; }
+.product-dossier-list-empty span { font-size:12px; font-weight:700; }
+.product-dossier-list-empty small { margin-top:3px; font-size:10px; }
+.product-dossier-list-item { display:grid; grid-template-columns:34px minmax(0,1fr) 16px; width:100%; padding:12px 13px; align-items:center; gap:9px; border-bottom:1px solid var(--border); background:#FFF; text-align:left; transition:background var(--transition); }
+.product-dossier-list-item:hover,.product-dossier-list-item.active { background:var(--primary-light); }
+.dossier-list-icon { display:grid; width:32px; height:32px; place-items:center; border-radius:8px; background:#F5F2EF; color:var(--primary); }
+.product-dossier-list-item > span:nth-child(2) { display:flex; min-width:0; flex-direction:column; }
+.product-dossier-list-item strong,.product-dossier-list-item small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.product-dossier-list-item strong { font-size:11px; }
+.product-dossier-list-item small { margin-top:2px; color:var(--text-light); font-size:9px; }
+.dossier-analyzed { color:var(--success); font-size:12px; }
+.product-dossier-editor { overflow:hidden; }
+.product-dossier-editor-head { display:flex; padding:22px 26px; align-items:center; justify-content:space-between; gap:16px; border-bottom:1px solid var(--border); }
+.product-dossier-editor-head h3 { margin-top:3px; font-size:20px; }
+.dossier-save-state { display:flex; align-items:center; gap:6px; color:var(--text-light); font-size:11px; }
+.dossier-save-state i { color:var(--success); font-size:8px; }
+.product-dossier-steps { display:grid; grid-template-columns:repeat(3,1fr); margin:0; padding:16px 26px; border-bottom:1px solid var(--border); background:#FCFBFA; list-style:none; }
+.product-dossier-steps li { position:relative; display:flex; align-items:center; justify-content:center; gap:7px; color:var(--text-light); font-size:11px; }
+.product-dossier-steps li:not(:last-child)::after { content:""; position:absolute; left:67%; width:66%; height:1px; background:var(--border); }
+.product-dossier-steps b { display:grid; width:23px; height:23px; place-items:center; border-radius:50%; background:#E7E3DF; font-size:10px; z-index:1; }
+.product-dossier-steps li.active { color:var(--primary); font-weight:700; }
+.product-dossier-steps li.active b { background:var(--primary); color:#FFF; }
+.dossier-step-card { padding:25px 26px; border-bottom:1px solid var(--border); }
+.dossier-step-heading { display:flex; gap:12px; margin-bottom:20px; }
+.dossier-step-heading > span { display:grid; width:30px; height:30px; flex:0 0 30px; place-items:center; border-radius:8px; background:var(--primary); color:#FFF; font-size:12px; font-weight:800; }
+.dossier-step-heading h4 { font-size:16px; }
+.dossier-step-heading p { max-width:760px; margin-top:3px; color:var(--text-light); font-size:12px; line-height:1.5; }
+.dossier-source-grid,.dossier-two-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+.dossier-label-dropzone { display:flex; min-height:170px; padding:20px; align-items:center; justify-content:center; flex-direction:column; border:2px dashed #D5CEC8; border-radius:10px; background:#FCFBFA; cursor:pointer; text-align:center; transition:all var(--transition); }
+.dossier-label-dropzone:hover,.dossier-label-dropzone.dragover,.dossier-label-dropzone:focus-visible { border-color:var(--primary); background:var(--primary-light); outline:none; }
+.dossier-label-dropzone > i { margin-bottom:9px; color:var(--primary); font-size:27px; }
+.dossier-label-dropzone strong { font-size:13px; }
+.dossier-label-dropzone span { margin-top:4px; color:var(--text-light); font-size:11px; }
+.dossier-label-dropzone small { margin-top:12px; color:#9A8F87; font-size:9px; }
+.dossier-label-preview { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:7px; margin-top:8px; }
+.dossier-label-preview > div { position:relative; min-width:0; height:72px; overflow:hidden; border:1px solid var(--border); border-radius:7px; background:#F7F5F3; }
+.dossier-label-preview img { width:100%; height:100%; object-fit:cover; }
+.dossier-label-preview span { position:absolute; right:0; bottom:0; left:0; padding:4px 5px; overflow:hidden; background:rgba(20,15,12,.76); color:#FFF; font-size:8px; text-overflow:ellipsis; white-space:nowrap; }
+.dossier-label-preview .saved { display:flex; padding:8px; align-items:center; justify-content:center; flex-direction:column; color:var(--text-light); text-align:center; }
+.dossier-label-preview .saved i { font-size:19px; }
+.dossier-label-preview .saved span { position:static; width:100%; margin-top:5px; padding:0; color:var(--text-light); background:none; }
+.dossier-source-notes textarea { min-height:231px; }
+.dossier-inline-actions { display:flex; align-items:center; gap:13px; margin-top:18px; }
+.dossier-inline-actions span { color:var(--text-light); font-size:11px; }
+.dossier-analysis-result { display:flex; gap:10px; margin-top:16px; padding:13px 14px; border:1px solid #BBF7D0; border-radius:9px; background:#F0FDF4; color:#166534; }
+.dossier-analysis-result.error { border-color:#FECACA; background:#FEF2F2; color:#991B1B; }
+.dossier-analysis-result > i { margin-top:2px; }
+.dossier-analysis-result strong { font-size:12px; }
+.dossier-analysis-result p,.dossier-analysis-result small { display:block; margin-top:3px; font-size:10px; line-height:1.5; }
+.dossier-analysis-result ul,.dossier-estimate-warning ul { margin:6px 0 0 16px; font-size:10px; }
+.dossier-fields-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0 14px; }
+.product-dossier-editor .form-group label span { color:var(--text-light); font-weight:400; }
+.product-dossier-editor .form-group small { display:block; margin-top:4px; color:var(--text-light); font-size:10px; line-height:1.4; }
+.dossier-subsection-head { display:flex; padding-top:18px; margin:7px 0 13px; align-items:center; justify-content:space-between; gap:15px; border-top:1px solid var(--border); }
+.dossier-subsection-head h5,.dossier-group-title { font-size:14px; }
+.dossier-subsection-head p { margin-top:3px; color:var(--text-light); font-size:10px; }
+.dossier-nutrition-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0 14px; margin-top:12px; }
+.nutrition-source-badge { display:inline-flex; align-items:center; gap:6px; padding:5px 9px; border-radius:99px; font-size:9px; font-weight:700; }
+.nutrition-source-badge.unknown { background:#F3F4F6; color:#6B7280; }
+.nutrition-source-badge.verified { background:#DCFCE7; color:#166534; }
+.nutrition-source-badge.estimated { background:#FEF3C7; color:#92400E; }
+.dossier-estimate-warning { display:flex; margin-top:2px; padding:11px 12px; border:1px solid #FDE68A; border-radius:8px; background:#FFFBEB; color:#92400E; flex-direction:column; font-size:10px; line-height:1.45; }
+.dossier-group-title { display:flex; align-items:center; gap:7px; margin-bottom:14px; color:var(--text); }
+.dossier-group-title i { color:var(--primary); }
+.expert-approval-note { display:flex; gap:9px; padding:11px; border-radius:8px; background:#F5F3FF; color:#5B21B6; font-size:10px; line-height:1.45; }
+.wordpress-preview-row { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-top:18px; padding:14px 15px; border:1px solid var(--border); border-radius:9px; background:#FCFBFA; }
+.wordpress-preview-row > div { display:flex; align-items:center; gap:11px; }
+.wordpress-preview-row > div > i { color:#287399; font-size:27px; }
+.wordpress-preview-row span { display:flex; flex-direction:column; }
+.wordpress-preview-row strong { font-size:12px; }
+.wordpress-preview-row small { margin-top:2px; color:var(--text-light); font-size:10px; }
+.dossier-footer-actions { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:20px 26px; background:#FCFBFA; }
+.dossier-footer-actions > span { color:var(--text-light); font-size:11px; }
+.dossier-footer-actions > div { display:flex; align-items:center; gap:9px; }
+.required-mark { display:inline-flex; margin-left:5px; padding:2px 6px; border-radius:99px; background:#FEE2E2; color:#B91C1C; font-size:8px; font-weight:800; text-transform:uppercase; }
+.product-dossier-editor .input-error { border-color:#EF4444; box-shadow:0 0 0 2px rgba(239,68,68,.1); }
+.dossier-heading-with-action { align-items:flex-start; }
+.dossier-heading-with-action > div { flex:1; }
+.dossier-field-wide { grid-column:span 2; }
+.field-source-badge { display:inline-flex; margin-top:6px; padding:4px 8px; border-radius:99px; font-size:8px; font-weight:700; }
+.field-source-badge.unknown { background:#F3F4F6; color:#6B7280; }
+.field-source-badge.verified { background:#DCFCE7; color:#166534; }
+.field-source-badge.estimated { background:#FEF3C7; color:#92400E; }
+.dossier-option-manager { display:grid; gap:22px; }
+.dossier-option-manager section { padding-bottom:18px; border-bottom:1px solid var(--border); }
+.dossier-option-manager section:last-child { padding-bottom:0; border-bottom:0; }
+.dossier-option-manager h4 { margin-bottom:9px; font-size:14px; }
+.dossier-option-add { display:flex; gap:8px; margin-bottom:10px; }
+.dossier-option-add input { flex:1; }
+.dossier-option-list { display:flex; max-height:180px; overflow-y:auto; align-content:flex-start; flex-wrap:wrap; gap:6px; }
+.dossier-option-list > span { display:inline-flex; align-items:center; gap:5px; padding:5px 5px 5px 9px; border:1px solid var(--border); border-radius:99px; background:#FCFBFA; font-size:10px; }
+.dossier-option-list button { display:grid; width:18px; height:18px; place-items:center; border:0; border-radius:50%; background:#EEEAE7; color:var(--text-light); cursor:pointer; }
+.dossier-option-list button:hover { background:#FEE2E2; color:#B91C1C; }
+.dossier-generated-content { display:flex; flex-direction:column; gap:13px; scroll-margin-top:20px; }
+.dossier-generated-empty { display:flex; min-height:180px; align-items:center; justify-content:center; flex-direction:column; border:1px dashed #D5CEC8; border-radius:10px; background:#FCFBFA; color:var(--text-light); text-align:center; }
+.dossier-generated-empty i { margin-bottom:10px; color:#B7AEA7; font-size:28px; }
+.dossier-generated-empty strong { color:var(--text); font-size:13px; }
+.dossier-generated-empty span { max-width:480px; margin-top:4px; font-size:10px; }
+.dossier-generated-empty.outdated { border-color:#FDE68A; background:#FFFBEB; color:#92400E; }
+.dossier-generated-empty.outdated i,.dossier-generated-empty.outdated strong { color:#92400E; }
+.generated-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 14px; border:1px solid #BBF7D0; border-radius:9px; background:#F0FDF4; color:#166534; }
+.generated-toolbar > div { display:flex; flex-direction:column; }
+.generated-toolbar strong { font-size:12px; }
+.generated-toolbar span { margin-top:2px; font-size:9px; }
+.generated-overview-tabs { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); overflow:hidden; border:1px solid var(--border); border-radius:10px; background:#FCFBFA; }
+.generated-overview-tabs button { display:flex; min-height:64px; padding:11px 12px; align-items:center; gap:9px; border-right:1px solid var(--border); background:transparent; color:var(--text-light); text-align:left; cursor:pointer; }
+.generated-overview-tabs button:last-child { border-right:0; }
+.generated-overview-tabs button:hover { background:#F7F4F1; }
+.generated-overview-tabs button.active { background:var(--primary-light); color:var(--primary); box-shadow:inset 0 -2px 0 var(--primary); }
+.generated-overview-tabs button > i { width:18px; text-align:center; }
+.generated-overview-tabs button > span { display:flex; min-width:0; flex-direction:column; }
+.generated-overview-tabs b { color:var(--text); font-size:10px; }
+.generated-overview-tabs small { margin-top:2px; overflow:hidden; font-size:8px; text-overflow:ellipsis; white-space:nowrap; }
+.generated-panel { padding:18px; border:1px solid var(--border); border-radius:10px; background:#FCFBFA; }
+.generated-panel-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:13px; }
+.generated-panel-heading > div { display:flex; flex-direction:column; }
+.generated-panel-heading span { color:var(--primary); font-size:8px; font-weight:800; text-transform:uppercase; }
+.generated-panel-heading h5 { margin-top:2px; font-size:14px; }
+.generated-panel-intro { margin:-4px 0 13px; color:var(--text-light); font-size:10px; line-height:1.5; }
+.generated-copy-flow { display:flex; flex-direction:column; gap:9px; margin-top:10px; }
+.generated-short-copy { border-left:3px solid var(--primary); }
+.generated-card-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.generated-card,.generated-faq { padding:15px; border:1px solid var(--border); border-radius:9px; background:#FFF; }
+.generated-card header,.generated-faq header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:9px; }
+.generated-card header > span,.generated-faq header > b { color:var(--primary); font-size:9px; font-weight:800; text-transform:uppercase; }
+.generated-card header button,.generated-faq header button { border:0; background:transparent; color:var(--text-light); font-size:9px; cursor:pointer; }
+.generated-card header button:hover,.generated-faq header button:hover { color:var(--primary); }
+.generated-card h5,.generated-faq h5 { margin-bottom:6px; font-size:13px; }
+.generated-card p,.generated-faq p { color:#443C37; font-size:11px; line-height:1.65; }
+.generated-section-title { display:flex; align-items:end; justify-content:space-between; gap:12px; margin-top:8px; }
+.generated-section-title h5 { font-size:14px; }
+.generated-section-title span { color:var(--text-light); font-size:9px; }
+.generated-faq-list { display:flex; flex-direction:column; gap:8px; }
+.generated-faq { padding:0; }
+.generated-faq summary { display:flex; padding:13px 14px; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; list-style:none; }
+.generated-faq summary::-webkit-details-marker { display:none; }
+.generated-faq summary > span { display:flex; flex-direction:column; gap:3px; color:var(--text); font-size:11px; font-weight:700; }
+.generated-faq summary b { color:var(--primary); font-size:8px; text-transform:uppercase; }
+.generated-faq summary > i { color:var(--text-light); font-size:9px; transition:transform var(--transition); }
+.generated-faq[open] summary > i { transform:rotate(180deg); }
+.generated-faq > div { padding:0 14px 14px; border-top:1px solid var(--border); }
+.generated-faq > div p { padding-top:11px; }
+.generated-faq > div button { margin-top:9px; border:0; background:transparent; color:var(--primary); font-size:9px; font-weight:700; cursor:pointer; }
+.generated-seo-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.generated-seo-grid article { position:relative; padding:12px 38px 12px 12px; border:1px solid var(--border); border-radius:8px; background:#FCFBFA; }
+.generated-seo-grid span { color:var(--primary); font-size:8px; font-weight:800; text-transform:uppercase; }
+.generated-seo-grid p { margin-top:4px; overflow-wrap:anywhere; font-size:10px; line-height:1.5; }
+.generated-seo-grid button { position:absolute; top:10px; right:10px; border:0; background:transparent; color:var(--text-light); cursor:pointer; }
+.generated-checks { padding:13px 15px; border:1px solid #FDE68A; border-radius:9px; background:#FFFBEB; color:#92400E; font-size:10px; }
+.generated-checks strong { display:flex; align-items:center; gap:6px; }
+.generated-checks ul { margin:7px 0 0 17px; line-height:1.6; }
+.generated-checks.complete { border-color:#BBF7D0; background:#F0FDF4; color:#166534; }
+
+@media (max-width:1100px) {
+  .product-dossier-layout { grid-template-columns:1fr; }
+  .product-dossier-sidebar { position:static; }
+  .product-dossier-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); max-height:240px; }
+  .dossier-fields-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .generated-overview-tabs { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .generated-overview-tabs button:nth-child(2) { border-right:0; }
+  .generated-overview-tabs button:nth-child(-n+2) { border-bottom:1px solid var(--border); }
+}
+@media (max-width:720px) {
+  .product-dossier-editor-head,.dossier-footer-actions,.dossier-subsection-head,.wordpress-preview-row { align-items:flex-start; flex-direction:column; }
+  .product-dossier-steps { padding:14px 12px; }
+  .product-dossier-steps li span { display:none; }
+  .dossier-step-card { padding:21px 18px; }
+  .dossier-source-grid,.dossier-two-columns,.dossier-fields-grid,.dossier-nutrition-grid { grid-template-columns:1fr; }
+  .dossier-inline-actions { align-items:flex-start; flex-direction:column; }
+  .product-dossier-list { grid-template-columns:1fr; }
+  .dossier-footer-actions .btn { width:100%; justify-content:center; }
+  .generated-overview-tabs { grid-template-columns:1fr; }
+  .generated-overview-tabs button { min-height:52px; border-right:0; border-bottom:1px solid var(--border); }
+  .generated-overview-tabs button:nth-child(-n+3) { border-bottom:1px solid var(--border); }
+  .generated-overview-tabs button:last-child { border-bottom:0; }
+  .generated-panel { padding:14px; }
+  .generated-panel-heading { align-items:flex-start; flex-direction:column; }
+}
+
 /* ========== Reset ========== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
@@ -447,8 +646,12 @@ input, select, textarea { font: inherit; }
 .toast {
   padding: 12px 20px; border-radius: var(--radius); color: white;
   font-size: 14px; box-shadow: var(--shadow-lg); animation: slideIn 0.3s ease;
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 8px; max-width: min(520px, calc(100vw - 40px));
+  transition: opacity 0.3s ease;
 }
+.toast-message { flex: 1; line-height: 1.4; }
+.toast-close { border: 0; background: transparent; color: inherit; cursor: pointer; padding: 4px; opacity: 0.85; }
+.toast-close:hover { opacity: 1; }
 .toast-success { background: var(--success); }
 .toast-error { background: var(--danger); }
 .toast-info { background: var(--primary); }
@@ -1693,6 +1896,17 @@ input, select, textarea { font: inherit; }
   .product-image-result-footer { align-items: flex-start; flex-direction: column; }
   .product-result-buttons { width: 100%; flex-wrap: wrap; }
   .webp-converter-section { padding: 22px 20px; }
+  .product-dossier-layout { grid-template-columns:1fr; }
+  .product-dossier-sidebar { position:static; }
+  .product-dossier-list { max-height:260px; }
+  .dossier-source-grid,.dossier-two-columns,.dossier-fields-grid,.dossier-nutrition-grid,.generated-card-grid,.generated-seo-grid { grid-template-columns:1fr; }
+  .dossier-field-wide { grid-column:auto; }
+  .dossier-heading-with-action { flex-wrap:wrap; }
+  .dossier-heading-with-action .btn { margin-left:42px; }
+  .dossier-footer-actions { align-items:stretch; flex-direction:column; }
+  .dossier-footer-actions > div { align-items:stretch; flex-direction:column; }
+  .dossier-footer-actions .btn { width:100%; }
+  .generated-toolbar,.generated-section-title { align-items:flex-start; flex-direction:column; }
   .ai-settings-brand { display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: start; }
   .ai-connection-badge { grid-column: 2; justify-self: start; margin-left: 0; }
   .ai-settings-current { align-items: flex-start; flex-direction: column; gap: 4px; }
@@ -1739,4 +1953,38 @@ input, select, textarea { font: inherit; }
   .cs-layout.cs-detail-open .cs-conflict-banner { top: 44px; }
   .cs-layout.cs-detail-open .cs-detail-tabs { top: 44px; }
 
+}
+/* Productstudio: compact source-first layout and persistent task status. */
+.product-dossier-steps button { display:flex; gap:8px; align-items:center; border:0; background:none; color:inherit; cursor:pointer; font:inherit; padding:6px; }
+.product-dossier-steps button:focus-visible, .dossier-step-card button:focus-visible { outline:3px solid var(--primary); outline-offset:3px; }
+.dossier-step-card { scroll-margin-top:24px; }
+.dossier-operation { display:flex; gap:12px; align-items:flex-start; margin:16px 24px; padding:16px; border:1px solid #c5d8ee; border-radius:8px; color:#234b68; background:#f1f8ff; overflow-wrap:anywhere; }
+.dossier-operation.error { color:#a31e25; background:#fff3f3; border-color:#ffb6bd; }
+.dossier-operation { position:sticky; top:8px; z-index:6; }
+.dossier-operation.success { color:#166534; background:#f0fdf4; border-color:#bbf7d0; }
+.dossier-operation.busy { color:#79521b; background:#fffbeb; border-color:#f5d788; }
+.dossier-export-actions, .generated-toolbar { display:flex; flex-wrap:wrap; gap:8px; }
+.dossier-style-source { padding:16px 0; border-bottom:1px solid var(--border); }
+.dossier-style-source blockquote { border-left:3px solid var(--primary); padding-left:12px; margin:12px 0; }
+.dossier-style-source p { margin:8px 0; line-height:1.65; }
+.dossier-review-confirmations { margin-top:16px; padding:12px; border:1px solid var(--border); border-radius:8px; }
+.dossier-review-confirmations summary { cursor:pointer; font-weight:600; }
+.dossier-review-confirmations p { margin:10px 0; font-size:13px; }
+.dossier-review-confirmations label { display:block; margin:10px 0; }
+.dossier-label-preview img { object-fit:contain; }
+.generated-faq button { margin:8px 12px 0 0; }
+#view-product-dossiers .product-studio-notice { padding:10px 14px; margin-bottom:10px; }
+#view-product-dossiers .product-dossier-ai-status.connected { padding:8px 14px; margin-bottom:16px; }
+#view-product-dossiers .product-dossier-ai-status.connected span { display:none; }
+#view-product-dossiers .dossier-footer-actions { position:sticky; bottom:0; background:#fff; z-index:5; box-shadow:0 -3px 15px #00000008; }
+@media (max-width:1100px) {
+  #view-product-dossiers .product-dossier-list-empty { padding:12px; min-height:0; }
+  #view-product-dossiers .product-dossier-list-empty > i, #view-product-dossiers .product-dossier-list-empty small { display:none; }
+  #view-product-dossiers .product-dossier-list { max-height:150px; overflow:auto; }
+  #view-product-dossiers .product-dossier-steps li span { display:inline; font-size:11px; }
+  #view-product-dossiers .product-dossier-steps { padding:10px; }
+  #view-product-dossiers .product-studio-notice { flex-wrap:wrap; }
+  #view-product-dossiers .dossier-footer-actions > span { display:none; }
+  #view-product-dossiers .dossier-footer-actions { padding:12px; }
+  #view-product-dossiers .dossier-footer-actions .btn { font-size:12px; padding:10px; }
 }

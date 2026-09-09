@@ -11,6 +11,7 @@ use App\Models\ProductImageStyleReference;
 use App\Models\User;
 use App\Services\ProductImageGenerationException;
 use App\Services\ProductImageGenerator;
+use App\Services\ProductImageRefiner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
@@ -171,7 +172,8 @@ class ProductImageTest extends TestCase
 
             $this->get($result['download_url'])
                 ->assertOk()
-                ->assertDownload($filename);
+                ->assertHeader('Content-Type', 'image/webp')
+                ->assertDownload($result['metadata']['filename']);
         }
     }
 
@@ -276,7 +278,7 @@ class ProductImageTest extends TestCase
         Queue::assertPushed(RefineProductImage::class, fn ($job) => $job->assetId === $selected->id);
 
         (new RefineProductImage($imageRequest->id, $selected->id, 'Maak de korst krokanter en de kern medium.'))
-            ->handle(app(\App\Services\ProductImageRefiner::class));
+            ->handle(app(ProductImageRefiner::class));
 
         $this->assertSame(2, $selected->refresh()->version);
         $this->assertSame(1, $selected->revisions()->where('version', 1)->count());

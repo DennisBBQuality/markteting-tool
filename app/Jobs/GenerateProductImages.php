@@ -20,7 +20,7 @@ class GenerateProductImages implements ShouldQueue
 {
     use Queueable;
 
-    public int $tries = 2;
+    public int $tries = 1;
 
     public int $timeout = 600;
 
@@ -57,11 +57,11 @@ class GenerateProductImages implements ShouldQueue
 
         $sources = $this->uploadedSources($request);
         $progress = function (string $step, int $progress) use ($request): void {
-                $request->update([
-                    'progress' => min(90, max(10, $progress)),
-                    'progress_step' => $step,
-                ]);
-            };
+            $request->update([
+                'progress' => min(90, max(10, $progress)),
+                'progress_step' => $step,
+            ]);
+        };
         $generatedImages = $generator instanceof ProductImageWorkflowGenerator && is_array($request->generation_context)
             ? $generator->generateForProduct($sources, $request->prompt, $request->generation_context, $progress)
             : $generator->generate($sources[0], $request->prompt, $progress);

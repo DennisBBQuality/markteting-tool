@@ -37,7 +37,8 @@ return [
 
     'product_images' => [
         'driver' => env('PRODUCT_IMAGE_DRIVER', 'fake'),
-        'queue_connection' => env('PRODUCT_IMAGE_QUEUE_CONNECTION', 'deferred'),
+        // PHP's local single-process server cannot serve polling while deferred work runs.
+        'queue_connection' => env('PRODUCT_IMAGE_QUEUE_CONNECTION', env('APP_ENV') === 'local' ? 'database' : 'deferred'),
         'max_output_bytes' => 20 * 1024 * 1024,
         'openai' => [
             'api_key' => env('OPENAI_API_KEY'),
@@ -47,6 +48,15 @@ return [
             'quality' => env('OPENAI_IMAGE_QUALITY', 'high'),
             'timeout' => (int) env('OPENAI_IMAGE_TIMEOUT', 240),
         ],
+    ],
+
+    'product_content' => [
+        // Match the existing image hosting route without requiring a new production worker.
+        'queue_connection' => env('PRODUCT_CONTENT_QUEUE_CONNECTION', env('APP_ENV') === 'production' ? 'deferred' : 'database'),
+        'endpoint' => env('OPENAI_RESPONSES_ENDPOINT', 'https://api.openai.com/v1/responses'),
+        'model' => env('OPENAI_PRODUCT_CONTENT_MODEL', 'gpt-5.6-sol'),
+        'reasoning_effort' => env('OPENAI_PRODUCT_CONTENT_REASONING_EFFORT', 'high'),
+        'timeout' => (int) env('OPENAI_PRODUCT_CONTENT_TIMEOUT', 240),
     ],
 
 ];

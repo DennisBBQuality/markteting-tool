@@ -30,6 +30,23 @@ class AiCredentialStore
         return $this->openAiApiKey() !== null;
     }
 
+    public function openAiContentApiKey(): ?string
+    {
+        $storedKey = $this->storedOpenAiApiKey();
+        if ($storedKey !== null) {
+            return $storedKey;
+        }
+
+        $environmentKey = trim((string) config('services.product_images.openai.api_key'));
+
+        return $environmentKey !== '' ? $environmentKey : null;
+    }
+
+    public function openAiContentIsActive(): bool
+    {
+        return $this->openAiContentApiKey() !== null;
+    }
+
     public function status(): array
     {
         $storedKey = $this->storedOpenAiApiKey();

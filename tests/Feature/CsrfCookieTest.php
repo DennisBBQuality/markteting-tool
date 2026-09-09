@@ -31,8 +31,17 @@ class CsrfCookieTest extends TestCase
 
         $this->assertIsString($appShell);
         $this->assertIsString($appJavascript);
-        $this->assertStringContainsString('/js/app.js?v=20260903-1', $appShell);
+        $this->assertStringContainsString('/js/app.js?v=20260909-1', $appShell);
         $this->assertStringContainsString("fetch('/api/auth/csrf'", $appJavascript);
         $this->assertStringContainsString('res.status === 419', $appJavascript);
+        $this->assertStringContainsString('JSON.parse(text)', $appJavascript);
+    }
+
+    public function test_unknown_api_routes_never_return_the_html_app_shell(): void
+    {
+        $this->get('/api/bestaat-niet')
+            ->assertNotFound()
+            ->assertHeader('Content-Type', 'application/json')
+            ->assertExactJson(['error' => 'Deze API-route bestaat niet.']);
     }
 }

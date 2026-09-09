@@ -6,11 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Jobs\GenerateProductImages;
 use App\Jobs\RefineProductImage;
 use App\Models\ImagePrompt;
+use App\Models\ProductDossier;
 use App\Models\ProductImageAsset;
-use App\Models\ProductImageRevision;
 use App\Models\ProductImageRequest;
+use App\Models\ProductImageRevision;
 use App\Models\ProductImageStyleReference;
 use App\Services\AiCredentialStore;
+use App\Services\ProductImageDelivery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -78,6 +80,9 @@ class ProductImageController extends Controller
         $mainIndex = min((int) ($validated['main_index'] ?? 0), count($files) - 1);
         if ($mainIndex > 0) {
             [$files[0], $files[$mainIndex]] = [$files[$mainIndex], $files[0]];
+            $names = (array) ($validated['reference_names'] ?? []);
+            [$names[0], $names[$mainIndex]] = [$names[$mainIndex] ?? null, $names[0] ?? null];
+            $validated['reference_names'] = $names;
         }
         $stored = [];
         foreach ($files as $index => $file) {
@@ -85,6 +90,7 @@ class ProductImageController extends Controller
             $path = $file->storeAs('product-image-inputs', Str::uuid().'.'.$extension, 'local');
             if (! is_string($path)) {
                 Storage::disk('local')->delete(array_column($stored, 'path'));
+
                 return response()->json(['error' => 'De referentiefoto’s konden niet veilig worden opgeslagen.'], 500);
             }
             $stored[] = [
@@ -126,6 +132,16 @@ class ProductImageController extends Controller
         return response()->json($this->requestPayload($imageRequest));
     }
 
+    public function linkDossier(Request $request, ProductImageRequest $imageRequest): JsonResponse
+    {
+        $this->ensureOwner($request, $imageRequest);
+        $id = $request->validate(['product_dossier_id' => ['required', 'uuid']])['product_dossier_id'];
+        ProductDossier::where('user_id', $request->session()->get('userId'))->findOrFail($id);
+        $imageRequest->update(['generation_context' => [...(array) $imageRequest->generation_context, 'product_dossier_id' => $id]]);
+
+        return response()->json(['linked' => true]);
+    }
+
     public function show(Request $request, ProductImageRequest $imageRequest, string $asset)
     {
         $this->ensureOwner($request, $imageRequest);
@@ -152,6 +168,10 @@ class ProductImageController extends Controller
                 abort(404);
             }
 
+            if ($request->query('format') === 'webp') {
+                return $this->webpResponse($imageRequest, $safeFilename, $contents, $asset->version ?? 1);
+            }
+
             if ($request->boolean('download')) {
                 $headers['Content-Disposition'] = 'attachment; filename="'.$safeFilename.'"';
             }
@@ -163,6 +183,10 @@ class ProductImageController extends Controller
         $path = 'product-images/'.$imageRequest->id.'/'.$safeFilename;
         if (! Storage::disk('local')->exists($path)) {
             abort(404);
+        }
+
+        if ($request->query('format') === 'webp') {
+            return $this->webpResponse($imageRequest, $safeFilename, Storage::disk('local')->get($path), 1);
         }
 
         if ($request->boolean('download')) {
@@ -283,6 +307,21 @@ class ProductImageController extends Controller
         }
     }
 
+    private function webpResponse(ProductImageRequest $request, string $filename, string $contents, int $version)
+    {
+        $delivery = app(ProductImageDelivery::class);
+        $result = collect($request->results)->firstWhere('filename', $filename) ?? [];
+        $metadata = $delivery->metadata((array) $request->generation_context, $result, $version);
+        $path = 'product-images/'.$request->id.'/webp/'.hash('sha256', $contents).'.webp';
+        if (! Storage::disk('local')->exists($path)) {
+            Storage::disk('local')->put($path, $delivery->webp($contents));
+        }
+
+        return Storage::disk('local')->download($path, $metadata['filename'], [
+            'Content-Type' => 'image/webp', 'Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
     private function requestPayload(ProductImageRequest $imageRequest): array
     {
         $results = collect($imageRequest->results ?? [])->map(function (array $result) use ($imageRequest) {
@@ -309,7 +348,8 @@ class ProductImageController extends Controller
                     : false,
                 'needs_label_review' => ($imageRequest->generation_context['product_type'] ?? null) === 'sauce',
                 'url' => $url.'?v='.($storedAsset?->version ?? 1),
-                'download_url' => $url.'?download=1',
+                'download_url' => $url.'?download=1&format=webp&v='.($storedAsset?->version ?? 1),
+                'metadata' => app(ProductImageDelivery::class)->metadata((array) $imageRequest->generation_context, $result, $storedAsset?->version ?? 1),
             ];
         })->values();
 
