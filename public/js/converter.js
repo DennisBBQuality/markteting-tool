@@ -71,6 +71,7 @@ function renderConverter() {
       </div>
 
       <div class="product-image-form">
+        <div class="form-group image-model-picker" id="image-model-picker-generator"></div>
         <div class="product-type-picker" role="radiogroup" aria-label="Soort opdracht">
           <button type="button" class="active" data-type="meat" onclick="setProductImageType('meat')"><i class="fas fa-drumstick-bite"></i><strong>Vlees</strong><span>2 rauw + 2 bereid</span></button>
           <button type="button" data-type="sauce" onclick="setProductImageType('sauce')"><i class="fas fa-bottle-droplet"></i><strong>Saus of rub</strong><span>2 productfoto's</span></button>
@@ -182,6 +183,7 @@ function renderConverter() {
   converterState = { files: [], results: [], converting: false, seoData: {} };
   initProductImageDropzone();
   initDropzone();
+  ImageModelPicker.load('generator');
   if (pendingRequestId) {
     showProductImagePendingState();
     pollProductImageRequest(pendingRequestId);
@@ -301,7 +303,8 @@ function updateProductImageForm() {
   const button = document.getElementById('product-image-generate-btn');
   const name = document.getElementById('product-image-name')?.value.trim();
   const quantity = Number(document.getElementById('product-image-quantity')?.value);
-  if (button) button.disabled = productImageState.generating || !productImageState.files.length || !name || quantity < 1;
+  if (button) button.disabled = productImageState.generating || !productImageState.files.length || !name || quantity < 1
+    || !ImageModelPicker.selection('generator');
 }
 
 async function openProductPromptModal() {
@@ -373,6 +376,12 @@ async function startProductImageGeneration() {
     return;
   }
 
+  const modelSelection = ImageModelPicker.selection('generator');
+  if (!modelSelection) {
+    showProductImageError('Kies eerst een beschikbaar afbeeldingsmodel. Bevestig bij een nieuw model dat je het wilt testen.');
+    return;
+  }
+
   productImageState.generating = true;
   const button = document.getElementById('product-image-generate-btn');
   const status = document.getElementById('product-image-status');
@@ -384,6 +393,8 @@ async function startProductImageGeneration() {
   results.classList.add('hidden');
 
   const formData = new FormData();
+  formData.append('image_model', modelSelection.image_model);
+  formData.append('accept_experimental', modelSelection.accept_experimental ? '1' : '0');
   productImageState.files.forEach(file => formData.append('fotos[]', file));
   formData.append('main_index', String(productImageState.mainIndex));
   formData.append('product_type', productImageState.productType);
@@ -586,6 +597,7 @@ function renderProductImageResults() {
       <div>
         <span class="product-image-eyebrow">Resultaat</span>
         <h3>Kies je favoriete productfoto</h3>
+        ${productImageState.context?.image_model ? `<p>Gemaakt met ${escHtml(productImageState.context.image_model)}</p>` : ''}
       </div>
       <span class="product-image-count"><i class="fas fa-check-circle"></i> ${productImageState.results.length} afbeeldingen</span>
       <button class="btn btn-outline btn-sm" type="button" onclick="linkImagesToDossier()">Koppel aan productdossier</button>

@@ -1,169 +1,271 @@
-// ========== Dashboard ==========
+// ========== Personal week dashboard ==========
+const Dashboard = {
+  calendar: null,
+  version: 0,
+  notes: [],
+  projects: [],
+  date: null,
+  taskPerson: null,
+  taskRequest: 0,
+  dispose() {
+    this.version++;
+    this.taskRequest++;
+    if (typeof DashboardLayout !== 'undefined') DashboardLayout.dispose();
+    if (this.calendar) this.calendar.destroy();
+    this.calendar = null;
+    this.notes = [];
+    this.projects = [];
+    if (typeof Trunkrs !== 'undefined') {
+      clearInterval(Trunkrs.timer);
+      Trunkrs.mountVersion++;
+    }
+  },
+  isCurrent(version, userId) {
+    return this.version === version && App.currentUser?.id === userId && App.currentView === 'dashboard';
+  },
+  changeWeek(action) {
+    this.calendar?.[action]();
+  },
+  myTasks() {
+    App.taskUserFilter = this.taskPerson || App.currentUser?.id || '';
+    navigateTo('tasks');
+  },
+  async loadTasks(person) {
+    const userId=App.currentUser?.id, version=this.version, request=++this.taskRequest;
+    this.taskPerson=person || userId;
+    const element=document.getElementById('dashboard-my-tasks');
+    element.innerHTML=dashboardEmpty('Taken laden…');
+    const count=document.getElementById('dashboard-task-count');
+    if (count) count.textContent='Laden…';
+    const url=this.taskPerson===userId?'/api/tasks?mine=1':'/api/tasks?toegewezen_aan='+encodeURIComponent(this.taskPerson);
+    const tasks=await api(url,{silentError:true});
+    if (!this.isCurrent(version,userId) || request!==this.taskRequest) return;
+    if (!Array.isArray(tasks)) { element.innerHTML=dashboardError('Dashboard.loadTasks(Dashboard.taskPerson)'); if (count) count.textContent='Niet geladen'; return; }
+    const personal=dashboardPersonalTasks(tasks,this.taskPerson);
+    element.innerHTML=personal.length?dashboardTasksHtml(personal):dashboardEmpty('Geen open taken voor deze persoon.');
+    if (count) count.textContent=personal.length+' open';
+  },
+  myNotes() {
+    App.notesMineFilter = true;
+    navigateTo('notes');
+  },
+  openNote(id) {
+    const note = this.notes.find(n => n.id === id && n.aangemaakt_door === App.currentUser?.id);
+    if (note) openNoteModal(note);
+  },
+  openProject(id) {
+    const project = this.projects.find(p => p.id === id);
+    if (project) {
+      navigateTo('projects');
+      openProjectModal(project);
+    }
+  },
+};
+
+function dashboardDate(value, options = {day: 'numeric', month: 'short'}) {
+  if (!value) return '';
+  const date = new Date(value.length === 10 ? value + 'T12:00:00' : value);
+  return Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat('nl-NL', options).format(date);
+}
+
+function dashboardLocalDate(date) {
+  return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+}
+
+function dashboardPersonalTasks(tasks, userId) {
+  if (!userId) return [];
+  return tasks.filter(t => t.status !== 'klaar' && (t.toegewezenen || []).some(u => u.id === userId))
+    .sort((a, b) => (a.deadline || '9999').localeCompare(b.deadline || '9999') || a.titel.localeCompare(b.titel));
+}
+
+function dashboardPersonalNotes(notes, userId) {
+  return userId ? notes.filter(n => n.aangemaakt_door === userId)
+    .sort((a, b) => (b.updated_at || b.created_at || '').localeCompare(a.updated_at || a.created_at || '')) : [];
+}
+
+function dashboardEmpty(text) {
+  return `<p class="dashboard-empty">${text}</p>`;
+}
+
+function dashboardError(retry) {
+  return `<div class="dashboard-error" role="alert">Dit onderdeel kon niet worden geladen.
+    <button class="btn btn-sm btn-outline" onclick="${retry}">Opnieuw proberen</button></div>`;
+}
+
+function dashboardTasksHtml(tasks) {
+  const status = {todo: 'Te doen', bezig: 'Bezig', review: 'Review'};
+  const today = dashboardLocalDate(new Date());
+  return tasks.length ? tasks.map(t => `
+    <button class="dashboard-row dashboard-task" onclick="openEditTaskModal('${escHtml(t.id)}')">
+      <i class="far fa-circle dashboard-task-icon" aria-hidden="true"></i>
+      <span class="dashboard-row-text"><strong>${escHtml(t.titel)}</strong></span>
+      <span class="dashboard-status dashboard-status-${status[t.status] ? t.status : 'todo'}">${status[t.status] || 'Te doen'}</span>
+      <span class="dashboard-date ${t.deadline && t.deadline.slice(0, 10) < today ? 'is-overdue' : ''}">${dashboardDate(t.deadline) || 'Geen datum'}</span>
+    </button>`).join('') : dashboardEmpty('Er staan geen open taken op jouw naam.');
+}
+
+function dashboardProjectsHtml(projects) {
+  return projects.length ? projects.slice(0, 4).map(p => `
+    <button class="dashboard-row" onclick="Dashboard.openProject('${escHtml(p.id)}')">
+      <i class="fas fa-folder dashboard-accent" aria-hidden="true"></i>
+      <span class="dashboard-row-text"><strong>${escHtml(p.naam)}</strong>
+        <small>${escHtml(p.beschrijving || 'Geen beschrijving')}</small></span>
+      <i class="fas fa-chevron-right dashboard-chevron" aria-hidden="true"></i>
+    </button>`).join('') : dashboardEmpty('Er zijn nog geen actieve projecten.');
+}
+
+function dashboardNotesHtml(notes) {
+  return notes.length ? notes.slice(0, 4).map(n => `
+    <button class="dashboard-row" onclick="Dashboard.openNote('${escHtml(n.id)}')">
+      <i class="far fa-file-alt dashboard-note-icon" aria-hidden="true"></i>
+      <span class="dashboard-row-text"><strong>${escHtml(n.titel)}</strong>
+        <small>${dashboardDate(n.updated_at || n.created_at)} · ${escHtml(n.aangemaakt_door_naam || App.currentUser?.naam || '')}</small></span>
+    </button>`).join('') : dashboardEmpty('Er staan nog geen notities op jouw naam.');
+}
+
 async function renderDashboard() {
+  Dashboard.dispose();
+  const version = Dashboard.version;
+  const userId = App.currentUser?.id;
   const container = document.getElementById('view-dashboard');
-  const [stats, tasks, calItems, notes, projects] = await Promise.all([
-    api('/api/dashboard/stats'),
-    api('/api/tasks'),
-    api('/api/calendar?start=' + todayStr() + '&end=' + new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0]),
-    api('/api/notes'),
-    api('/api/projects'),
-  ]);
-  if (!stats || !tasks) return;
-
-  const today = todayStr();
-  const overdueTasks = tasks.filter(t => t.deadline && t.deadline.split('T')[0] < today && t.status !== 'klaar');
-  const todayTasks = tasks.filter(t => t.deadline && t.deadline.split('T')[0] === today && t.status !== 'klaar');
-  const upcomingCal = (calItems || []).slice(0, 8);
-  const recentNotes = (notes || []).slice(0, 4);
-  const activeProjects = (projects || []).filter(p => p.status === 'actief').slice(0, 6);
-
+  if (!container || !userId) return;
+  container.innerHTML=dashboardEmpty('Dashboard laden…');
+  if (typeof DashboardLayout !== 'undefined') {
+    if (!await DashboardLayout.load(version,userId)) return;
+  }
+  if (!Dashboard.isCurrent(version,userId)) return;
+  Dashboard.taskPerson=userId;
   container.innerHTML = `
-    <div class="page-header">
+    <div class="page-header dashboard-header">
       <h2>Dashboard</h2>
       <div class="page-header-actions">
-        <button class="btn btn-primary" onclick="openQuickTaskModal()"><i class="fas fa-plus"></i> Nieuwe taak</button>
-        <button class="btn btn-outline" onclick="navigateTo('calendar')"><i class="fas fa-calendar-plus"></i> Kalender item</button>
+        <span class="dashboard-today"><i class="far fa-calendar" aria-hidden="true"></i> ${dashboardDate(new Date().toISOString(), {weekday:'long', day:'numeric', month:'long', year:'numeric'})}</span>
+        <button class="btn btn-primary" onclick="openQuickTaskModal()"><i class="fas fa-plus" aria-hidden="true"></i> Nieuwe taak</button>
+        <button id="dashboard-customize" class="btn btn-outline" onclick="DashboardLayout.edit()"><i class="fas fa-sliders" aria-hidden="true"></i> Dashboard aanpassen</button>
       </div>
     </div>
-
-    <div class="stats-grid">
-      <div class="stat-card clickable" onclick="navigateTo('projects')">
-        <div class="stat-icon blue"><i class="fas fa-folder"></i></div>
-        <div><div class="stat-value">${stats.totaal_projecten}</div><div class="stat-label">Projecten</div></div>
-      </div>
-      <div class="stat-card clickable" onclick="navigateTo('tasks')">
-        <div class="stat-icon purple"><i class="fas fa-tasks"></i></div>
-        <div><div class="stat-value">${stats.actieve_taken}</div><div class="stat-label">Actieve taken</div></div>
-      </div>
-      <div class="stat-card clickable" onclick="navigateTo('tasks')" ${stats.taken_verlopen > 0 ? 'style="border:2px solid var(--danger)"' : ''}>
-        <div class="stat-icon red"><i class="fas fa-exclamation-triangle"></i></div>
-        <div><div class="stat-value">${stats.taken_verlopen}</div><div class="stat-label">Verlopen</div></div>
-      </div>
-    </div>
-
-    <!-- Main dashboard grid -->
-    <div class="dash-grid">
-      <!-- Left: Kanban -->
-      <div class="dash-main">
-        <div class="dash-section">
-          <div class="dash-section-header">
-            <h3><i class="fas fa-tasks"></i> Taken overzicht</h3>
-            <div class="dash-section-actions">
-              <select id="dash-filter-project" onchange="filterDashboardTasks()" class="filter-inline">
-                <option value="">Alle projecten</option>
-                ${App.projects.map(p => `<option value="${p.id}">${p.naam}</option>`).join('')}
-              </select>
-              <select id="dash-filter-user" onchange="filterDashboardTasks()" class="filter-inline">
-                <option value="">Alle personen</option>
-                ${App.users.map(u => `<option value="${u.id}">${u.naam}</option>`).join('')}
-              </select>
-            </div>
-          </div>
-          <div class="kanban-board" id="dashboard-kanban"></div>
+    <div id="dashboard-layout-status" role="status"></div>
+    <section id="dashboard-layout-editor" hidden aria-label="Dashboard aanpassen"></section>
+    <div id="dashboard-widget-grid">
+    <section data-widget="calendar" class="dashboard-week dashboard-tile" aria-label="Weekkalender">
+      <header class="dashboard-week-header">
+        <div><h3>Deze week</h3><p id="dashboard-week-title" aria-live="polite"></p></div>
+        <div class="dashboard-week-actions">
+          <button class="btn btn-outline" aria-label="Vorige week" onclick="Dashboard.changeWeek('prev')"><i class="fas fa-chevron-left" aria-hidden="true"></i></button>
+          <button class="btn btn-outline" onclick="Dashboard.changeWeek('today')">Vandaag</button>
+          <button class="btn btn-outline" aria-label="Volgende week" onclick="Dashboard.changeWeek('next')"><i class="fas fa-chevron-right" aria-hidden="true"></i></button>
         </div>
-      </div>
+      </header>
+      <div id="dashboard-calendar-status" role="status"></div>
+      <div class="dashboard-calendar-scroll"><div id="dashboard-calendar"></div></div>
+    </section>
+      <section data-widget="tasks" class="dashboard-tile" aria-labelledby="dashboard-tasks-title">
+        <header class="dashboard-tile-header">
+          <i class="fas fa-tasks dashboard-accent" aria-hidden="true"></i>
+          <div><h3 id="dashboard-tasks-title">Openstaande taken</h3><p id="dashboard-task-count">Toegewezen aan jou</p></div>
+          <button class="dashboard-link" onclick="Dashboard.myTasks()">Bekijk taken <i class="fas fa-arrow-right" aria-hidden="true"></i></button>
+        </header>
+        <label class="dashboard-person-label" for="dashboard-task-person">Persoon</label>
+        <select id="dashboard-task-person" onchange="Dashboard.loadTasks(this.value)">${[App.currentUser, ...(App.users || []).filter(u=>u.id!==userId)].map(u=>`<option value="${escHtml(u.id)}" ${u.id===userId?'selected':''}>${escHtml(u.naam)}${u.id===userId?' (ik)':''}</option>`).join('')}</select>
+        <div id="dashboard-my-tasks" class="dashboard-list" aria-live="polite">${dashboardEmpty('Taken laden…')}</div>
+      </section>
+      <section data-widget="projects" class="dashboard-tile" aria-labelledby="dashboard-projects-title">
+        <header class="dashboard-tile-header">
+          <i class="fas fa-folder dashboard-accent" aria-hidden="true"></i>
+          <div><h3 id="dashboard-projects-title">Actieve projecten</h3></div>
+          <button class="dashboard-link" onclick="navigateTo('projects')">Alle projecten <i class="fas fa-arrow-right" aria-hidden="true"></i></button>
+        </header>
+        <div id="dashboard-active-projects" class="dashboard-list" aria-live="polite">${dashboardEmpty('Projecten laden…')}</div>
+      </section>
+      <section data-widget="notes" class="dashboard-tile" aria-labelledby="dashboard-notes-title">
+        <header class="dashboard-tile-header">
+          <i class="fas fa-sticky-note dashboard-accent" aria-hidden="true"></i>
+          <div><h3 id="dashboard-notes-title">Mijn notities</h3><p>Op jouw naam</p></div>
+          <button class="dashboard-link" onclick="Dashboard.myNotes()">Al mijn notities <i class="fas fa-arrow-right" aria-hidden="true"></i></button>
+        </header>
+        <div id="dashboard-my-notes" class="dashboard-list" aria-live="polite">${dashboardEmpty('Notities laden…')}</div>
+      </section>
+    <section data-widget="trunkrs" class="dashboard-tile trunkrs-tile" id="trunkrs-tile" aria-label="Niet bezorgd Trunkrs">
+      <div class="dash-section-header"><h3><i class="fas fa-truck" aria-hidden="true"></i> Niet bezorgd Trunkrs</h3></div>
+      <div class="trunkrs-body">Overzicht laden…</div>
+    </section></div>`;
+  if (typeof DashboardLayout !== 'undefined') DashboardLayout.mount();
+  mountDashboardCalendar(version, userId);
+  if (typeof DashboardLayout !== 'undefined') DashboardLayout.resizeCalendar();
+  if (typeof Trunkrs !== 'undefined') Trunkrs.mount();
+  await Promise.all([Dashboard.loadTasks(userId), ...[
+    ['notes', '/api/notes?mine=1', 'dashboard-my-notes'],
+    ['projects', '/api/projects', 'dashboard-active-projects'],
+  ].map(async ([kind, url, id]) => {
+    const data = await api(url, {silentError: true});
+    if (!Dashboard.isCurrent(version, userId)) return;
+    const element = document.getElementById(id);
+    if (!element) return;
+    if (!Array.isArray(data)) { element.innerHTML = dashboardError('renderDashboard()'); return; }
+    if (kind === 'tasks') element.innerHTML = dashboardTasksHtml(dashboardPersonalTasks(data, userId));
+    if (kind === 'notes') {
+      Dashboard.notes = dashboardPersonalNotes(data, userId);
+      element.innerHTML = dashboardNotesHtml(Dashboard.notes);
+    }
+    if (kind === 'projects') {
+      Dashboard.projects = data.filter(p => p.status === 'actief');
+      element.innerHTML = dashboardProjectsHtml(Dashboard.projects);
+    }
+  })]);
+}
 
-      <!-- Right sidebar -->
-      <div class="dash-sidebar-right">
-        <!-- Overdue -->
-        ${overdueTasks.length > 0 ? `
-        <div class="dash-panel dash-panel-danger">
-          <div class="dash-panel-header"><h4><i class="fas fa-exclamation-circle"></i> Verlopen taken</h4></div>
-          <div class="dash-panel-body">
-            ${overdueTasks.slice(0, 5).map(t => `
-              <div class="dash-task-item" onclick="openEditTaskModal('${t.id}')">
-                <div class="dash-task-title">${escHtml(t.titel)}</div>
-                <div class="dash-task-meta">
-                  <span class="tag priority-${t.prioriteit}">${t.prioriteit}</span>
-                  <span class="dash-task-date overdue"><i class="fas fa-clock"></i> ${formatDate(t.deadline)}</span>
-                </div>
-              </div>
-            `).join('')}
-            ${overdueTasks.length > 5 ? `<div class="dash-more" onclick="navigateTo('tasks')">+${overdueTasks.length - 5} meer...</div>` : ''}
-          </div>
-        </div>` : ''}
-
-        <!-- Today -->
-        <div class="dash-panel">
-          <div class="dash-panel-header"><h4><i class="fas fa-calendar-day"></i> Vandaag</h4><span class="badge">${todayTasks.length}</span></div>
-          <div class="dash-panel-body">
-            ${todayTasks.length === 0 ? '<div class="dash-empty">Geen taken voor vandaag</div>' : ''}
-            ${todayTasks.slice(0, 6).map(t => `
-              <div class="dash-task-item" onclick="openEditTaskModal('${t.id}')">
-                <div class="dash-task-title">${escHtml(t.titel)}</div>
-                <div class="dash-task-meta">
-                  <span class="tag priority-${t.prioriteit}">${t.prioriteit}</span>
-                  ${t.project_naam ? `<span style="color:${t.project_kleur || '#64748B'}"><i class="fas fa-folder"></i> ${escHtml(t.project_naam)}</span>` : ''}
-                  ${(t.toegewezenen||[]).length > 0 ? `<span class="kanban-card-assignees">${(t.toegewezenen||[]).map(u=>`<span class="kanban-card-assignee" style="background:${u.kleur||'#3B82F6'}" title="${escHtml(u.naam)}">${u.naam.charAt(0)}</span>`).join('')}</span>` : ''}
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-
-        <!-- Upcoming Calendar -->
-        <div class="dash-panel">
-          <div class="dash-panel-header"><h4><i class="fas fa-calendar-alt"></i> Komende kalender items</h4><button class="btn btn-sm btn-outline" onclick="navigateTo('calendar')">Bekijk alles</button></div>
-          <div class="dash-panel-body">
-            ${upcomingCal.length === 0 ? '<div class="dash-empty">Geen komende items</div>' : ''}
-            ${upcomingCal.map(c => `
-              <div class="dash-cal-item" onclick="navigateTo('calendar')">
-                <div class="dash-cal-dot" style="background:${c.kleur || calTypeColor(c.type)}"></div>
-                <div class="dash-cal-info">
-                  <div class="dash-cal-title">${escHtml(c.titel)}</div>
-                  <div class="dash-cal-date">${formatDateTime(c.datum_start)} · <span class="dash-cal-type">${c.type}</span></div>
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-
-        <!-- Recent Notes -->
-        <div class="dash-panel">
-          <div class="dash-panel-header"><h4><i class="fas fa-sticky-note"></i> Recente notities</h4><button class="btn btn-sm btn-outline" onclick="navigateTo('notes')">Bekijk alles</button></div>
-          <div class="dash-panel-body">
-            ${recentNotes.length === 0 ? '<div class="dash-empty">Geen notities</div>' : ''}
-            ${recentNotes.map(n => `
-              <div class="dash-note-item" style="border-left:3px solid ${n.kleur || '#FEF3C7'}" onclick="navigateTo('notes')">
-                <div class="dash-note-title">${escHtml(n.titel)}</div>
-                <div class="dash-note-preview">${escHtml((n.inhoud || '').substring(0, 80))}${(n.inhoud || '').length > 80 ? '...' : ''}</div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-
-      </div>
-    </div>
-
-    <!-- Actieve projecten - full width -->
-    <div class="dash-section" style="margin-top:24px">
-      <div class="dash-section-header">
-        <h3><i class="fas fa-folder"></i> Actieve projecten</h3>
-        <button class="btn btn-sm btn-outline" onclick="navigateTo('projects')">Bekijk alles</button>
-      </div>
-      <div class="dash-projects-grid">
-        ${activeProjects.map(p => {
-          const progress = p.aantal_taken > 0 ? Math.round((p.taken_klaar / p.aantal_taken) * 100) : 0;
-          return `
-          <div class="dash-project-card" onclick="navigateTo('projects')" style="border-top:3px solid ${p.kleur || '#ea484b'}">
-            <div class="dash-project-name">${escHtml(p.naam)}</div>
-            <div class="dash-project-desc">${escHtml((p.beschrijving || '').substring(0, 60))}</div>
-            <div class="dash-project-progress">
-              <div class="progress-bar" style="flex:1"><div class="progress-fill" style="width:${progress}%"></div></div>
-              <span>${p.taken_klaar || 0}/${p.aantal_taken || 0} taken</span>
-            </div>
-            <div class="dash-project-meta">
-              <span class="tag priority-${p.prioriteit}">${p.prioriteit}</span>
-              ${p.deadline ? `<span><i class="fas fa-clock"></i> ${formatDate(p.deadline)}</span>` : ''}
-            </div>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>
-  `;
-
-  App.dashboardTasks = tasks.filter(t => t.status !== 'klaar');
-  filterDashboardTasks();
+function mountDashboardCalendar(version, userId) {
+  const element = document.getElementById('dashboard-calendar');
+  const status = document.getElementById('dashboard-calendar-status');
+  if (typeof FullCalendar === 'undefined') {
+    status.innerHTML = dashboardError('renderDashboard()');
+    return;
+  }
+  Dashboard.calendar = new FullCalendar.Calendar(element, {
+    locale: 'nl', initialView: 'timeGridWeek', initialDate: Dashboard.date || undefined,
+    firstDay: 1, headerToolbar: false, height: 450,
+    allDaySlot: false, nowIndicator: true,
+    slotMinTime: '00:00:00', slotMaxTime: '24:00:00', scrollTime: '08:00:00',
+    slotDuration: '01:00:00', slotLabelInterval: '01:00:00',
+    dayHeaderFormat: {weekday: 'short', day: 'numeric', month: 'short'},
+    eventTimeFormat: {hour: '2-digit', minute: '2-digit', hour12: false},
+    slotLabelFormat: {hour: '2-digit', minute: '2-digit', hour12: false},
+    editable: false, selectable: false,
+    datesSet(info) {
+      Dashboard.date = dashboardLocalDate(info.start);
+      const end = new Date(info.end); end.setDate(end.getDate() - 1);
+      document.getElementById('dashboard-week-title').textContent =
+        dashboardDate(info.start.toISOString()) + ' – ' + dashboardDate(end.toISOString(), {day:'numeric', month:'long', year:'numeric'});
+    },
+    async events(info, success, failure) {
+      status.textContent = 'Kalender laden…';
+      const params = new URLSearchParams({start: dashboardLocalDate(info.start), end: dashboardLocalDate(info.end), overlap:'1'});
+      const items = await api('/api/calendar?' + params, {silentError:true});
+      if (!Dashboard.isCurrent(version, userId)) return;
+      if (!Array.isArray(items)) {
+        status.innerHTML = dashboardError("Dashboard.calendar.refetchEvents()");
+        failure(new Error('Kalender kon niet worden geladen'));
+        return;
+      }
+      status.textContent = '';
+      success(items.map(item => ({
+        id: item.id, title: item.titel, start: item.datum_start, end: item.datum_eind || undefined,
+        backgroundColor: (/^#[0-9a-f]{6}$/i.test(item.kleur || '') ? item.kleur : calTypeColor(item.type)) + '20',
+        borderColor: /^#[0-9a-f]{6}$/i.test(item.kleur || '') ? item.kleur : calTypeColor(item.type),
+        textColor: '#2C1810', extendedProps: {item},
+      })));
+    },
+    eventClick(info) { openCalendarModal(info.event.extendedProps.item); },
+    eventDidMount(info) {
+      info.el.setAttribute('tabindex', '0');
+      info.el.setAttribute('role', 'button');
+      info.el.setAttribute('aria-label', info.event.title + ', ' + dashboardDate(info.event.start.toISOString(), {weekday:'long',hour:'2-digit',minute:'2-digit'}));
+      info.el.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openCalendarModal(info.event.extendedProps.item); }
+      });
+    },
+  });
+  Dashboard.calendar.render();
 }
 
 function calTypeColor(type) {
@@ -286,7 +388,7 @@ function openQuickTaskModal() {
     <div class="form-row">
       <div class="form-group">
         <label>Toegewezen aan</label>
-        <div id="qt-users">${userCheckboxGroup()}</div>
+        <div id="qt-users">${userCheckboxGroup(App.currentUser?.id ? [App.currentUser.id] : [])}</div>
       </div>
       <div class="form-group">
         <label>Deadline</label>
@@ -327,7 +429,8 @@ async function saveQuickTask() {
   if (result) {
     closeModal();
     toast('Taak aangemaakt', 'success');
-    renderDashboard();
+    if (App.currentView === 'dashboard') renderDashboard();
+    else if (App.currentView === 'tasks') loadAndRenderTasks();
   }
 }
 

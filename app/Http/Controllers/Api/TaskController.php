@@ -20,6 +20,18 @@ class TaskController extends Controller
         if ($request->filled('project_id')) $query->where('tasks.project_id', $request->project_id);
         if ($request->filled('status')) $query->where('tasks.status', $request->status);
         if ($request->filled('prioriteit')) $query->where('tasks.prioriteit', $request->prioriteit);
+        // Personal dashboard scope comes from the authenticated session, never a supplied user ID.
+        if ($request->boolean('mine')) {
+            if (Schema::hasTable('taak_gebruiker')) {
+                $query->whereExists(function ($q) use ($request) {
+                    $q->select(DB::raw(1))->from('taak_gebruiker')
+                        ->whereColumn('taak_gebruiker.task_id', 'tasks.id')
+                        ->where('taak_gebruiker.user_id', $request->session()->get('userId'));
+                });
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
         if ($request->filled('toegewezen_aan') && Schema::hasTable('taak_gebruiker')) {
             $userId = $request->toegewezen_aan;
             $query->whereExists(function ($q) use ($userId) {

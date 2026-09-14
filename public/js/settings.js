@@ -19,7 +19,7 @@ async function renderSettings() {
           <div class="ai-settings-logo">AI</div>
           <div>
             <h4>OpenAI — productfoto's</h4>
-            <p>Voor twee bereide en twee rauwe productfoto's met ${escHtml(aiSettings.model)}.</p>
+            <p>Productfoto's met <span id="openai-active-model">${escHtml(aiSettings.model)}</span>.</p>
           </div>
           <span class="ai-connection-badge ${aiSettings.actief ? 'connected' : 'inactive'}">
             <i class="fas fa-${aiSettings.actief ? 'check-circle' : 'flask'}"></i>
@@ -28,6 +28,7 @@ async function renderSettings() {
         </div>
 
         <div class="ai-settings-body">
+          <div class="form-group image-model-picker" id="image-model-picker-settings"></div>
           <div class="ai-settings-current">
             <span>Huidige sleutel</span>
             <strong>${aiSettings.ingesteld ? escHtml(aiSettings.weergave) : 'Nog niet ingesteld'}</strong>
@@ -104,6 +105,7 @@ async function renderSettings() {
       </div>
     </div>
   `;
+  ImageModelPicker.load('settings');
 }
 
 async function saveOpenAiKey() {

@@ -18,10 +18,15 @@ class AssetCacheTest extends TestCase
 
         $appShell = file_get_contents(public_path('index.html'));
         $this->assertIsString($appShell);
-        $this->assertStringContainsString('/css/style.css?v=20260909-1', $appShell);
-        $this->assertStringContainsString('/js/app.js?v=20260909-1', $appShell);
-        $this->assertStringContainsString('/js/converter.js?v=20260909-1', $appShell);
+        $this->assertStringContainsString('/css/style.css?v=20260911-1', $appShell);
+        $this->assertStringContainsString('/js/app.js?v=20260914-1', $appShell);
+        $this->assertStringContainsString('/js/image-models.js?v=20260911-1', $appShell);
+        $this->assertStringContainsString('/js/converter.js?v=20260911-1', $appShell);
         $this->assertStringContainsString('/js/product-dossiers.js?v=20260909-1', $appShell);
-        $this->assertStringContainsString('/js/settings.js?v=20260903-1', $appShell);
+        $this->assertStringContainsString('/js/settings.js?v=20260911-1', $appShell);
+        $this->assertStringContainsString('/js/trunkrs.js?v=20260914-1', $appShell);
+        $this->assertStringContainsString('/css/trunkrs.css?v=20260911-1', $appShell);
+        $this->assertStringContainsString('/js/dashboard.js?v=20260914-3', $appShell);
+        $this->assertStringContainsString('/js/dashboard-layout.js?v=20260914-2', $appShell);
     }
 }

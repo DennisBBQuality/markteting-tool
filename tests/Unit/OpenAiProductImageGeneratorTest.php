@@ -2,9 +2,11 @@
 
 namespace Tests\Unit;
 
+use App\Models\ImagePrompt;
 use App\Models\ProductImageStyleReference;
 use App\Services\OpenAiProductImageGenerator;
 use App\Services\ProductImageGenerationException;
+use App\Services\ProductImageModelCatalog;
 use GuzzleHttp\Psr7\Response as PsrResponse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
@@ -16,6 +18,120 @@ use Tests\TestCase;
 class OpenAiProductImageGeneratorTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_generation_and_refinement_use_the_pinned_model_and_keep_high_quality(): void
+    {
+        config(['services.product_images.driver' => 'openai', 'services.product_images.openai.api_key' => 'test-key']);
+        app(ProductImageModelCatalog::class)->saveDefault('gpt-image-2');
+        $photo = UploadedFile::fake()->image('test-reference.png', 40, 40);
+        $encoded = base64_encode(file_get_contents($photo->getRealPath()));
+        Http::fake(['*' => Http::response(['data' => [['b64_json' => $encoded]]])]);
+        $generator = app(OpenAiProductImageGenerator::class);
+        $context = ['product_type' => 'meat', 'product_name' => 'Test ribeye', 'quantity' => 1, 'image_model' => 'gpt-image-2.5-sunburst'];
+        $this->assertCount(4, $generator->generateForProduct([$photo], ImagePrompt::DEFAULT_PRODUCT_PHOTO_PROMPT, $context));
+        $cookedRequests = 0;
+        foreach (Http::recorded() as [$request]) {
+            $fields = collect($request->data())->keyBy('name');
+            $prompt = $fields['prompt']['contents'];
+            if (str_contains($prompt, 'BRONBEHOUD BIJ BEREIDING')) {
+                $cookedRequests++;
+                $this->assertStringContainsString('FOTOGRAFIE BEREID VLEES: zacht diffuus zijlicht', $prompt);
+                $this->assertStringContainsString('geen referentie voor korst, vleesvezels', $prompt);
+                $this->assertStringContainsString('niet magerder of vetter op basis van algemene aannames over de diersoort', $prompt);
+                $this->assertStringContainsString('Een vetnaad mag dus glanzen zonder dat de hele korst een olieachtige glans krijgt', $prompt);
+                $this->assertStringNotContainsString('LEGE VASTE BBQUALITY', $prompt);
+            } else {
+                $this->assertStringStartsWith(ImagePrompt::DEFAULT_PRODUCT_PHOTO_PROMPT, $prompt);
+                $this->assertStringNotContainsString('FOTOGRAFIE BEREID VLEES', $prompt);
+            }
+        }
+        $this->assertSame(2, $cookedRequests);
+        $generator->refine($photo, 'Behoud het vlees en pas het licht aan.', $context);
+        Http::assertSentCount(5);
+        foreach (Http::recorded() as [$request]) {
+            $fields = collect($request->data())->keyBy('name');
+            $this->assertSame('gpt-image-2.5-sunburst', $fields['model']['contents']);
+            $this->assertSame('high', $fields['quality']['contents']);
+            $this->assertSame('1024x1024', $fields['size']['contents']);
+            $this->assertSame('png', $fields['output_format']['contents']);
+            $this->assertFalse($fields->has('input_fidelity'));
+        }
+    }
+
+    public function test_unavailable_model_fails_without_sending_an_alternative_request(): void
+    {
+        config(['services.product_images.driver' => 'openai', 'services.product_images.openai.api_key' => 'test-key']);
+        Http::fake(['*' => Http::response(['error' => ['code' => 'model_not_found']], 404)]);
+        $this->expectException(ProductImageGenerationException::class);
+        $this->expectExceptionMessage('niet automatisch gewisseld');
+        try {
+            app(OpenAiProductImageGenerator::class)->refine(UploadedFile::fake()->image('test.png'), 'Pas licht aan.', ['image_model' => 'gpt-image-2.5-flare']);
+        } finally {
+            Http::assertSentCount(1);
+        }
+    }
+
+    public function test_sucade_requests_stew_scenes_and_only_reuses_approved_stew_references(): void
+    {
+        config(['services.product_images.driver' => 'openai', 'services.product_images.openai.api_key' => 'test-key']);
+        $source = UploadedFile::fake()->image('sucade.png', 40, 40);
+        $encoded = base64_encode(file_get_contents($source->getRealPath()));
+        $approvedId = null;
+        foreach (['bbq_buiten_algemeen', 'serveerbeeld_algemeen', 'bbq_buiten_stoof'] as $styleId) {
+            $reference = ProductImageStyleReference::create([
+                'product_name' => 'Kalfssucade',
+                'product_key' => 'kalfssucade',
+                'product_type' => 'meat',
+                'status' => 'bereid',
+                'style_id' => $styleId,
+                'source_version' => 1,
+                'mime_type' => 'image/png',
+                'contents_base64' => $encoded,
+            ]);
+            if ($styleId === 'bbq_buiten_stoof') {
+                $approvedId = $reference->id;
+            }
+        }
+        Http::fake(['*' => Http::response(['data' => [['b64_json' => $encoded]]])]);
+        $results = app(OpenAiProductImageGenerator::class)->generateForProduct([$source], ImagePrompt::DEFAULT_PRODUCT_PHOTO_PROMPT, [
+            'product_type' => 'meat', 'product_name' => 'Kalfssucade', 'quantity' => 1, 'image_model' => 'gpt-image-2.5-sunburst',
+        ]);
+
+        $this->assertSame(['bbq_buiten_stoof', 'serveerbeeld_stoof', 'rauw_studio', 'rauw_licht'], array_column($results, 'style_id'));
+        Http::assertSentCount(4);
+        foreach (Http::recorded() as $index => [$request]) {
+            $data = collect($request->data());
+            $fields = $data->keyBy('name');
+            $filenames = $data->whereIn('name', ['image', 'image[]'])->pluck('filename')->values()->all();
+            $prompt = $fields['prompt']['contents'];
+            $this->assertSame('gpt-image-2.5-sunburst', $fields['model']['contents']);
+            $this->assertSame('high', $fields['quality']['contents']);
+            $this->assertSame('1024x1024', $fields['size']['contents']);
+            $this->assertSame('png', $fields['output_format']['contents']);
+
+            if ($index < 2) {
+                $this->assertStringContainsString('GEEN SNIJPLAKKEN', $prompt);
+                $this->assertStringContainsString('BRONBEHOUD BIJ STOVEN', $prompt);
+                $this->assertStringNotContainsString('zichtbare plankrand', $prompt);
+                $this->assertStringNotContainsString('LEGE VASTE BBQUALITY', $prompt);
+                // No generic roast, brisket or kamado image is attached to a stew scene.
+                $this->assertSame($index === 0
+                    ? ['product-reference-1.png', 'approved-'.$approvedId.'.png']
+                    : ['product-reference-1.png'], $filenames);
+                if ($index === 0) {
+                    $this->assertStringContainsString('Afbeelding 2 is een door BBQuality goedgekeurd stoofvoorbeeld', $prompt);
+                } else {
+                    $this->assertStringNotContainsString('De allerlaatste afbeelding', $prompt);
+                }
+            } else {
+                $this->assertStringNotContainsString('BRONBEHOUD BIJ STOVEN', $prompt);
+                $this->assertSame($index === 2
+                    ? ['product-reference-1.png', 'style-rauw-bbquality-vast.png']
+                    : ['product-reference-1.png'], $filenames);
+            }
+        }
+        $this->assertSame(3, ProductImageStyleReference::count());
+    }
 
     public function test_product_workflow_never_runs_more_than_two_image_requests_at_once(): void
     {

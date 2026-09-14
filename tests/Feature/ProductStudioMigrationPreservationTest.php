@@ -24,6 +24,7 @@ class ProductStudioMigrationPreservationTest extends TestCase
             '2024_01_01_000002_create_projects_table.php',
             '2024_01_01_000003_create_tasks_table.php',
             '2024_01_01_000004_create_calendar_items_table.php',
+            '2024_01_01_000005_create_notes_table.php',
             '2026_04_02_000001_create_taak_gebruiker_pivot_table.php',
             '2026_04_02_000002_create_project_gebruiker_pivot_table.php',
         ];
@@ -48,8 +49,13 @@ class ProductStudioMigrationPreservationTest extends TestCase
         ]);
         DB::table('taak_gebruiker')->insert(['id' => (string) Str::uuid(), 'task_id' => $taskId, 'user_id' => $user->id, ...$timestamps]);
         DB::table('project_gebruiker')->insert(['id' => (string) Str::uuid(), 'project_id' => $projectId, 'user_id' => $user->id, ...$timestamps]);
+        DB::table('notes')->insert([
+            'id' => (string) Str::uuid(), 'project_id' => $projectId, 'task_id' => $taskId,
+            'titel' => 'Fictieve bestaande notitie', 'inhoud' => 'Deze inhoud en relaties moeten exact behouden blijven.',
+            'aangemaakt_door' => $user->id, ...$timestamps,
+        ]);
 
-        $protected = ['users', 'projects', 'tasks', 'calendar_items', 'taak_gebruiker', 'project_gebruiker'];
+        $protected = ['users', 'projects', 'tasks', 'calendar_items', 'notes', 'taak_gebruiker', 'project_gebruiker'];
         $snapshot = fn () => collect($protected)->mapWithKeys(fn ($table) => [$table => [
             'rows' => DB::table($table)->orderBy('id')->get()->toJson(),
             'schema' => DB::table('sqlite_master')->where('name', $table)->value('sql'),
@@ -62,12 +68,19 @@ class ProductStudioMigrationPreservationTest extends TestCase
             '2026_09_07_100000_add_generation_to_product_dossiers.php',
             '2026_09_07_110000_add_expert_assets_to_product_dossiers.php',
             '2026_09_09_100000_create_product_dossier_assets_table.php',
+            '2026_09_11_100000_create_product_image_model_settings_table.php',
+            '2026_09_11_160000_create_trunkrs_reports_tables.php',
+            '2026_09_14_140000_create_dashboard_preferences_table.php',
         ];
         $this->artisan('migrate', ['--path' => $paths($upgrade)])->assertExitCode(0);
         $this->assertSame($before, $snapshot(), 'Bestaande planningsgegevens, relaties en tabellen moeten exact gelijk blijven.');
         $this->assertTrue(Schema::hasColumns('product_dossiers', ['generation', 'expert_assets']));
         $this->assertGreaterThan(0, DB::table('product_dossier_options')->count());
         $this->assertSame(0, DB::table('product_dossiers')->count(), 'Geen testdossiers toevoegen bij een upgrade.');
+        foreach (['dashboard_preferences', 'product_image_model_settings', 'trunkrs_reports', 'trunkrs_connections'] as $table) {
+            $this->assertTrue(Schema::hasTable($table));
+            $this->assertSame(0, DB::table($table)->count(), 'Nieuwe tabellen mogen geen lokale voorbeeldgegevens bevatten.');
+        }
 
         // Running the approved upgrade again must be a no-op for existing planning data.
         $this->artisan('migrate', ['--path' => $paths($upgrade)])->assertExitCode(0);

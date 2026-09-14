@@ -43,7 +43,7 @@ return [
         'openai' => [
             'api_key' => env('OPENAI_API_KEY'),
             'endpoint' => env('OPENAI_IMAGE_ENDPOINT', 'https://api.openai.com/v1/images/edits'),
-            'model' => env('OPENAI_IMAGE_MODEL', 'gpt-image-2'),
+            'model' => env('OPENAI_IMAGE_MODEL', 'gpt-image-2.5-sunburst'),
             'size' => env('OPENAI_IMAGE_SIZE', '1024x1024'),
             'quality' => env('OPENAI_IMAGE_QUALITY', 'high'),
             'timeout' => (int) env('OPENAI_IMAGE_TIMEOUT', 240),

@@ -233,6 +233,7 @@ async function saveCalendarItem(id) {
     closeModal();
     toast(id ? 'Item bijgewerkt' : 'Item aangemaakt', 'success');
     if (calendarInstance) calendarInstance.refetchEvents();
+    if (App.currentView === 'dashboard' && typeof Dashboard !== 'undefined') Dashboard.calendar?.refetchEvents();
   }
 }
 
@@ -242,4 +243,5 @@ async function deleteCalendarItem(id) {
   closeModal();
   toast('Item verwijderd', 'success');
   if (calendarInstance) calendarInstance.refetchEvents();
+  if (App.currentView === 'dashboard' && typeof Dashboard !== 'undefined') Dashboard.calendar?.refetchEvents();
 }

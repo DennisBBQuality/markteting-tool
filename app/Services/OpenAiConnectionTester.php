@@ -14,7 +14,7 @@ class OpenAiConnectionTester
                 ->acceptJson()
                 ->connectTimeout(10)
                 ->timeout(15)
-                ->get('https://api.openai.com/v1/models/'.config('services.product_images.openai.model', 'gpt-image-2'));
+                ->get('https://api.openai.com/v1/models/'.rawurlencode(app(ProductImageModelCatalog::class)->selected()));
         } catch (ConnectionException) {
             return [
                 'opslaan' => false,
@@ -43,7 +43,7 @@ class OpenAiConnectionTester
             return [
                 'opslaan' => false,
                 'verbonden' => false,
-                'bericht' => 'Deze API-sleutel is ongeldig of heeft geen toegang tot GPT Image 2.',
+                'bericht' => 'Deze API-sleutel is ongeldig of heeft geen toegang tot het gekozen afbeeldingsmodel.',
             ];
         }
 

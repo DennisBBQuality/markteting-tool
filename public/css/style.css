@@ -1988,3 +1988,11 @@ input, select, textarea { font: inherit; }
   #view-product-dossiers .dossier-footer-actions { padding:12px; }
   #view-product-dossiers .dossier-footer-actions .btn { font-size:12px; padding:10px; }
 }
+.image-model-picker { padding: 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); }
+.image-model-row { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
+.image-model-row select { flex: 1; min-width: 0; }
+.image-model-picker small { display: block; margin: 5px 0; color: var(--text-light); line-height: 1.5; }
+.image-model-notice { padding: 10px; border-radius: 6px; background: #fff8e1; color: #714900; font-size: 13px; line-height: 1.5; }
+.image-model-picker .image-model-confirm { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; line-height: 1.5; margin: 12px 0; }
+.image-model-confirm input { width: auto; margin-top: 3px; }
+@media (max-width: 640px) { .image-model-row { flex-direction: column; align-items: stretch; } }

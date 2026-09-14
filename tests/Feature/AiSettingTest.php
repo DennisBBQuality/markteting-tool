@@ -55,7 +55,7 @@ class AiSettingTest extends TestCase
         $this->assertSame($admin->id, AiProviderSetting::firstOrFail()->updated_by);
         $this->assertStringNotContainsString(self::VALID_KEY, json_encode($response->json(), JSON_THROW_ON_ERROR));
 
-        Http::assertSent(fn (Request $request) => $request->url() === 'https://api.openai.com/v1/models/gpt-image-2'
+        Http::assertSent(fn (Request $request) => $request->url() === 'https://api.openai.com/v1/models/gpt-image-2.5-sunburst'
             && $request->hasHeader('Authorization', 'Bearer '.self::VALID_KEY)
         );
     }
@@ -69,7 +69,7 @@ class AiSettingTest extends TestCase
 
         $this->putJson('/api/settings/ai/openai', ['api_key' => self::VALID_KEY])
             ->assertUnprocessable()
-            ->assertJsonPath('error', 'Deze API-sleutel is ongeldig of heeft geen toegang tot GPT Image 2.');
+            ->assertJsonPath('error', 'Deze API-sleutel is ongeldig of heeft geen toegang tot het gekozen afbeeldingsmodel.');
 
         $this->assertDatabaseCount('ai_provider_settings', 0);
     }

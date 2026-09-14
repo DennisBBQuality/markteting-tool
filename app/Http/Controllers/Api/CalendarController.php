@@ -16,8 +16,24 @@ class CalendarController extends Controller
             ->leftJoin('projects as p', 'calendar_items.project_id', '=', 'p.id')
             ->leftJoin('users as u', 'calendar_items.aangemaakt_door', '=', 'u.id');
 
-        if ($request->filled('start')) $query->where('calendar_items.datum_start', '>=', $request->start);
-        if ($request->filled('end')) $query->where('calendar_items.datum_start', '<=', $request->end);
+        if ($request->boolean('overlap')) {
+            // Existing calendar values are local wall-clock times, without a timezone cast.
+            $request->validate(['start' => 'required|date_format:Y-m-d', 'end' => 'required|date_format:Y-m-d|after:start']);
+            $start = $request->start;
+            $end = $request->end;
+            $query->whereDate('calendar_items.datum_start', '<', $end)
+                ->where(function ($q) use ($start) {
+                    $q->whereDate('calendar_items.datum_start', '>=', $start)
+                        ->orWhereDate('calendar_items.datum_eind', '>', $start)
+                        ->orWhere(function ($endQuery) use ($start) {
+                            $endQuery->whereDate('calendar_items.datum_eind', $start)
+                                ->whereTime('calendar_items.datum_eind', '>', '00:00:00');
+                        });
+                });
+        } else {
+            if ($request->filled('start')) $query->where('calendar_items.datum_start', '>=', $request->start);
+            if ($request->filled('end')) $query->where('calendar_items.datum_start', '<=', $request->end);
+        }
         if ($request->filled('type')) $query->where('calendar_items.type', $request->type);
         if ($request->filled('project_id')) $query->where('calendar_items.project_id', $request->project_id);
 

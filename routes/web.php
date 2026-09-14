@@ -13,13 +13,16 @@ use App\Http\Controllers\Api\CustomerService\TicketNoteController;
 use App\Http\Controllers\Api\CustomerService\TicketPriorityController;
 use App\Http\Controllers\Api\CustomerService\TicketStatusController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\DashboardPreferenceController;
 use App\Http\Controllers\Api\NoteController;
 use App\Http\Controllers\Api\ProductDossierController;
 use App\Http\Controllers\Api\ProductDossierOptionController;
 use App\Http\Controllers\Api\ProductImageController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\TaskController;
+use App\Http\Controllers\Api\TrunkrsReportController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Middleware\EnsureCustomerServiceEnabled;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 
@@ -38,19 +41,21 @@ Route::middleware('auth.custom')->group(function () {
     // Auth
     Route::get('/api/auth/me', [AuthController::class, 'me']);
 
-    // Customer Service
-    Route::get('/api/customer-service/tickets', [TicketController::class, 'index']);
-    Route::post('/api/customer-service/tickets', [TicketController::class, 'store']);
-    Route::get('/api/customer-service/tickets/{id}', [TicketController::class, 'show']);
-    Route::post('/api/customer-service/tickets/{id}/claim', [TicketClaimController::class, 'claim']);
-    Route::post('/api/customer-service/tickets/{id}/release', [TicketClaimController::class, 'release']);
-    Route::put('/api/customer-service/tickets/{id}/status', [TicketStatusController::class, 'update']);
-    Route::put('/api/customer-service/tickets/{id}/priority', [TicketPriorityController::class, 'update']);
-    Route::get('/api/customer-service/tickets/{id}/messages', [TicketMessageController::class, 'index']);
-    Route::post('/api/customer-service/tickets/{id}/messages', [TicketMessageController::class, 'store']);
-    Route::get('/api/customer-service/tickets/{id}/notes', [TicketNoteController::class, 'index']);
-    Route::post('/api/customer-service/tickets/{id}/notes', [TicketNoteController::class, 'store']);
-    Route::get('/api/customer-service/tickets/{id}/activities', [TicketActivityController::class, 'index']);
+    // Paused: retain the implementation, but also block requests from old open tabs.
+    Route::middleware(EnsureCustomerServiceEnabled::class)->group(function () {
+        Route::get('/api/customer-service/tickets', [TicketController::class, 'index']);
+        Route::post('/api/customer-service/tickets', [TicketController::class, 'store']);
+        Route::get('/api/customer-service/tickets/{id}', [TicketController::class, 'show']);
+        Route::post('/api/customer-service/tickets/{id}/claim', [TicketClaimController::class, 'claim']);
+        Route::post('/api/customer-service/tickets/{id}/release', [TicketClaimController::class, 'release']);
+        Route::put('/api/customer-service/tickets/{id}/status', [TicketStatusController::class, 'update']);
+        Route::put('/api/customer-service/tickets/{id}/priority', [TicketPriorityController::class, 'update']);
+        Route::get('/api/customer-service/tickets/{id}/messages', [TicketMessageController::class, 'index']);
+        Route::post('/api/customer-service/tickets/{id}/messages', [TicketMessageController::class, 'store']);
+        Route::get('/api/customer-service/tickets/{id}/notes', [TicketNoteController::class, 'index']);
+        Route::post('/api/customer-service/tickets/{id}/notes', [TicketNoteController::class, 'store']);
+        Route::get('/api/customer-service/tickets/{id}/activities', [TicketActivityController::class, 'index']);
+    });
 
     // Users
     Route::get('/api/users', [UserController::class, 'index']);
@@ -59,6 +64,7 @@ Route::middleware('auth.custom')->group(function () {
         Route::put('/api/users/{id}', [UserController::class, 'update']);
         Route::delete('/api/users/{id}', [UserController::class, 'destroy']);
         Route::get('/api/settings/ai/openai', [AiSettingController::class, 'show']);
+        Route::put('/api/settings/ai/openai/image-model', [AiSettingController::class, 'updateImageModel'])->middleware('throttle:10,1');
         Route::put('/api/settings/ai/openai', [AiSettingController::class, 'update'])->middleware('throttle:5,1');
         Route::post('/api/settings/ai/openai/test', [AiSettingController::class, 'test'])->middleware('throttle:10,1');
         Route::delete('/api/settings/ai/openai', [AiSettingController::class, 'destroy']);
@@ -100,6 +106,8 @@ Route::middleware('auth.custom')->group(function () {
 
     // Product images
     Route::get('/api/images/prompt', [ProductImageController::class, 'prompt']);
+    Route::get('/api/images/models', [ProductImageController::class, 'models'])->middleware('throttle:30,1');
+    Route::post('/api/images/models/refresh', [ProductImageController::class, 'refreshModels'])->middleware('throttle:3,1');
     Route::put('/api/images/prompt', [ProductImageController::class, 'updatePrompt']);
     Route::post('/api/images/generate', [ProductImageController::class, 'generate'])->middleware('throttle:3,1');
     Route::get('/api/images/requests/{imageRequest}', [ProductImageController::class, 'status']);
@@ -132,7 +140,12 @@ Route::middleware('auth.custom')->group(function () {
     Route::delete('/api/product-dossier-options/{productDossierOption}', [ProductDossierOptionController::class, 'destroy']);
 
     // Dashboard
+    Route::get('/api/trunkrs/summary', [TrunkrsReportController::class, 'summary']);
+    Route::get('/api/trunkrs/reports', [TrunkrsReportController::class, 'index']);
+    Route::get('/api/trunkrs/reports/{id}', [TrunkrsReportController::class, 'show'])->whereUuid('id');
     Route::get('/api/dashboard/stats', [DashboardController::class, 'stats']);
+    Route::get('/api/dashboard/preferences', [DashboardPreferenceController::class, 'show']);
+    Route::put('/api/dashboard/preferences', [DashboardPreferenceController::class, 'update']);
 
     // Serve uploaded files
     Route::get('/uploads/{filename}', function (string $filename) {

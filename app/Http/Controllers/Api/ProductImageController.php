@@ -13,6 +13,7 @@ use App\Models\ProductImageRevision;
 use App\Models\ProductImageStyleReference;
 use App\Services\AiCredentialStore;
 use App\Services\ProductImageDelivery;
+use App\Services\ProductImageModelCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -20,6 +21,16 @@ use Illuminate\Support\Str;
 
 class ProductImageController extends Controller
 {
+    public function models(ProductImageModelCatalog $models): JsonResponse
+    {
+        return response()->json($models->catalog());
+    }
+
+    public function refreshModels(ProductImageModelCatalog $models): JsonResponse
+    {
+        return response()->json($models->catalog(true));
+    }
+
     public function prompt(AiCredentialStore $credentials): JsonResponse
     {
         $prompt = ImagePrompt::productPhoto();
@@ -49,7 +60,7 @@ class ProductImageController extends Controller
         ]);
     }
 
-    public function generate(Request $request): JsonResponse
+    public function generate(Request $request, ProductImageModelCatalog $models): JsonResponse
     {
         $validated = $request->validate([
             'foto' => [
@@ -74,7 +85,13 @@ class ProductImageController extends Controller
             'main_index' => ['nullable', 'integer', 'min:0', 'max:4'],
             'reference_names' => ['nullable', 'array', 'max:5'],
             'reference_names.*' => ['nullable', 'string', 'max:160'],
+            'image_model' => ['nullable', 'string', 'max:120'],
+            'accept_experimental' => ['sometimes', 'boolean'],
         ]);
+
+        $model = isset($validated['image_model'])
+            ? $models->validateSelection($validated['image_model'], (bool) ($validated['accept_experimental'] ?? false))
+            : $models->selected();
 
         $files = isset($validated['fotos']) ? array_values($validated['fotos']) : [$validated['foto']];
         $mainIndex = min((int) ($validated['main_index'] ?? 0), count($files) - 1);
@@ -101,6 +118,7 @@ class ProductImageController extends Controller
         }
 
         $context = [
+            'image_model' => $model,
             'product_type' => $validated['product_type'] ?? 'meat',
             'product_name' => trim((string) ($validated['product_name'] ?? 'Vleesproduct')),
             'quantity' => (int) ($validated['quantity'] ?? 1),
