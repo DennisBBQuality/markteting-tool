@@ -9,7 +9,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImageWorkflowGenerator, ProductImageRefiner
+class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImageRefiner, ProductImageWorkflowGenerator
 {
     private const MAX_CONCURRENT_IMAGE_REQUESTS = 2;
 
@@ -91,7 +91,8 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
             $reportProgress('generating_product', 20);
         }
 
-        $generatedImages = $this->requestConcurrently($requests, $apiKey);
+        $model = $context['image_model'] ?? app(ProductImageModelCatalog::class)->selected();
+        $generatedImages = $this->requestConcurrently($requests, $apiKey, $model);
         $results = [];
         foreach ($plans as $index => $plan) {
             $results[] = [
@@ -110,9 +111,9 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
      * @param  array<int, array{sources: list<string|array{contents: string, filename: string}>, prompt: string}>  $requests
      * @return array<int, string>
      */
-    private function requestConcurrently(array $requests, string $apiKey): array
+    private function requestConcurrently(array $requests, string $apiKey, string $model): array
     {
-        $responses = Http::pool(function (Pool $pool) use ($requests, $apiKey): void {
+        $responses = Http::pool(function (Pool $pool) use ($requests, $apiKey, $model): void {
             foreach ($requests as $index => $request) {
                 $pending = $pool->as((string) $index)
                     ->withToken($apiKey)
@@ -130,7 +131,7 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
 
                 $pending->post(
                     (string) config('services.product_images.openai.endpoint'),
-                    $this->requestParameters($request['prompt']),
+                    $this->requestParameters($request['prompt'], $model),
                 );
             }
         }, self::MAX_CONCURRENT_IMAGE_REQUESTS);
@@ -159,6 +160,7 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
             [$this->normalizeSource($source)],
             $this->promptBuilder->refinementPrompt($instruction, $context),
             $apiKey,
+            $context['image_model'] ?? app(ProductImageModelCatalog::class)->selected(),
         );
     }
 
@@ -175,6 +177,7 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
         }
         $normalizedSource = $this->normalizeSource($source);
         $results = [];
+        $model = app(ProductImageModelCatalog::class)->selected();
 
         foreach (self::VARIANT_PROMPTS as $status => $variantPrompt) {
             if ($reportProgress) {
@@ -184,7 +187,7 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
                 );
             }
 
-            foreach ($this->requestVariants($normalizedSource, trim($basePrompt)."\n\n".$variantPrompt, $apiKey) as $contents) {
+            foreach ($this->requestVariants($normalizedSource, trim($basePrompt)."\n\n".$variantPrompt, $apiKey, $model) as $contents) {
                 $results[] = [
                     'status' => $status,
                     'contents' => $contents,
@@ -201,24 +204,9 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
     }
 
     /** @return list<string> */
-    private function requestVariants(string $sourcePng, string $prompt, string $apiKey): array
+    private function requestVariants(string $sourcePng, string $prompt, string $apiKey, string $model): array
     {
-        $model = (string) config('services.product_images.openai.model');
-        $parameters = [
-            'model' => $model,
-            'prompt' => $prompt,
-            'n' => 2,
-            'size' => (string) config('services.product_images.openai.size'),
-        ];
-
-        $parameters['output_format'] = 'png';
-        $parameters['quality'] = (string) config('services.product_images.openai.quality', 'high');
-        $parameters['background'] = 'opaque';
-
-        // GPT Image 2 always uses high input fidelity and rejects this parameter.
-        if (! str_starts_with($model, 'gpt-image-2')) {
-            $parameters['input_fidelity'] = (string) config('services.product_images.openai.input_fidelity', 'high');
-        }
+        $parameters = [...$this->requestParameters($prompt, $model), 'n' => 2];
 
         try {
             $response = Http::withToken($apiKey)
@@ -266,7 +254,7 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
     }
 
     /** @param list<string|array{contents: string, filename: string}> $sourcePngs */
-    private function requestOne(array $sourcePngs, string $prompt, string $apiKey): string
+    private function requestOne(array $sourcePngs, string $prompt, string $apiKey, string $model): string
     {
         try {
             $pending = Http::withToken($apiKey)
@@ -283,7 +271,7 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
             }
             $response = $pending->post(
                 (string) config('services.product_images.openai.endpoint'),
-                $this->requestParameters($prompt),
+                $this->requestParameters($prompt, $model),
             );
         } catch (ConnectionException) {
             throw new ProductImageGenerationException('De beeldservice is momenteel niet bereikbaar.');
@@ -293,9 +281,8 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
     }
 
     /** @return array<string, int|string> */
-    private function requestParameters(string $prompt): array
+    private function requestParameters(string $prompt, string $model): array
     {
-        $model = (string) config('services.product_images.openai.model');
         $parameters = [
             'model' => $model,
             'prompt' => $prompt,
@@ -305,7 +292,8 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
             'quality' => (string) config('services.product_images.openai.quality', 'high'),
             'background' => 'opaque',
         ];
-        if (! str_starts_with($model, 'gpt-image-2')) {
+        // Legacy-only parameter: do not infer support in newly discovered models.
+        if (preg_match('/^gpt-image-1(?:[.-]|$)/', $model)) {
             $parameters['input_fidelity'] = (string) config('services.product_images.openai.input_fidelity', 'high');
         }
 
@@ -351,10 +339,17 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
 
         if ($status === 403) {
             if (str_contains($errorText, 'verification') || str_contains($errorText, 'verified')) {
-                return 'De OpenAI-organisatie moet eerst worden geverifieerd voordat GPT Image 2 gebruikt kan worden.';
+                return 'De OpenAI-organisatie moet eerst worden geverifieerd voordat het gekozen afbeeldingsmodel gebruikt kan worden.';
             }
 
-            return 'Deze OpenAI API-sleutel heeft geen toegang tot GPT Image 2. Controleer de rechten van het OpenAI-project.';
+            return 'Deze OpenAI API-sleutel heeft geen toegang tot het gekozen afbeeldingsmodel. Controleer de rechten van het OpenAI-project.';
+        }
+
+        if ($status === 404 || str_contains($errorText, 'model_not_found')) {
+            return 'Het gekozen afbeeldingsmodel is niet (meer) beschikbaar. Vernieuw de modellenlijst en kies zelf een ander model. Er is niet automatisch gewisseld.';
+        }
+        if ($status === 400 && (str_contains($errorText, 'unsupported') || str_contains($errorText, 'parameter'))) {
+            return 'Dit model ondersteunt de huidige beeldinstellingen niet. Kies een ander model of laat de koppeling controleren. Er is geen alternatief model aangeroepen.';
         }
 
         if ($status === 429) {

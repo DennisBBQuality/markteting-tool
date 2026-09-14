@@ -29,6 +29,8 @@ async function renderTasks() {
     </div>
     <div class="kanban-board" id="tasks-kanban"></div>
   `;
+  document.getElementById('task-filter-user').value = App.taskUserFilter || '';
+  App.taskUserFilter = '';
   loadAndRenderTasks();
 }
 
@@ -181,7 +183,7 @@ async function saveEditTask(id) {
     closeModal();
     toast('Taak bijgewerkt', 'success');
     if (App.currentView === 'dashboard') renderDashboard();
-    else renderTasks();
+    else loadAndRenderTasks();
   }
 }
 
@@ -191,5 +193,5 @@ async function deleteTask(id) {
   closeModal();
   toast('Taak verwijderd', 'success');
   if (App.currentView === 'dashboard') renderDashboard();
-  else renderTasks();
+  else loadAndRenderTasks();
 }

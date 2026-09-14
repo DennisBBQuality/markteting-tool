@@ -6,8 +6,13 @@ BBQuality is een online slagerij en BBQ-webshop.
 ## Applicatie
 The Pitboard is de interne portal voor projecten, taken, kalenderplanning, notities, bijlagen en dashboardinformatie.
 
-## Nieuw project
-We willen een klantenservicemodule toevoegen waarin meerdere medewerkers tegelijk kunnen werken.
+## Klantenservice — voorlopig gepauzeerd
+Op 11 september 2026 heeft Dennis gevraagd het klantenservicegedeelte voorlopig uit het Pitboard te verwijderen. De module is daarom niet meer opgenomen in de navigatie of schermen en de ticket-API is standaard uitgeschakeld. Bestaande gegevens en code blijven behouden. Er is geen productie-uitrol uitgevoerd voor deze wijziging.
+
+Onderstaande uitbreidingswensen zijn geparkeerd en vormen geen actieve bouwopdracht.
+
+## Geparkeerd project
+Een klantenservicemodule waarin meerdere medewerkers tegelijk kunnen werken.
 
 De module moet op termijn klantvragen verzamelen vanuit e-mail en WhatsApp.
 

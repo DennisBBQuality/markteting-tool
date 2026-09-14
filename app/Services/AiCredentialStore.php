@@ -59,7 +59,7 @@ class AiCredentialStore
             'actief' => $activeKey !== null,
             'weergave' => $activeKey !== null ? $this->mask($activeKey) : null,
             'bron' => $storedKey !== null ? 'app' : ($environmentActive ? 'server' : null),
-            'model' => (string) config('services.product_images.openai.model', 'gpt-image-2'),
+            'model' => app(ProductImageModelCatalog::class)->selected(),
         ];
     }
 

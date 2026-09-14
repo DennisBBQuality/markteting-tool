@@ -26,6 +26,9 @@
         <env name="CACHE_STORE" value="array"/>
         <env name="DB_CONNECTION" value="sqlite"/>
         <env name="DB_DATABASE" value=":memory:"/>
+        <!-- Exercise retained ticket functionality only in isolated tests.
+             CustomerServicePausedTest explicitly tests the disabled state. -->
+        <env name="CUSTOMER_SERVICE_ENABLED" value="true"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

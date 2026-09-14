@@ -10,6 +10,10 @@ async function renderNotes() {
       </div>
     </div>
     <div class="filters-bar">
+      <select id="note-filter-owner" aria-label="Notities van" onchange="loadNotes()">
+        <option value="">Alle notities</option>
+        <option value="mine" ${App.notesMineFilter ? 'selected' : ''}>Mijn notities</option>
+      </select>
       <select id="note-filter-project" onchange="loadNotes()">
         <option value="">Alle projecten</option>
         ${App.projects.map(p => `<option value="${p.id}">${p.naam}</option>`).join('')}
@@ -18,6 +22,7 @@ async function renderNotes() {
     </div>
     <div class="notes-grid" id="notes-grid"></div>
   `;
+  App.notesMineFilter = false;
   loadNotes();
 }
 
@@ -27,6 +32,7 @@ async function loadNotes() {
   const search = document.getElementById('note-filter-search')?.value;
   if (project) params.set('project_id', project);
   if (search) params.set('search', search);
+  if (document.getElementById('note-filter-owner')?.value === 'mine') params.set('mine', '1');
 
   const notes = await api(`/api/notes?${params}`);
   if (!notes) return;
@@ -111,7 +117,8 @@ async function saveNote(id) {
   if (result) {
     closeModal();
     toast(id ? 'Notitie bijgewerkt' : 'Notitie aangemaakt', 'success');
-    loadNotes();
+    if (App.currentView === 'dashboard') renderDashboard();
+    else loadNotes();
   }
 }
 
@@ -120,5 +127,6 @@ async function deleteNote(id) {
   await api(`/api/notes/${id}`, { method: 'DELETE' });
   closeModal();
   toast('Notitie verwijderd', 'success');
-  loadNotes();
+  if (App.currentView === 'dashboard') renderDashboard();
+  else loadNotes();
 }

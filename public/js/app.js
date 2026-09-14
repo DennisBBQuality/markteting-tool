@@ -198,6 +198,10 @@ async function checkAuth() {
 }
 
 function showLogin() {
+  App.currentUser = null;
+  if (typeof Dashboard !== 'undefined') { Dashboard.dispose(); Dashboard.date = null; }
+  const dashboard = document.getElementById('view-dashboard');
+  if (dashboard) dashboard.innerHTML = '';
   document.getElementById('login-screen').classList.remove('hidden');
   document.getElementById('app').classList.add('hidden');
 }
@@ -230,20 +234,20 @@ async function loadGlobalData() {
 
 // ========== Navigation ==========
 function navigateTo(view) {
+  // Removed views (including Klantenservice) must not leave the app blank.
+  if (!document.getElementById(`view-${view}`)) view = 'dashboard';
+
   if (App.currentView === 'product-dossiers' && view !== 'product-dossiers' && typeof productDossierState !== 'undefined') {
     if (dossierForegroundBusy()) { toast('Wacht tot het opslaan klaar is.', 'error'); return; }
     if (productDossierState.pendingLabels.length && !confirm('Je etiketfoto’s zijn nog niet opgeslagen. Toch deze pagina verlaten?')) return;
     rememberDossierBrowserDraft(); clearTimeout(productDossierState.pollTimer);
   }
+  if (typeof Dashboard !== 'undefined') Dashboard.dispose();
   App.currentView = view;
   document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
   document.getElementById(`view-${view}`).classList.remove('hidden');
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.querySelector(`[data-view="${view}"]`)?.classList.add('active');
-
-  if (view !== 'customer-service' && typeof cleanupCustomerService === 'function') {
-    cleanupCustomerService();
-  }
 
   switch(view) {
     case 'dashboard': renderDashboard(); break;
@@ -251,7 +255,6 @@ function navigateTo(view) {
     case 'tasks': renderTasks(); break;
     case 'calendar': renderCalendar(); break;
     case 'notes': renderNotes(); break;
-    case 'customer-service': renderCustomerService(); break;
     case 'converter': renderConverter(); break;
     case 'product-dossiers': renderProductDossiers(); break;
     case 'settings': renderSettings(); break;
@@ -617,6 +620,9 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
 document.getElementById('logout-btn').addEventListener('click', async () => {
   await api('/api/auth/logout', { method: 'POST' });
   App.currentUser = null;
+  if (typeof Dashboard !== 'undefined') { Dashboard.dispose(); Dashboard.date = null; }
+  App.taskUserFilter = '';
+  App.notesMineFilter = false;
   showLogin();
 });
 

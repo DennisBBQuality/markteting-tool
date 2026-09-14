@@ -5,11 +5,24 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Services\AiCredentialStore;
 use App\Services\OpenAiConnectionTester;
+use App\Services\ProductImageModelCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class AiSettingController extends Controller
 {
+    public function updateImageModel(Request $request, ProductImageModelCatalog $models): JsonResponse
+    {
+        $data = $request->validate([
+            'image_model' => ['required', 'string', 'max:120'],
+            'accept_experimental' => ['sometimes', 'boolean'],
+        ]);
+        $model = $models->validateSelection($data['image_model'], (bool) ($data['accept_experimental'] ?? false));
+        $models->saveDefault($model);
+
+        return response()->json(['model' => $model, 'bericht' => 'Het standaardmodel is opgeslagen. Lopende fotosets blijven hun eigen model gebruiken.']);
+    }
+
     public function show(AiCredentialStore $credentials): JsonResponse
     {
         return response()->json($credentials->status());

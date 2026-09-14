@@ -16,6 +16,9 @@ class NoteController extends Controller
 
         if ($request->filled('project_id')) $query->where('notes.project_id', $request->project_id);
         if ($request->filled('task_id')) $query->where('notes.task_id', $request->task_id);
+        if ($request->boolean('mine')) {
+            $query->where('notes.aangemaakt_door', $request->session()->get('userId'));
+        }
         if ($request->filled('search')) {
             $search = '%' . $request->search . '%';
             $query->where(function ($q) use ($search) {
