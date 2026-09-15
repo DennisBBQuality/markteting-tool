@@ -92,6 +92,15 @@ test('calendar uses local date bounds and does not allow accidental dragging', a
   assert.equal(options.eventMaxStack,2);
   assert.equal(options.slotEventOverlap,false);
   assert.equal(options.moreLinkText(3),'+3 meer');
+  let opened;
+  c.openCalendarModal=(...args)=>{opened=args;};
+  options.dateClick({dateStr:'2026-09-15T13:00:00+02:00',allDay:false});
+  assert.deepEqual(opened,[null,'2026-09-15T13:00:00+02:00',false]);
+  options.dateClick({dateStr:'2026-09-15',allDay:true});
+  assert.deepEqual(opened,[null,'2026-09-15',true]);
+  c.DashboardLayout={editing:true}; opened=null;
+  options.dateClick({dateStr:'2026-09-15',allDay:true});
+  assert.equal(opened,null,'layout editing cannot create items by accident');
 });
 
 test('compact projects retain all projects, sort by deadline and show actual open counts without descriptions', () => {
@@ -112,6 +121,10 @@ test('only explicit absence names are separated, not multi-day campaigns or Frid
   for (const titel of ['Vrijdag teamoverleg','Vakantiecampagne','Vakantie bespreken','Campagne kerst','Planning vrije dagen bespreken']) assert.equal(c.dashboardIsAbsence({titel}),false,titel);
   const item={id:'test',titel:'Campagne',datum_start:'2026-09-14T08:00:00',datum_eind:'2026-09-20T18:00:00'};
   assert.equal(c.dashboardCalendarEvent(item).allDay,false);
+  assert.equal(c.dashboardIsAbsence({titel:'Testmedewerker',is_vacation:true}),true);
+  assert.equal(c.dashboardIsAbsence({titel:'Testmedewerker vakantie',is_vacation:false}),false);
+  assert.equal(c.dashboardIsAbsence({titel:'Testmedewerker vakantie',is_vacation:null}),true);
+  assert.equal(c.dashboardIsAbsence({titel:'Testmedewerker',is_vacation:1}),true);
 });
 
 test('absence spans preserve final day, exclusive midnight and original record without writes', () => {

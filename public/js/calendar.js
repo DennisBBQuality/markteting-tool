@@ -119,9 +119,28 @@ const calTypeColors = {
   social: '#EC4899', email: '#F59E0B', blog: '#10B981',
 };
 
-function openCalendarModal(item, dateStr) {
+// Calendar values are local wall-clock times; never round-trip through UTC.
+function calendarInputDate(value) {
+  if (!value) return '';
+  const local = String(value).replace(' ', 'T');
+  return local.length === 10 ? local + 'T09:00' : local.slice(0,19);
+}
+
+function calendarNewDates(dateStr, allDay) {
+  if (!dateStr) return {start:'',end:''};
+  const start = allDay ? dateStr.slice(0,10) + 'T00:00' : calendarInputDate(dateStr);
+  const end = new Date(start);
+  if (allDay) end.setDate(end.getDate() + 1);
+  else end.setHours(end.getHours() + 1);
+  const pad = n => String(n).padStart(2,'0');
+  return {start,end:`${end.getFullYear()}-${pad(end.getMonth()+1)}-${pad(end.getDate())}T${pad(end.getHours())}:${pad(end.getMinutes())}`};
+}
+
+function openCalendarModal(item, dateStr, allDay = false) {
   const c = item || {};
   const isEdit = !!c.id;
+  const dates = calendarNewDates(dateStr, allDay);
+  const vacation = isEdit ? dashboardIsAbsence(c) : allDay;
 
   // Detect if it's a Google Drive link
   const isGDrive = c.link && (c.link.includes('drive.google.com') || c.link.includes('docs.google.com'));
@@ -158,6 +177,12 @@ function openCalendarModal(item, dateStr) {
       </div>` : ''}
     </div>
 
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="cal-vacation" ${vacation ? 'checked' : ''} style="width:auto" aria-describedby="cal-vacation-help"> Vakantie
+      </label>
+      <div id="cal-vacation-help" class="link-hint">Toon dit item bovenaan de dashboardkalender, buiten de tijdvakken. De ingevulde datums en tijden blijven behouden.</div>
+    </div>
     <div class="form-row">
       <div class="form-group">
         <label>Type</label>
@@ -174,12 +199,12 @@ function openCalendarModal(item, dateStr) {
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label>Start datum</label>
-        <input type="datetime-local" id="cal-start" value="${c.datum_start || (dateStr ? dateStr + 'T09:00' : '')}">
+        <label for="cal-start">Start datum</label>
+        <input type="datetime-local" id="cal-start" value="${escHtml(calendarInputDate(c.datum_start) || dates.start)}">
       </div>
       <div class="form-group">
-        <label>Eind datum</label>
-        <input type="datetime-local" id="cal-eind" value="${c.datum_eind || ''}">
+        <label for="cal-eind">Eind datum</label>
+        <input type="datetime-local" id="cal-eind" value="${escHtml(calendarInputDate(c.datum_eind) || (isEdit ? '' : dates.end))}">
       </div>
     </div>
     <div class="form-group">
@@ -191,7 +216,7 @@ function openCalendarModal(item, dateStr) {
     ${isEdit && c.link ? `<a href="${escHtml(c.link)}" target="_blank" class="btn btn-outline"><i class="${isGDrive ? 'fab fa-google-drive' : 'fas fa-external-link-alt'}"></i> ${isGDrive ? 'Google Drive' : 'Open link'}</a>` : ''}
     ${isEdit ? `<button class="btn btn-danger" onclick="deleteCalendarItem('${c.id}')"><i class="fas fa-trash"></i></button>` : ''}
     <button class="btn btn-outline" onclick="closeModal()">Annuleren</button>
-    <button class="btn btn-primary" onclick="saveCalendarItem('${c.id || ''}')">${isEdit ? 'Opslaan' : 'Aanmaken'}</button>
+    <button id="cal-save" class="btn btn-primary" onclick="saveCalendarItem('${c.id || ''}')">${isEdit ? 'Opslaan' : 'Aanmaken'}</button>
   `);
   if (isEdit) loadAttachments('calendar_item_id', c.id);
 }
@@ -212,6 +237,8 @@ async function openCalendarEditModal(id) {
 }
 
 async function saveCalendarItem(id) {
+  const saveButton = document.getElementById('cal-save');
+  if (saveButton?.disabled) return;
   const titel = document.getElementById('cal-titel').value.trim();
   if (!titel) { toast('Voer een titel in', 'error'); return; }
   const kleur = getSelectedColor(document.getElementById('modal-body'));
@@ -224,11 +251,17 @@ async function saveCalendarItem(id) {
     datum_eind: document.getElementById('cal-eind').value || null,
     link: document.getElementById('cal-link').value.trim() || null,
     kleur,
+    is_vacation: document.getElementById('cal-vacation').checked,
   };
   if (!body.datum_start) { toast('Voer een startdatum in', 'error'); return; }
+  if (body.datum_eind && new Date(body.datum_eind) < new Date(body.datum_start)) {
+    toast('De einddatum mag niet vóór de startdatum liggen', 'error'); return;
+  }
+  if (saveButton) saveButton.disabled = true;
   const result = id
     ? await api(`/api/calendar/${id}`, { method: 'PUT', body })
     : await api('/api/calendar', { method: 'POST', body });
+  if (saveButton) saveButton.disabled = false;
   if (result) {
     closeModal();
     toast(id ? 'Item bijgewerkt' : 'Item aangemaakt', 'success');
