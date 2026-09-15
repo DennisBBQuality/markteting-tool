@@ -10,7 +10,7 @@
 
 ## Veilige uitrol
 
-Deze release heeft één nieuwe nullable boolean-kolom nodig. Voer vóór activering van de nieuwe code uitsluitend onderstaande Laravel-migratie op de bevoegde hostingomgeving uit, na een herstelbare productieback-up:
+Deze release heeft één nieuwe nullable boolean-kolom nodig. Dennis heeft op 15 september bevestigd dat GitHub automatisch de live-uitrol start. Gebruik die bestaande route (zie AGENTS.md), geen nieuwe hosting. De meegeleverde migratie is het enige nieuwe databaseschema in deze release. Als de automatische uitrol deze niet uitvoert, is dit het gerichte herstelcommando voor de bevoegde hostingbeheerder, na een herstelbare productieback-up:
 
 ```sh
 php artisan migrate --path=database/migrations/2026_09_15_080000_add_is_vacation_to_calendar_items.php --force
@@ -31,4 +31,4 @@ Verifieer dat de kolom bestaat en de migratie geregistreerd is; vergelijk bestaa
 
 ## Nog niet uitgevoerd
 
-Productiemigratie en live-activering zijn nog niet geverifieerd. De hostingroute moet worden bevestigd voordat deze release naar main wordt samengevoegd. Er zijn tijdens deze controles geen productiegegevens gewijzigd.
+De hostingroute is bevestigd: de bestaande automatische GitHub-uitrol. Productiemigratie en live-activering moeten na de release apart worden geverifieerd voor zover de beschikbare toegang dit toelaat. De lokale controles wijzigen geen productiegegevens.
