@@ -126,6 +126,7 @@ function dashboardProjectsHtml(projects) {
 // "Britt vrij". Do not infer absence from duration, colour or a generic keyword
 // inside a meeting title. Stored dates and the full calendar remain untouched.
 function dashboardIsAbsence(item) {
+  if (item.is_vacation != null) return item.is_vacation === true || item.is_vacation === 1;
   const title = (item.titel || '').trim();
   return ['vakantie', 'verlof', 'afwezig'].includes(item.type)
     || /(?:^|\s)(?:vakantie|verlof|afwezig|vrij|vrije dag(?:en)?)$/i.test(title)
@@ -209,6 +210,7 @@ async function renderDashboard() {
       <header class="dashboard-week-header">
         <div><h3>Deze week</h3><p id="dashboard-week-title" aria-live="polite"></p></div>
         <div class="dashboard-week-actions">
+          <button class="btn btn-outline" onclick="openCalendarModal()"><i class="fas fa-plus" aria-hidden="true"></i> Nieuw item</button>
           <button class="btn btn-outline" aria-label="Vorige week" onclick="Dashboard.changeWeek('prev')"><i class="fas fa-chevron-left" aria-hidden="true"></i></button>
           <button class="btn btn-outline" onclick="Dashboard.changeWeek('today')">Vandaag</button>
           <button class="btn btn-outline" aria-label="Volgende week" onclick="Dashboard.changeWeek('next')"><i class="fas fa-chevron-right" aria-hidden="true"></i></button>
@@ -291,6 +293,10 @@ function mountDashboardCalendar(version, userId) {
     eventTimeFormat: {hour: '2-digit', minute: '2-digit', hour12: false},
     slotLabelFormat: {hour: '2-digit', minute: '2-digit', hour12: false},
     editable: false, selectable: false,
+    dateClick(info) {
+      if (!Dashboard.isCurrent(version, userId) || (typeof DashboardLayout !== 'undefined' && DashboardLayout.editing)) return;
+      openCalendarModal(null, info.dateStr, info.allDay);
+    },
     datesSet(info) {
       Dashboard.date = dashboardLocalDate(info.start);
       const end = new Date(info.end); end.setDate(end.getDate() - 1);

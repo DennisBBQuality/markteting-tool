@@ -85,5 +85,24 @@ class ProductStudioMigrationPreservationTest extends TestCase
         // Running the approved upgrade again must be a no-op for existing planning data.
         $this->artisan('migrate', ['--path' => $paths($upgrade)])->assertExitCode(0);
         $this->assertSame($before, $snapshot());
+
+        // Vacation opt-in adds one nullable column, with no data backfill.
+        $vacationUpgrade = ['--path' => $paths(['2026_09_15_080000_add_is_vacation_to_calendar_items.php'])];
+        $this->artisan('migrate', $vacationUpgrade)->assertExitCode(0);
+        $this->assertTrue(Schema::hasColumn('calendar_items', 'is_vacation'));
+        $calendar = DB::table('calendar_items')->orderBy('id')->get();
+        foreach ($calendar as $row) {
+            $this->assertNull($row->is_vacation);
+            unset($row->is_vacation);
+        }
+        $this->assertSame($before['calendar_items']['rows'], $calendar->toJson());
+        foreach ($snapshot() as $table => $values) {
+            if ($table !== 'calendar_items') {
+                $this->assertSame($before[$table], $values);
+            }
+        }
+        $after = $snapshot();
+        $this->artisan('migrate', $vacationUpgrade)->assertExitCode(0);
+        $this->assertSame($after, $snapshot());
     }
 }

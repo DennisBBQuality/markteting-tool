@@ -11,8 +11,8 @@ class CalendarController extends Controller
     public function index(Request $request)
     {
         $query = CalendarItem::select('calendar_items.*',
-                'p.naam as project_naam', 'p.kleur as project_kleur',
-                'u.naam as aangemaakt_door_naam')
+            'p.naam as project_naam', 'p.kleur as project_kleur',
+            'u.naam as aangemaakt_door_naam')
             ->leftJoin('projects as p', 'calendar_items.project_id', '=', 'p.id')
             ->leftJoin('users as u', 'calendar_items.aangemaakt_door', '=', 'u.id');
 
@@ -31,11 +31,19 @@ class CalendarController extends Controller
                         });
                 });
         } else {
-            if ($request->filled('start')) $query->where('calendar_items.datum_start', '>=', $request->start);
-            if ($request->filled('end')) $query->where('calendar_items.datum_start', '<=', $request->end);
+            if ($request->filled('start')) {
+                $query->where('calendar_items.datum_start', '>=', $request->start);
+            }
+            if ($request->filled('end')) {
+                $query->where('calendar_items.datum_start', '<=', $request->end);
+            }
         }
-        if ($request->filled('type')) $query->where('calendar_items.type', $request->type);
-        if ($request->filled('project_id')) $query->where('calendar_items.project_id', $request->project_id);
+        if ($request->filled('type')) {
+            $query->where('calendar_items.type', $request->type);
+        }
+        if ($request->filled('project_id')) {
+            $query->where('calendar_items.project_id', $request->project_id);
+        }
 
         return response()->json($query->orderBy('calendar_items.datum_start')->get());
     }
@@ -45,6 +53,7 @@ class CalendarController extends Controller
         $request->validate([
             'titel' => 'required|string',
             'datum_start' => 'required',
+            'is_vacation' => 'sometimes|nullable|boolean',
         ]);
 
         $item = CalendarItem::create([
@@ -57,6 +66,7 @@ class CalendarController extends Controller
             'kleur' => $request->kleur,
             'link' => $request->link,
             'aangemaakt_door' => $request->session()->get('userId'),
+            'is_vacation' => $request->input('is_vacation'),
         ]);
 
         return response()->json($item);
@@ -65,6 +75,7 @@ class CalendarController extends Controller
     public function update(Request $request, string $id)
     {
         $item = CalendarItem::findOrFail($id);
+        $request->validate(['is_vacation' => 'sometimes|nullable|boolean']);
         $item->update([
             'project_id' => $request->project_id,
             'titel' => $request->titel,
@@ -74,6 +85,8 @@ class CalendarController extends Controller
             'datum_eind' => $request->datum_eind,
             'kleur' => $request->kleur,
             'link' => $request->link,
+            // Older tabs and drag/resize requests do not carry this new field.
+            'is_vacation' => $request->has('is_vacation') ? $request->input('is_vacation') : $item->is_vacation,
         ]);
 
         return response()->json($item->fresh());
@@ -82,6 +95,7 @@ class CalendarController extends Controller
     public function destroy(string $id)
     {
         CalendarItem::destroy($id);
+
         return response()->json(['ok' => true]);
     }
 }

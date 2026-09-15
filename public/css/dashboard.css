@@ -8,7 +8,7 @@
 .dashboard-week-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 16px; }
 .dashboard-week h3 { font-size: 22px; line-height: 1.3; }
 .dashboard-week-header p, .dashboard-tile-header p { color: var(--text-light); font-size: 13px; margin-top: 3px; }
-.dashboard-week-actions { display: flex; gap: 8px; }
+.dashboard-week-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .dashboard-week-actions .btn { min-height: 40px; }
 .dashboard-calendar-scroll { overflow-x: auto; }
 #dashboard-calendar { min-width: 700px; }

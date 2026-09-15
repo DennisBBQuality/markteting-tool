@@ -14,8 +14,10 @@ class CalendarItem extends Model
 
     protected $fillable = [
         'project_id', 'titel', 'beschrijving', 'type', 'datum_start',
-        'datum_eind', 'kleur', 'link', 'aangemaakt_door',
+        'datum_eind', 'kleur', 'link', 'aangemaakt_door', 'is_vacation',
     ];
+
+    protected $casts = ['is_vacation' => 'boolean'];
 
     public function project(): BelongsTo
     {
