@@ -105,13 +105,71 @@ function dashboardTasksHtml(tasks) {
 }
 
 function dashboardProjectsHtml(projects) {
-  return projects.length ? projects.slice(0, 4).map(p => `
-    <button class="dashboard-row" onclick="Dashboard.openProject('${escHtml(p.id)}')">
-      <i class="fas fa-folder dashboard-accent" aria-hidden="true"></i>
-      <span class="dashboard-row-text"><strong>${escHtml(p.naam)}</strong>
-        <small>${escHtml(p.beschrijving || 'Geen beschrijving')}</small></span>
-      <i class="fas fa-chevron-right dashboard-chevron" aria-hidden="true"></i>
-    </button>`).join('') : dashboardEmpty('Er zijn nog geen actieve projecten.');
+  if (!projects.length) return dashboardEmpty('Er zijn nog geen actieve projecten.');
+  const rows = [...projects].sort((a,b) => (a.deadline || '9999').localeCompare(b.deadline || '9999') || a.naam.localeCompare(b.naam, 'nl'));
+  return `<table class="dashboard-project-table"><thead><tr><th>Project</th><th>Deadline</th><th>Team</th><th>Open taken</th></tr></thead><tbody>${rows.map(p => {
+    const team = Array.isArray(p.medewerkers) ? p.medewerkers : [];
+    const count = p.aantal_taken != null && p.taken_klaar != null && Number.isFinite(Number(p.aantal_taken)) && Number.isFinite(Number(p.taken_klaar))
+      ? Math.max(0, Number(p.aantal_taken) - Number(p.taken_klaar)) : '–';
+    return `<tr>
+      <td><button class="dashboard-project-open" onclick="Dashboard.openProject('${escHtml(p.id)}')" title="${escHtml(p.naam)}">
+        <i class="fas fa-folder dashboard-accent" aria-hidden="true"></i><strong>${escHtml(p.naam)}</strong>
+        <i class="fas fa-chevron-right dashboard-chevron" aria-hidden="true"></i></button></td>
+      <td class="dashboard-project-date">${dashboardDate(p.deadline) || 'Geen datum'}</td>
+      <td><span class="dashboard-project-team" aria-label="${escHtml(team.map(u => u.naam).join(', ') || 'Geen team ingesteld')}" title="${escHtml(team.map(u => u.naam).join(', ') || 'Geen team ingesteld')}">${team.slice(0,3).map(u => `<span class="dashboard-project-avatar" style="background:${/^#[0-9a-f]{6}$/i.test(u.kleur || '') ? u.kleur : '#64748b'}" aria-hidden="true">${escHtml((u.naam || '?').trim().slice(0,1).toUpperCase())}</span>`).join('')}${team.length > 3 ? `<span class="dashboard-project-extra">+${team.length - 3}</span>` : ''}${team.length ? '' : '<span class="dashboard-muted">Geen team</span>'}</span></td>
+      <td class="dashboard-project-count">${count}</td>
+    </tr>`;
+  }).join('')}</tbody></table>`;
+}
+
+// Display-only compatibility for existing titles such as "Colin Vakantie" and
+// "Britt vrij". Do not infer absence from duration, colour or a generic keyword
+// inside a meeting title. Stored dates and the full calendar remain untouched.
+function dashboardIsAbsence(item) {
+  const title = (item.titel || '').trim();
+  return ['vakantie', 'verlof', 'afwezig'].includes(item.type)
+    || /(?:^|\s)(?:vakantie|verlof|afwezig|vrij|vrije dag(?:en)?)$/i.test(title)
+    || /^(?:vakantie|verlof|afwezig)\s*[:–-]\s*\S/i.test(title);
+}
+
+function dashboardCalendarEvent(item) {
+  const color = /^#[0-9a-f]{6}$/i.test(item.kleur || '') ? item.kleur : calTypeColor(item.type);
+  const event = {id:item.id, title:item.titel, start:item.datum_start, end:item.datum_eind || undefined,
+    allDay:false, backgroundColor:color + '20', borderColor:color, textColor:'#2C1810', extendedProps:{item}};
+  if (!dashboardIsAbsence(item)) return event;
+  const start = new Date(item.datum_start);
+  if (Number.isNaN(start.getTime())) return event;
+  const end = new Date(item.datum_eind || item.datum_start);
+  if (Number.isNaN(end.getTime()) || end < start) return event;
+  // FullCalendar's all-day end is exclusive: preserve exact-midnight ends,
+  // include the final occupied date otherwise. Calendar arithmetic is DST-safe.
+  if (end <= start || end.getHours() || end.getMinutes() || end.getSeconds()) end.setDate(end.getDate() + 1);
+  if (dashboardLocalDate(end) === dashboardLocalDate(start)) end.setDate(end.getDate() + 1);
+  event.allDay = true;
+  event.start = dashboardLocalDate(start);
+  event.end = dashboardLocalDate(end);
+  event.backgroundColor = '#f3e9dc';
+  event.borderColor = '#c7ab85';
+  event.classNames = ['dashboard-absence-event'];
+  // A half day must not appear to be an entire day off.
+  const originalEnd = new Date(item.datum_eind || item.datum_start);
+  if (dashboardLocalDate(start) === dashboardLocalDate(originalEnd) && (start.getHours() || start.getMinutes() || originalEnd.getHours() || originalEnd.getMinutes())) {
+    const time = date => new Intl.DateTimeFormat('nl-NL',{hour:'2-digit',minute:'2-digit'}).format(date);
+    event.title += ` · ${time(start)}${item.datum_eind ? '–' + time(originalEnd) : ''}`;
+  }
+  return event;
+}
+
+function dashboardCalendarHours(events) {
+  let min = 8, max = 18;
+  for (const event of events.filter(e => !e.allDay)) {
+    const start = new Date(event.start), end = new Date(event.end || event.start);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) continue;
+    if (dashboardLocalDate(start) !== dashboardLocalDate(end)) return {min:'00:00:00',max:'24:00:00'};
+    min = Math.min(min, start.getHours());
+    max = Math.max(max, event.end ? Math.ceil(end.getHours() + end.getMinutes()/60) : start.getHours()+1);
+  }
+  return {min:String(min).padStart(2,'0')+':00:00',max:String(max).padStart(2,'0')+':00:00'};
 }
 
 function dashboardNotesHtml(notes) {
@@ -224,8 +282,10 @@ function mountDashboardCalendar(version, userId) {
   Dashboard.calendar = new FullCalendar.Calendar(element, {
     locale: 'nl', initialView: 'timeGridWeek', initialDate: Dashboard.date || undefined,
     firstDay: 1, headerToolbar: false, height: 450,
-    allDaySlot: false, nowIndicator: true,
-    slotMinTime: '00:00:00', slotMaxTime: '24:00:00', scrollTime: '08:00:00',
+    allDaySlot: true, allDayText: 'Afwezig', nowIndicator: true,
+    dayMaxEvents: 2, eventMaxStack: 2, slotEventOverlap: false,
+    moreLinkText: n => `+${n} meer`, moreLinkClick: 'popover',
+    slotMinTime: '08:00:00', slotMaxTime: '18:00:00', scrollTime: '08:00:00', expandRows: true,
     slotDuration: '01:00:00', slotLabelInterval: '01:00:00',
     dayHeaderFormat: {weekday: 'short', day: 'numeric', month: 'short'},
     eventTimeFormat: {hour: '2-digit', minute: '2-digit', hour12: false},
@@ -248,18 +308,22 @@ function mountDashboardCalendar(version, userId) {
         return;
       }
       status.textContent = '';
-      success(items.map(item => ({
-        id: item.id, title: item.titel, start: item.datum_start, end: item.datum_eind || undefined,
-        backgroundColor: (/^#[0-9a-f]{6}$/i.test(item.kleur || '') ? item.kleur : calTypeColor(item.type)) + '20',
-        borderColor: /^#[0-9a-f]{6}$/i.test(item.kleur || '') ? item.kleur : calTypeColor(item.type),
-        textColor: '#2C1810', extendedProps: {item},
-      })));
+      const events = items.map(dashboardCalendarEvent);
+      // Start with a readable working day, but never hide an early/late event.
+      const hours = dashboardCalendarHours(events);
+      Dashboard.calendar.setOption('slotMinTime', hours.min);
+      Dashboard.calendar.setOption('slotMaxTime', hours.max);
+      success(events);
     },
     eventClick(info) { openCalendarModal(info.event.extendedProps.item); },
     eventDidMount(info) {
       info.el.setAttribute('tabindex', '0');
       info.el.setAttribute('role', 'button');
-      info.el.setAttribute('aria-label', info.event.title + ', ' + dashboardDate(info.event.start.toISOString(), {weekday:'long',hour:'2-digit',minute:'2-digit'}));
+      const item = info.event.extendedProps.item;
+      const format = {weekday:'long',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'};
+      const label = item.titel + ', ' + dashboardDate(item.datum_start, format) + (item.datum_eind ? ' – ' + dashboardDate(item.datum_eind, format) : '');
+      info.el.setAttribute('aria-label', label);
+      info.el.setAttribute('title', label);
       info.el.addEventListener('keydown', event => {
         if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openCalendarModal(info.event.extendedProps.item); }
       });

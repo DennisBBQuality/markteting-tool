@@ -12,15 +12,52 @@
 .dashboard-week-actions .btn { min-height: 40px; }
 .dashboard-calendar-scroll { overflow-x: auto; }
 #dashboard-calendar { min-width: 700px; }
-#dashboard-calendar.fc { font-size: 14px; --fc-border-color: #e8e7e4; --fc-today-bg-color: #fff2f2; }
+#dashboard-calendar.fc { font-size: 14px; --fc-border-color: #e8e7e4; --fc-today-bg-color: #fffafa; }
 #dashboard-calendar .fc-col-header-cell-cushion { padding: 10px 4px; font-weight: 600; }
 #dashboard-calendar .fc-day-today .fc-col-header-cell-cushion { color: #c42e33; }
-#dashboard-calendar .fc-timegrid-slot { height: 39px; }
+#dashboard-calendar .fc-timegrid-slot { height: 28px; }
 #dashboard-calendar .fc-timegrid-slot-label-cushion { font-size: 13px; color: var(--text-light); }
 #dashboard-calendar .fc-event { padding: 1px 4px; font-size: 12px; border-width: 0 0 0 3px; border-radius: 4px; }
 #dashboard-calendar .fc-event-time { font-size: 10px; line-height: 12px; }
 #dashboard-calendar .fc-event-title { font-size: 12px; line-height: 16px; font-weight: 600; }
-#dashboard-calendar .fc-event-main { padding: 1px 0; }
+#dashboard-calendar .fc-event-main { padding: 0; }
+#dashboard-calendar .fc-timegrid-event-short .fc-event-main-frame { display: block; }
+#dashboard-calendar .fc-timegrid-event-short .fc-event-time::after { content: none; }
+#dashboard-calendar .fc-timegrid-event-short .fc-event-title { font-size: 11px; line-height: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#dashboard-calendar .fc-timegrid-event-short .fc-event-time { font-size: 9px; line-height: 10px; }
+#dashboard-calendar .fc-day-sat, #dashboard-calendar .fc-day-sun { background-color: #fafafa; }
+#dashboard-calendar .fc-timegrid-axis-cushion { font-size: 11px; padding: 4px; }
+#dashboard-calendar .fc-daygrid-body .fc-daygrid-event { margin: 2px 3px; }
+#dashboard-calendar .fc-daygrid-day-events { min-height: 0; margin-bottom: 2px; }
+#dashboard-calendar .dashboard-absence-event { border: 0; padding: 2px 6px; }
+#dashboard-calendar .fc-daygrid-more-link { font-size: 11px; color: #674e30; padding: 3px 5px; }
+#dashboard-calendar .fc-popover { max-width: min(350px, 90vw); z-index: 20; }
+#dashboard-calendar .fc-popover-body { max-height: 240px; overflow: auto; }
+#dashboard-calendar .fc-popover .fc-event-title { white-space: normal; }
+.dashboard-project-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.dashboard-project-table th { position: sticky; top: 0; z-index: 1; background: white; padding: 12px 8px; text-align: left; font-weight: 500; color: var(--text-light); border-bottom: 1px solid var(--dashboard-line); white-space: nowrap; }
+.dashboard-project-table td { padding: 10px 8px; border-bottom: 1px solid var(--dashboard-line); vertical-align: middle; }
+.dashboard-project-table th:first-child, .dashboard-project-table td:first-child { padding-left: 0; }
+.dashboard-project-table tr:last-child td { border-bottom: 0; }
+.dashboard-project-table tbody tr:hover { background: #faf8f6; }
+.dashboard-project-open { display: flex; align-items: center; gap: 10px; width: 100%; background: transparent; border: 0; text-align: left; color: var(--text); font: inherit; cursor: pointer; }
+.dashboard-project-open strong { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.dashboard-project-open .dashboard-accent { font-size: 16px; }
+.dashboard-project-open .dashboard-chevron { margin-left: auto; color: var(--text-light); font-size: 9px; }
+.dashboard-project-date { white-space: nowrap; color: var(--text-light); }
+.dashboard-project-team { display: flex; align-items: center; gap: 3px; white-space: nowrap; }
+.dashboard-project-avatar { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; color: white; font-size: 11px; font-weight: 600; }
+.dashboard-project-extra, .dashboard-muted { font-size: 11px; color: var(--text-light); }
+.dashboard-project-count { text-align: center; font-variant-numeric: tabular-nums; }
+[data-widget=projects] { container-type: inline-size; }
+@container (max-width: 440px) {
+  .dashboard-project-table th, .dashboard-project-table td { padding: 10px 4px; }
+  .dashboard-project-open { gap: 5px; }
+  .dashboard-project-open .dashboard-chevron { display: none; }
+  .dashboard-project-avatar { width: 20px; height: 20px; font-size: 10px; }
+  .dashboard-project-team { gap: 1px; }
+  .dashboard-project-table { min-width: 360px; }
+}
 #dashboard-calendar-status:empty { display: none; }
 #dashboard-calendar-status { font-size: 13px; color: var(--text-light); margin-bottom: 8px; }
 .dashboard-personal-grid { display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
