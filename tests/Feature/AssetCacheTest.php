@@ -26,7 +26,8 @@ class AssetCacheTest extends TestCase
         $this->assertStringContainsString('/js/settings.js?v=20260911-1', $appShell);
         $this->assertStringContainsString('/js/trunkrs.js?v=20260914-1', $appShell);
         $this->assertStringContainsString('/css/trunkrs.css?v=20260911-1', $appShell);
-        $this->assertStringContainsString('/js/dashboard.js?v=20260914-3', $appShell);
+        $this->assertStringContainsString('/js/dashboard.js?v=20260914-4', $appShell);
+        $this->assertStringContainsString('/css/dashboard.css?v=20260914-4', $appShell);
         $this->assertStringContainsString('/js/dashboard-layout.js?v=20260914-2', $appShell);
     }
 }
