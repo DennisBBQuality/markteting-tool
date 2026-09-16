@@ -9,14 +9,15 @@ function harness() {
   const field = id => {
     if (!fields.has(id)) fields.set(id, {
       value: '', innerHTML: '', textContent: '', disabled: false, isConnected: true,
-      classList: { add() {} }, focus() { this.focused = true; },
+      classList: { add() {}, toggle() {} }, focus() { this.focused = true; },
     });
     return fields.get(id);
   };
   const messages = [];
   let urls = 0;
   const context = vm.createContext({
-    document: { getElementById: field }, navigator: { clipboard: { read: async () => [] } },
+    document: { getElementById: field, querySelectorAll: () => [] }, navigator: { clipboard: { read: async () => [] } },
+    sessionStorage: { removeItem() {} },
     File, Date, URL: { createObjectURL: () => `blob:${++urls}`, revokeObjectURL() {} },
     toast: text => messages.push(text), escHtml: String, formatFileSize: String,
     ImageModelPicker: { selection: () => ({ image_model: 'test-model' }) },
@@ -159,4 +160,31 @@ test('removing a pasted photo releases its preview and upload duplicate handling
   assert.equal(released, 'blob:1');
   assert.equal(h.run('productImageState.files.length'), 0);
   assert.equal(h.field('product-image-generate-btn').disabled, true);
+});
+
+test('fish selection keeps references and name, shows four photos and remains selected after completion', () => {
+  const h = harness(); h.context.uploads = [file()];
+  h.run("handleProductImageFiles(uploads); setProductImageType('fish')");
+  assert.equal(h.run('productImageState.productType'), 'fish');
+  assert.equal(h.run('productImageState.files.length'), 1);
+  assert.equal(h.field('product-image-name').value, 'Testproduct');
+  assert.match(h.field('product-image-generate-btn').innerHTML, /Maak 4 productfoto/);
+  assert.equal(h.field('product-image-generate-btn').disabled, false);
+  h.run('finishProductImageRequest()');
+  assert.match(h.field('product-image-generate-btn').innerHTML, /Maak 4 productfoto/);
+});
+
+test('polling accepts four fish results, not two; existing sauce and bundle counts remain two', async () => {
+  for (const [type, count, valid] of [['fish', 4, true], ['fish', 2, false], ['meat', 4, true], ['sauce', 2, true], ['bundle', 2, true]]) {
+    const h = harness();
+    h.context.fetch = async () => ({ ok: true, status: 200, json: async () => ({ status: 'completed', context: { product_type: type }, results: Array.from({ length: count }, () => ({})) }) });
+    h.context.renderProductImageResults = () => {};
+    h.context.showProductImageError = error => { h.context.error = error; };
+    h.run('productImageState.requestId = "test"; productImageState.pollFailures = 3');
+    // Error counter resets after a valid server response, so capture any scheduled retry.
+    h.context.setTimeout = () => { h.context.retry = true; return 1; };
+    await h.run('pollProductImageRequest("test")');
+    assert.equal(h.run('productImageState.results.length'), valid ? count : 0);
+    assert.equal(Boolean(h.context.retry), !valid);
+  }
 });

@@ -77,7 +77,7 @@ class ProductImageController extends Controller
                 'file', 'max:10240', 'extensions:jpg,jpeg,png,webp', 'mimes:jpg,jpeg,png,webp',
                 'dimensions:max_width=8000,max_height=8000',
             ],
-            'product_type' => ['nullable', 'in:meat,sauce,bundle'],
+            'product_type' => ['nullable', 'in:meat,fish,sauce,bundle'],
             'product_name' => ['nullable', 'string', 'max:160'],
             'quantity' => ['nullable', 'integer', 'min:1', 'max:100'],
             'notes' => ['nullable', 'string', 'max:2000'],

@@ -63,7 +63,7 @@ function renderConverter() {
           <span class="product-image-eyebrow">AI productfotografie</span>
           <h3 id="product-image-title">Productfoto Generator</h3>
           <p>Maak betrouwbare productfoto's vanuit maximaal vijf echte referentiefoto's.</p>
-          <p><i class="fas fa-circle-check" style="color:var(--success);"></i> BBQuality-stijlbibliotheek actief: vaste rauwe achtergrond met vormbehoud en verschillende bereide sferen.</p>
+          <p><i class="fas fa-circle-check" style="color:var(--success);"></i> BBQuality-stijlbibliotheek actief: eigen rauwe setting voor vlees en vis, met verschillende bereide sferen.</p>
         </div>
         <button class="btn btn-outline" type="button" onclick="openProductPromptModal()">
           <i class="fas fa-pen"></i> Prompt instellen
@@ -74,6 +74,7 @@ function renderConverter() {
         <div class="form-group image-model-picker" id="image-model-picker-generator"></div>
         <div class="product-type-picker" role="radiogroup" aria-label="Soort opdracht">
           <button type="button" class="active" data-type="meat" onclick="setProductImageType('meat')"><i class="fas fa-drumstick-bite"></i><strong>Vlees</strong><span>2 rauw + 2 bereid</span></button>
+          <button type="button" data-type="fish" onclick="setProductImageType('fish')"><i class="fas fa-fish"></i><strong>Vis</strong><span>2 rauw + 2 bereid</span></button>
           <button type="button" data-type="sauce" onclick="setProductImageType('sauce')"><i class="fas fa-bottle-droplet"></i><strong>Saus of rub</strong><span>2 productfoto's</span></button>
           <button type="button" data-type="bundle" onclick="setProductImageType('bundle')"><i class="fas fa-box-open"></i><strong>Totaalpakket</strong><span>2 totaalbeelden</span></button>
         </div>
@@ -390,7 +391,7 @@ function setProductImageType(type) {
   productImageState.productType = type;
   document.querySelectorAll('.product-type-picker button').forEach(button => button.classList.toggle('active', button.dataset.type === type));
   document.getElementById('product-image-components-group')?.classList.toggle('hidden', type !== 'bundle');
-  const labels = { meat: 'Maak 4 productfoto\'s', sauce: 'Maak 2 productfoto\'s', bundle: 'Maak 2 totaalbeelden' };
+  const labels = { meat: 'Maak 4 productfoto\'s', fish: 'Maak 4 productfoto\'s', sauce: 'Maak 2 productfoto\'s', bundle: 'Maak 2 totaalbeelden' };
   const button = document.getElementById('product-image-generate-btn');
   if (button) button.innerHTML = `<i class="fas fa-wand-magic-sparkles"></i> ${labels[type]}`;
   updateProductImageForm();
@@ -632,7 +633,7 @@ async function pollProductImageRequest(requestId) {
     productImageState.pollFailures = 0;
 
     if (data.status === 'completed') {
-      const expected = data.context?.product_type === 'meat' || !data.context ? 4 : 2;
+      const expected = ['meat', 'fish'].includes(data.context?.product_type ?? 'meat') ? 4 : 2;
       if (!Array.isArray(data.results) || data.results.length !== expected) {
         throw new Error(`De beeldservice leverde niet de verwachte ${expected} productfoto's op.`);
       }
@@ -679,7 +680,7 @@ function finishProductImageRequest(hideStatus = true) {
   const status = document.getElementById('product-image-status');
   if (button) {
     updateProductImageForm();
-    const labels = { meat: 'Maak 4 productfoto\'s', sauce: 'Maak 2 productfoto\'s', bundle: 'Maak 2 totaalbeelden' };
+    const labels = { meat: 'Maak 4 productfoto\'s', fish: 'Maak 4 productfoto\'s', sauce: 'Maak 2 productfoto\'s', bundle: 'Maak 2 totaalbeelden' };
     button.innerHTML = `<i class="fas fa-wand-magic-sparkles"></i> ${labels[productImageState.productType]}`;
   }
   if (hideStatus) status?.classList.add('hidden');

@@ -17,6 +17,7 @@ class ProductImagePromptBuilder
     public function plans(array $context): array
     {
         return match ($context['product_type'] ?? 'meat') {
+            'fish' => (new FishProductImageProfile)->plans(array_slice($this->meatPlans([]), 0, 2)),
             'sauce' => $this->saucePlans($context),
             'bundle' => $this->bundlePlans($context),
             default => $this->meatPlans($context),
@@ -25,6 +26,10 @@ class ProductImagePromptBuilder
 
     public function prompt(string $basePrompt, array $context, array $plan): string
     {
+        if (($context['product_type'] ?? null) === 'fish') {
+            return (new FishProductImageProfile)->prompt($basePrompt, $context, $plan);
+        }
+
         $name = trim((string) ($context['product_name'] ?? 'product'));
         $quantity = max(1, (int) ($context['quantity'] ?? 1));
         $notes = trim((string) ($context['notes'] ?? ''));

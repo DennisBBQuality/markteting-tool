@@ -12,6 +12,12 @@ Voor bereid vlees gaan deze beelden uitsluitend over type omgeving, camerahoek e
 
 Een afzonderlijk door het team opgeslagen, goedgekeurd voorbeeld voor exact hetzelfde product en dezelfde variantstijl vervangt nog steeds het gebundelde bereide sfeerbeeld. Dat blijft een kwaliteitsanker voor bereiding en presentatie, met behoud van de nieuwe echte productreferenties als bron voor identiteit en hoeveelheid. Kopieer ook hier geen overmatige korrels, glans of verscherping. Voeg afgekeurde testresultaten niet als nieuwe kwaliteitsreferentie toe. Een echte bereide productfoto kan later een betere referentie bieden; deze wijziging voegt die niet automatisch toe.
 
+## Vis: afzonderlijke rauwe achtergrond vanaf 16 september 2026
+
+`vis-rauw-zwart.png` is een ongewijzigde kopie van de echte zalmfoto die Dennis op 16 september aanleverde als gewenst achtergrondvoorbeeld. Uitsluitend gebruikt voor `vis_rauw_zwart`: zwart achtervlak, zwarte ondergrond, subtiele textuur en reflectie. Dit is nadrukkelijk géén lege plaat: het voorbeeldproduct mag niet worden gekopieerd. De andere twee aangeleverde echte voorbeelden (hele vis en kreeftenstaart) onderbouwen dezelfde setting, maar worden niet extra meegestuurd. De afgekeurde rechtopstaande zalmhaas op de vleesachtergrond is niet opgenomen.
+
+`vis_rauw_hout` heeft geen gebundelde stijlreferentie en mag wel een lichte houten plank gebruiken. Bereide vis deelt de bestaande kamado- en serveerplank-sfeerbeelden; de visprompt beperkt hun rol tot omgeving en compositie, niet het vlees of de gaarheid. Opgeslagen kwaliteitsankers blijven gescheiden op producttype, productnaam, status en stijl-ID. De bestaande vleesreferenties zijn ongewijzigd.
+
 ## Stoofgerechten
 
 Voor sucade/sukade en expliciet genoemde stoof-/sudderproducten bestaan de stijlen `bbq_buiten_stoof` en `serveerbeeld_stoof`. Deze gebruiken bewust geen gebundelde kamado-, steak- of brisketfoto: de bord-/panpresentatie en stoofstructuur worden in de prompt beschreven. Een goedgekeurd voorbeeld wordt alleen hergebruikt bij hetzelfde product en dezelfde nieuwe stoofstijl. Oudere foto's onder `bbq_buiten_algemeen` of `serveerbeeld_algemeen` blijven bewaard, maar worden niet automatisch als stoofvoorbeeld geselecteerd. Dennis' aangeleverde `Stoofgerecht final.webp` is inhoudelijk de presentatierichting voor deze wijziging; het bestand is niet automatisch geïmporteerd of als nieuwe bibliotheekreferentie opgeslagen.
