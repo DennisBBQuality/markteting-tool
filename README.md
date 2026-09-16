@@ -102,6 +102,8 @@ Alle API routes zijn beschermd met custom session-based authenticatie.
 
 ## Productfoto-generator
 
+Referentiefoto's kunnen worden geüpload, gesleept of toegevoegd met **Afbeelding plakken**. Kopieer de afbeelding zelf, niet alleen de link. De plakknop vraagt zo nodig browsertoestemming; bij ontbrekende ondersteuning of geweigerde toegang wordt het fotovak geselecteerd voor **Cmd+V / Ctrl+V**. Sneltoetsplakken werkt alleen in het referentiefotovak en verandert het plakken in tekstvelden niet. Er worden uitsluitend afbeeldingsbestanden verwerkt, geen klembordtekst of externe afbeeldingslinks. De bestaande limieten (vijf foto's, JPG/PNG/WEBP, 10 MB per foto), hoofdfotokeuze en normale upload blijven gelden. Plakken start geen AI-opdracht en verstuurt de foto nog niet naar de server.
+
 De module **Afbeeldingen** gebruikt lokaal standaard de kostenloze `fake`-driver. Daarmee kan de volledige upload- en resultaatflow worden getest zonder externe verzoeken of API-kosten.
 
 Een beheerder kan de OpenAI API-sleutel veilig instellen via **Instellingen → AI-koppelingen**. De sleutel wordt met de Laravel-applicatiesleutel versleuteld in de database opgeslagen, wordt nooit teruggestuurd naar de browser en komt niet in Git terecht.

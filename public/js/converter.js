@@ -85,7 +85,8 @@ function renderConverter() {
         <div class="form-group hidden" id="product-image-components-group"><label for="product-image-components">Onderdelen zonder eigen foto <span>(indien van toepassing)</span></label><textarea id="product-image-components" rows="3" maxlength="3000" placeholder="Beschrijf ieder ontbrekend onderdeel en het exacte aantal"></textarea></div>
       </div>
 
-      <div class="product-image-workspace">
+      <div class="product-image-workspace" onpaste="handleProductImagePaste(event)">
+        <div class="product-image-upload">
         <div class="product-image-dropzone" id="product-image-dropzone"
           role="button" tabindex="0"
           onclick="document.getElementById('product-image-file-input').click()"
@@ -97,6 +98,12 @@ function renderConverter() {
         </div>
         <input type="file" id="product-image-file-input" multiple accept="image/jpeg,image/png,image/webp"
           style="display:none" onchange="handleProductImageFiles(this.files)">
+        <button class="btn btn-outline" id="product-image-paste-btn" type="button" onclick="pasteProductImageFromClipboard()" aria-describedby="product-image-paste-help">
+          <i class="fas fa-paste" aria-hidden="true"></i> Afbeelding plakken
+        </button>
+        <p class="product-image-paste-help" id="product-image-paste-help">Kopieer een afbeelding en klik op plakken. Of selecteer het fotovak met Tab en gebruik Cmd+V / Ctrl+V.</p>
+        <p class="product-image-paste-help" id="product-image-paste-status" role="status" aria-live="polite"></p>
+        </div>
         <div class="product-image-selection" id="product-image-selection">
           <div class="product-image-empty-preview">
             <i class="fas fa-drumstick-bite"></i>
@@ -214,36 +221,126 @@ function handleProductImageDropzoneKeydown(event) {
   document.getElementById('product-image-file-input')?.click();
 }
 
+function productImagePasteMessage(message) {
+  const status = document.getElementById('product-image-paste-status');
+  if (status) status.textContent = message;
+}
+
+function productImageClipboardFile(blob) {
+  const extension = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }[blob.type] || 'afbeelding';
+  productImageState.pasteSequence = (productImageState.pasteSequence || 0) + 1;
+  return new File([blob], `geplakte-afbeelding-${Date.now()}-${productImageState.pasteSequence}.${extension}`, { type: blob.type });
+}
+
+function addProductImageClipboardFiles(files) {
+  if (!files.length) {
+    productImagePasteMessage('Geen afbeelding gevonden. Kies bij het kopiëren voor “Afbeelding kopiëren”, niet voor de link. Je kunt ook een JPG, PNG of WEBP uploaden.');
+    return;
+  }
+  const { added, errors } = handleProductImageFiles(files);
+  productImagePasteMessage([
+    added ? `${added === 1 ? 'Afbeelding toegevoegd' : `${added} afbeeldingen toegevoegd`} aan je referentiefoto’s.` : '',
+    ...errors,
+  ].filter(Boolean).join(' '));
+}
+
+async function pasteProductImageFromClipboard() {
+  const state = productImageState;
+  const button = document.getElementById('product-image-paste-btn');
+  if (!button || state.pasting) return;
+  if (state.generating || state.files.length >= 5) {
+    productImagePasteMessage(state.generating ? 'Wacht tot de huidige fotoset klaar is.' : 'Je kunt maximaal vijf referentiefoto’s gebruiken. Verwijder eerst een foto.');
+    return;
+  }
+  const fallback = 'Het fotovak is geselecteerd: druk op Cmd+V (Mac) of Ctrl+V (Windows), of upload de afbeelding.';
+  if (!navigator.clipboard?.read) {
+    document.getElementById('product-image-dropzone')?.focus();
+    productImagePasteMessage(`Deze browser ondersteunt de plakknop niet. ${fallback}`);
+    return;
+  }
+  state.pasting = true;
+  button.disabled = true;
+  updateProductImageForm();
+  productImagePasteMessage('Afbeelding ophalen… Geef toestemming als je browser daarom vraagt.');
+  const current = () => productImageState === state && button.isConnected
+    && document.getElementById('product-image-paste-btn') === button;
+  try {
+    // Read only after this explicit click, and never request text, HTML or remote URLs.
+    const items = await navigator.clipboard.read();
+    const files = [];
+    for (const item of items) {
+      if (!current()) return;
+      const type = ['image/png', 'image/jpeg', 'image/webp'].find(type => item.types.includes(type));
+      if (type) {
+        const blob = await item.getType(type);
+        if (!current()) return;
+        files.push(productImageClipboardFile(blob));
+      }
+    }
+    if (current()) addProductImageClipboardFiles(files);
+  } catch (error) {
+    if (current()) {
+      document.getElementById('product-image-dropzone')?.focus();
+      productImagePasteMessage(`De browser kon het klembord niet lezen of gaf geen toestemming. ${fallback}`);
+    }
+  } finally {
+    state.pasting = false;
+    if (current()) {
+      button.disabled = false;
+      updateProductImageForm();
+    }
+  }
+}
+
+function handleProductImagePaste(event) {
+  // Only the reference-photo area handles paste; text fields keep their normal behaviour.
+  if (event.target?.closest('input, textarea, [contenteditable="true"]')) return;
+  const files = Array.from(event.clipboardData?.files || []).filter(file => file.type.startsWith('image/'));
+  if (!files.length) return;
+  event.preventDefault();
+  if (productImageState.pasting) return;
+  addProductImageClipboardFiles(files.map(productImageClipboardFile));
+}
+
 function handleProductImageFiles(fileList) {
+  const result = { added: 0, errors: [] };
+  const reject = message => { result.errors.push(message); toast(message, 'error'); };
+  if (productImageState.generating) {
+    reject('Wacht tot de huidige fotoset klaar is.');
+    return result;
+  }
   // FileList is live in browsers: copy it before resetting the input.
   const selectedFiles = Array.from(fileList || []);
   const input = document.getElementById('product-image-file-input');
   if (input) input.value = '';
-  if (selectedFiles.length === 0) return;
+  if (selectedFiles.length === 0) return result;
 
   const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
   for (const file of selectedFiles) {
     if (productImageState.files.length >= 5) {
-      toast('Je kunt maximaal vijf referentiefoto\'s gebruiken.', 'error');
+      reject('Je kunt maximaal vijf referentiefoto\'s gebruiken.');
       break;
     }
     if (!allowedTypes.includes(file.type)) {
-      toast(`${file.name} is geen JPG-, PNG- of WEBP-afbeelding.`, 'error');
+      reject(`${file.name} is geen JPG-, PNG- of WEBP-afbeelding.`);
       continue;
     }
-    if (file.size > 10 * 1024 * 1024) {
-      toast(`${file.name} is groter dan 10 MB.`, 'error');
+    if (file.size === 0 || file.size > 10 * 1024 * 1024) {
+      reject(`${file.name} ${file.size === 0 ? 'is leeg' : 'is groter dan 10 MB'}.`);
       continue;
     }
     if (productImageState.files.some(existing => existing.name === file.name && existing.size === file.size)) continue;
     productImageState.files.push(file);
     productImageState.previewUrls.push(URL.createObjectURL(file));
+    result.added++;
   }
 
+  if (!result.added) return result;
   productImageState.results = [];
 
   document.getElementById('product-image-results')?.classList.add('hidden');
   renderProductImageSelection();
+  return result;
 }
 
 function renderProductImageSelection() {
@@ -303,7 +400,7 @@ function updateProductImageForm() {
   const button = document.getElementById('product-image-generate-btn');
   const name = document.getElementById('product-image-name')?.value.trim();
   const quantity = Number(document.getElementById('product-image-quantity')?.value);
-  if (button) button.disabled = productImageState.generating || !productImageState.files.length || !name || quantity < 1
+  if (button) button.disabled = productImageState.generating || Boolean(productImageState.pasting) || !productImageState.files.length || !name || quantity < 1
     || !ImageModelPicker.selection('generator');
 }
 
