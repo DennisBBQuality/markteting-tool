@@ -9,6 +9,10 @@ use RuntimeException;
 class ProductImageStyleLibrary
 {
     private const REFERENCES = [
+        'vis_rauw_zwart' => [
+            'file' => 'vis-rauw-zwart.png',
+            'label' => 'BBQuality-visvoorbeeld: zwarte achtergrond en ondergrond, niet het product',
+        ],
         'bbq_outdoor_kamado' => [
             'file' => 'bbq-outdoor-kamado.png',
             'label' => 'BBQ-buitenbeeld met kamado',

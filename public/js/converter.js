@@ -63,7 +63,7 @@ function renderConverter() {
           <span class="product-image-eyebrow">AI productfotografie</span>
           <h3 id="product-image-title">Productfoto Generator</h3>
           <p>Maak betrouwbare productfoto's vanuit maximaal vijf echte referentiefoto's.</p>
-          <p><i class="fas fa-circle-check" style="color:var(--success);"></i> BBQuality-stijlbibliotheek actief: vaste rauwe achtergrond met vormbehoud en verschillende bereide sferen.</p>
+          <p><i class="fas fa-circle-check" style="color:var(--success);"></i> BBQuality-stijlbibliotheek actief: eigen rauwe setting voor vlees en vis, met verschillende bereide sferen.</p>
         </div>
         <button class="btn btn-outline" type="button" onclick="openProductPromptModal()">
           <i class="fas fa-pen"></i> Prompt instellen
@@ -74,6 +74,7 @@ function renderConverter() {
         <div class="form-group image-model-picker" id="image-model-picker-generator"></div>
         <div class="product-type-picker" role="radiogroup" aria-label="Soort opdracht">
           <button type="button" class="active" data-type="meat" onclick="setProductImageType('meat')"><i class="fas fa-drumstick-bite"></i><strong>Vlees</strong><span>2 rauw + 2 bereid</span></button>
+          <button type="button" data-type="fish" onclick="setProductImageType('fish')"><i class="fas fa-fish"></i><strong>Vis</strong><span>2 rauw + 2 bereid</span></button>
           <button type="button" data-type="sauce" onclick="setProductImageType('sauce')"><i class="fas fa-bottle-droplet"></i><strong>Saus of rub</strong><span>2 productfoto's</span></button>
           <button type="button" data-type="bundle" onclick="setProductImageType('bundle')"><i class="fas fa-box-open"></i><strong>Totaalpakket</strong><span>2 totaalbeelden</span></button>
         </div>
@@ -85,7 +86,8 @@ function renderConverter() {
         <div class="form-group hidden" id="product-image-components-group"><label for="product-image-components">Onderdelen zonder eigen foto <span>(indien van toepassing)</span></label><textarea id="product-image-components" rows="3" maxlength="3000" placeholder="Beschrijf ieder ontbrekend onderdeel en het exacte aantal"></textarea></div>
       </div>
 
-      <div class="product-image-workspace">
+      <div class="product-image-workspace" onpaste="handleProductImagePaste(event)">
+        <div class="product-image-upload">
         <div class="product-image-dropzone" id="product-image-dropzone"
           role="button" tabindex="0"
           onclick="document.getElementById('product-image-file-input').click()"
@@ -97,6 +99,12 @@ function renderConverter() {
         </div>
         <input type="file" id="product-image-file-input" multiple accept="image/jpeg,image/png,image/webp"
           style="display:none" onchange="handleProductImageFiles(this.files)">
+        <button class="btn btn-outline" id="product-image-paste-btn" type="button" onclick="pasteProductImageFromClipboard()" aria-describedby="product-image-paste-help">
+          <i class="fas fa-paste" aria-hidden="true"></i> Afbeelding plakken
+        </button>
+        <p class="product-image-paste-help" id="product-image-paste-help">Kopieer een afbeelding en klik op plakken. Of selecteer het fotovak met Tab en gebruik Cmd+V / Ctrl+V.</p>
+        <p class="product-image-paste-help" id="product-image-paste-status" role="status" aria-live="polite"></p>
+        </div>
         <div class="product-image-selection" id="product-image-selection">
           <div class="product-image-empty-preview">
             <i class="fas fa-drumstick-bite"></i>
@@ -214,36 +222,126 @@ function handleProductImageDropzoneKeydown(event) {
   document.getElementById('product-image-file-input')?.click();
 }
 
+function productImagePasteMessage(message) {
+  const status = document.getElementById('product-image-paste-status');
+  if (status) status.textContent = message;
+}
+
+function productImageClipboardFile(blob) {
+  const extension = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }[blob.type] || 'afbeelding';
+  productImageState.pasteSequence = (productImageState.pasteSequence || 0) + 1;
+  return new File([blob], `geplakte-afbeelding-${Date.now()}-${productImageState.pasteSequence}.${extension}`, { type: blob.type });
+}
+
+function addProductImageClipboardFiles(files) {
+  if (!files.length) {
+    productImagePasteMessage('Geen afbeelding gevonden. Kies bij het kopiëren voor “Afbeelding kopiëren”, niet voor de link. Je kunt ook een JPG, PNG of WEBP uploaden.');
+    return;
+  }
+  const { added, errors } = handleProductImageFiles(files);
+  productImagePasteMessage([
+    added ? `${added === 1 ? 'Afbeelding toegevoegd' : `${added} afbeeldingen toegevoegd`} aan je referentiefoto’s.` : '',
+    ...errors,
+  ].filter(Boolean).join(' '));
+}
+
+async function pasteProductImageFromClipboard() {
+  const state = productImageState;
+  const button = document.getElementById('product-image-paste-btn');
+  if (!button || state.pasting) return;
+  if (state.generating || state.files.length >= 5) {
+    productImagePasteMessage(state.generating ? 'Wacht tot de huidige fotoset klaar is.' : 'Je kunt maximaal vijf referentiefoto’s gebruiken. Verwijder eerst een foto.');
+    return;
+  }
+  const fallback = 'Het fotovak is geselecteerd: druk op Cmd+V (Mac) of Ctrl+V (Windows), of upload de afbeelding.';
+  if (!navigator.clipboard?.read) {
+    document.getElementById('product-image-dropzone')?.focus();
+    productImagePasteMessage(`Deze browser ondersteunt de plakknop niet. ${fallback}`);
+    return;
+  }
+  state.pasting = true;
+  button.disabled = true;
+  updateProductImageForm();
+  productImagePasteMessage('Afbeelding ophalen… Geef toestemming als je browser daarom vraagt.');
+  const current = () => productImageState === state && button.isConnected
+    && document.getElementById('product-image-paste-btn') === button;
+  try {
+    // Read only after this explicit click, and never request text, HTML or remote URLs.
+    const items = await navigator.clipboard.read();
+    const files = [];
+    for (const item of items) {
+      if (!current()) return;
+      const type = ['image/png', 'image/jpeg', 'image/webp'].find(type => item.types.includes(type));
+      if (type) {
+        const blob = await item.getType(type);
+        if (!current()) return;
+        files.push(productImageClipboardFile(blob));
+      }
+    }
+    if (current()) addProductImageClipboardFiles(files);
+  } catch (error) {
+    if (current()) {
+      document.getElementById('product-image-dropzone')?.focus();
+      productImagePasteMessage(`De browser kon het klembord niet lezen of gaf geen toestemming. ${fallback}`);
+    }
+  } finally {
+    state.pasting = false;
+    if (current()) {
+      button.disabled = false;
+      updateProductImageForm();
+    }
+  }
+}
+
+function handleProductImagePaste(event) {
+  // Only the reference-photo area handles paste; text fields keep their normal behaviour.
+  if (event.target?.closest('input, textarea, [contenteditable="true"]')) return;
+  const files = Array.from(event.clipboardData?.files || []).filter(file => file.type.startsWith('image/'));
+  if (!files.length) return;
+  event.preventDefault();
+  if (productImageState.pasting) return;
+  addProductImageClipboardFiles(files.map(productImageClipboardFile));
+}
+
 function handleProductImageFiles(fileList) {
+  const result = { added: 0, errors: [] };
+  const reject = message => { result.errors.push(message); toast(message, 'error'); };
+  if (productImageState.generating) {
+    reject('Wacht tot de huidige fotoset klaar is.');
+    return result;
+  }
   // FileList is live in browsers: copy it before resetting the input.
   const selectedFiles = Array.from(fileList || []);
   const input = document.getElementById('product-image-file-input');
   if (input) input.value = '';
-  if (selectedFiles.length === 0) return;
+  if (selectedFiles.length === 0) return result;
 
   const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
   for (const file of selectedFiles) {
     if (productImageState.files.length >= 5) {
-      toast('Je kunt maximaal vijf referentiefoto\'s gebruiken.', 'error');
+      reject('Je kunt maximaal vijf referentiefoto\'s gebruiken.');
       break;
     }
     if (!allowedTypes.includes(file.type)) {
-      toast(`${file.name} is geen JPG-, PNG- of WEBP-afbeelding.`, 'error');
+      reject(`${file.name} is geen JPG-, PNG- of WEBP-afbeelding.`);
       continue;
     }
-    if (file.size > 10 * 1024 * 1024) {
-      toast(`${file.name} is groter dan 10 MB.`, 'error');
+    if (file.size === 0 || file.size > 10 * 1024 * 1024) {
+      reject(`${file.name} ${file.size === 0 ? 'is leeg' : 'is groter dan 10 MB'}.`);
       continue;
     }
     if (productImageState.files.some(existing => existing.name === file.name && existing.size === file.size)) continue;
     productImageState.files.push(file);
     productImageState.previewUrls.push(URL.createObjectURL(file));
+    result.added++;
   }
 
+  if (!result.added) return result;
   productImageState.results = [];
 
   document.getElementById('product-image-results')?.classList.add('hidden');
   renderProductImageSelection();
+  return result;
 }
 
 function renderProductImageSelection() {
@@ -293,7 +391,7 @@ function setProductImageType(type) {
   productImageState.productType = type;
   document.querySelectorAll('.product-type-picker button').forEach(button => button.classList.toggle('active', button.dataset.type === type));
   document.getElementById('product-image-components-group')?.classList.toggle('hidden', type !== 'bundle');
-  const labels = { meat: 'Maak 4 productfoto\'s', sauce: 'Maak 2 productfoto\'s', bundle: 'Maak 2 totaalbeelden' };
+  const labels = { meat: 'Maak 4 productfoto\'s', fish: 'Maak 4 productfoto\'s', sauce: 'Maak 2 productfoto\'s', bundle: 'Maak 2 totaalbeelden' };
   const button = document.getElementById('product-image-generate-btn');
   if (button) button.innerHTML = `<i class="fas fa-wand-magic-sparkles"></i> ${labels[type]}`;
   updateProductImageForm();
@@ -303,7 +401,7 @@ function updateProductImageForm() {
   const button = document.getElementById('product-image-generate-btn');
   const name = document.getElementById('product-image-name')?.value.trim();
   const quantity = Number(document.getElementById('product-image-quantity')?.value);
-  if (button) button.disabled = productImageState.generating || !productImageState.files.length || !name || quantity < 1
+  if (button) button.disabled = productImageState.generating || Boolean(productImageState.pasting) || !productImageState.files.length || !name || quantity < 1
     || !ImageModelPicker.selection('generator');
 }
 
@@ -535,7 +633,7 @@ async function pollProductImageRequest(requestId) {
     productImageState.pollFailures = 0;
 
     if (data.status === 'completed') {
-      const expected = data.context?.product_type === 'meat' || !data.context ? 4 : 2;
+      const expected = ['meat', 'fish'].includes(data.context?.product_type ?? 'meat') ? 4 : 2;
       if (!Array.isArray(data.results) || data.results.length !== expected) {
         throw new Error(`De beeldservice leverde niet de verwachte ${expected} productfoto's op.`);
       }
@@ -582,7 +680,7 @@ function finishProductImageRequest(hideStatus = true) {
   const status = document.getElementById('product-image-status');
   if (button) {
     updateProductImageForm();
-    const labels = { meat: 'Maak 4 productfoto\'s', sauce: 'Maak 2 productfoto\'s', bundle: 'Maak 2 totaalbeelden' };
+    const labels = { meat: 'Maak 4 productfoto\'s', fish: 'Maak 4 productfoto\'s', sauce: 'Maak 2 productfoto\'s', bundle: 'Maak 2 totaalbeelden' };
     button.innerHTML = `<i class="fas fa-wand-magic-sparkles"></i> ${labels[productImageState.productType]}`;
   }
   if (hideStatus) status?.classList.add('hidden');

@@ -887,7 +887,7 @@ input, select, textarea { font: inherit; }
 }
 
 .product-image-form { padding: 22px 28px 0; }
-.product-type-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
+.product-type-picker { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
 .product-type-picker button {
   display: grid; grid-template-columns: 30px 1fr; grid-template-rows: auto auto; column-gap: 9px;
   padding: 13px; border: 1px solid var(--border); border-radius: 10px; background: #FFF; color: var(--text); text-align: left; cursor: pointer;
@@ -907,6 +907,11 @@ input, select, textarea { font: inherit; }
   gap: 18px;
   padding: 24px 28px;
 }
+
+.product-image-upload { min-width: 0; }
+.product-image-upload > .btn { margin-top: 12px; }
+.product-image-paste-help { margin-top: 8px; color: var(--text-light); font-size: 12px; line-height: 1.5; }
+.product-image-paste-help:empty { display: none; }
 
 .product-image-dropzone,
 .product-image-selection {

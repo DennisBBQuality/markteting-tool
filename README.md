@@ -9,7 +9,7 @@ Een uitgebreide marketing team samenwerkingstool gebouwd met Laravel 12 en een v
 - **Kalender** — Evenementen voor content, deadlines, meetings, social posts, emails en blogs (FullCalendar integratie)
 - **Sticky Notes** — Kleurgecodeerde notities gekoppeld aan projecten en taken
 - **Bestandsbijlagen** — Uploads tot 10MB gekoppeld aan projecten, taken, kalenderitems en notities
-- **Afbeeldingen** — AI-productfotogenerator voor vlees, sauzen/rubs en totaalpakketten, plus batch WebP-conversie
+- **Afbeeldingen** — AI-productfotogenerator voor vlees, vis, sauzen/rubs en totaalpakketten, plus batch WebP-conversie
 - **Productstudio** — Etiketanalyse, beheerbare productkeuzes, gestructureerde PDP-teksten, voedingswaardeschattingen en voorbereiding op WordPress-concepten
 - **Dashboard** — Statistieken over projecten, actieve taken, deadlines en kalenderitems
 
@@ -102,6 +102,8 @@ Alle API routes zijn beschermd met custom session-based authenticatie.
 
 ## Productfoto-generator
 
+Referentiefoto's kunnen worden geüpload, gesleept of toegevoegd met **Afbeelding plakken**. Kopieer de afbeelding zelf, niet alleen de link. De plakknop vraagt zo nodig browsertoestemming; bij ontbrekende ondersteuning of geweigerde toegang wordt het fotovak geselecteerd voor **Cmd+V / Ctrl+V**. Sneltoetsplakken werkt alleen in het referentiefotovak en verandert het plakken in tekstvelden niet. Er worden uitsluitend afbeeldingsbestanden verwerkt, geen klembordtekst of externe afbeeldingslinks. De bestaande limieten (vijf foto's, JPG/PNG/WEBP, 10 MB per foto), hoofdfotokeuze en normale upload blijven gelden. Plakken start geen AI-opdracht en verstuurt de foto nog niet naar de server.
+
 De module **Afbeeldingen** gebruikt lokaal standaard de kostenloze `fake`-driver. Daarmee kan de volledige upload- en resultaatflow worden getest zonder externe verzoeken of API-kosten.
 
 Een beheerder kan de OpenAI API-sleutel veilig instellen via **Instellingen → AI-koppelingen**. De sleutel wordt met de Laravel-applicatiesleutel versleuteld in de database opgeslagen, wordt nooit teruggestuurd naar de browser en komt niet in Git terecht.
@@ -124,6 +126,12 @@ De bestaande gebundelde bereide stijlbeelden sturen alleen omgeving, camerahoek 
 De tweede verfijningsronde, op basis van de bizon-ribeyevoorbeelden, bewaakt daarnaast de bronafhankelijke asymmetrie, verhoudingen en vetnaden. De hoofdfoto bepaalt het exemplaar; andere aanzichten mogen geen geïdealiseerde tussenvorm opleveren. Vet mag bij garing slinken en plaatselijk glanzen, maar wordt niet verminderd op basis van een algemene aanname over de diersoort. De buitenvariant krijgt neutrale daglichtkleuren en geen standaard uitgestrooide kruiding; steak krijgt fijne, spaarzame kruiding. De bestaande serveerscène en bedoelde glaze bij bijvoorbeeld MOINK balls blijven behouden. Ook deze ronde vraagt een nieuwe fotoset voor visuele beoordeling.
 
 Sucade/sukade en expliciet genoemde stoof- of sudderproducten krijgen nu een eigen stoofprofiel: een geserveerd gerecht met jus, een klein natuurlijk losgemaakt deel en bescheiden bijgerechten, zonder nette snijplakken. Buiten wordt dit op een bord gepresenteerd, aan tafel in een ondiepe stoofpan. Deze bijgerechten zijn serveersuggesties, geen productingrediënten. Een expliciete steaknaam behoudt het bestaande steakprofiel; dit is gerichte naamherkenning, geen algemene automatische bereidingsanalyse. De rauwe varianten blijven gelijk. Het stoofprofiel krijgt geen gebundeld grill-/brisketvoorbeeld; uitsluitend een exact passend, later goedgekeurd stoofvoorbeeld kan worden hergebruikt onder de nieuwe stijl-ID's. Bestaande bibliotheekfoto's en resultaten worden niet gemigreerd of gewijzigd.
+
+### Visfotografie
+
+De knop **Vis** omvat ook schaal- en schelpdieren en maakt twee bereide en twee rauwe varianten. Rauw 1 gebruikt een zwarte achtergrond én zwarte ondergrond naar het door Dennis aangeleverde echte visvoorbeeld. Rauw 2 gebruikt de lichte ambachtelijke houtsetting. De zwart/goudbruin-houtachtergrond voor vlees wordt nooit als visreferentie meegestuurd. De vis blijft natuurlijk plat liggen en behoudt zijn verhoudingen, snit en aanwezige huid/schaal. De twee bereide varianten delen de bestaande buiten-BBQ- en serveerscènes met vlees, maar gebruiken een eigen visprompt voor garing, materiaal en presentatie. Geen standaard steakplakken of vleesvezels.
+
+De regels staan in `FishProductImageProfile`; vlees, sauzen en pakketten behouden hun bestaande prompts. Nieuwe visstijl-ID's en filtering op producttype voorkomen hergebruik van oude, onder Vlees opgeslagen visresultaten. Het echte zalmvoorbeeld is alleen een achtergrondreferentie, nooit bewijs voor de kleur, vorm of soort van een nieuw product. Technische tests gebruiken gesimuleerde providerantwoorden; de eerste echte visset moet nog visueel beoordeeld worden. Er zijn geen migraties of productie-instellingswijzigingen nodig.
 
 ### Afbeeldingsmodel kiezen
 

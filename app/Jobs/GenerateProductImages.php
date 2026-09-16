@@ -103,7 +103,7 @@ class GenerateProductImages implements ShouldQueue
     /** @param mixed $images */
     private function storeValidatedResults(ProductImageRequest $request, $images): array
     {
-        $expected = ($request->generation_context['product_type'] ?? 'meat') === 'meat' ? 4 : 2;
+        $expected = in_array($request->generation_context['product_type'] ?? 'meat', ['meat', 'fish'], true) ? 4 : 2;
         if (! is_array($images) || count($images) !== $expected) {
             throw new RuntimeException("De beeldservice leverde niet exact {$expected} afbeeldingen op.");
         }
