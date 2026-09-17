@@ -44,7 +44,7 @@ class GenerateProductImageSeo implements ShouldQueue
             $request = ProductImageRequest::findOrFail($asset->product_image_request_id);
             $result = collect($request->results)->firstWhere('filename', $asset->filename) ?? [];
             $fields = $analyzer->analyze(base64_decode($asset->contents_base64), (array) $request->generation_context, $result);
-            DB::transaction(function () use ($asset, $request, $fields) {
+            DB::transaction(function () use ($asset, $request, $result, $fields) {
                 ProductImageRequest::whereKey($request->id)->lockForUpdate()->firstOrFail();
                 $current = ProductImageAsset::whereKey($asset->id)->lockForUpdate()->firstOrFail();
                 $row = ProductImageMetadata::where('job_token', $this->token)->lockForUpdate()->first();
@@ -56,7 +56,7 @@ class GenerateProductImageSeo implements ShouldQueue
 
                     return;
                 }
-                $row->update(['fields' => app(ProductImageSeo::class)->uniqueFilename($current, ProductImageSeo::normalize($fields)),
+                $row->update(['fields' => app(ProductImageSeo::class)->uniqueFilename($current, ProductImageSeo::normalizeForImage($fields, (array) $request->generation_context, $result)),
                     'source' => 'ai', 'status' => 'completed', 'error' => null, 'job_token' => null, 'revision' => $row->revision + 1]);
             });
         } catch (Throwable $e) {

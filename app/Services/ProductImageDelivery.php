@@ -26,6 +26,7 @@ class ProductImageDelivery
             'review_note' => 'Controleer de zichtbare inhoud. Zet alt-tekst en bijschrift in de mediavelden van de website; alleen bestandsmetadata is niet voldoende.',
         ];
         $stored = $asset ? app(ProductImageSeo::class)->record($asset) : null;
+        $fallback = ProductImagePreparationSeo::complete($fallback, $context, $result);
 
         return [...$fallback, ...($stored?->fields ?? []),
             'review_note' => $stored?->fields

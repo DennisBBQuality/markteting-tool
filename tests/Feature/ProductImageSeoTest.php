@@ -9,6 +9,7 @@ use App\Models\ProductImageAsset;
 use App\Models\ProductImageMetadata;
 use App\Models\ProductImageRequest;
 use App\Services\FakeProductImageGenerator;
+use App\Services\ProductImagePromptBuilder;
 use App\Services\ProductImageSeo;
 use App\Services\ProductImageSeoAnalyzer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -33,7 +34,8 @@ class ProductImageSeoTest extends TestCase
             ->assertAccepted()->json('request_id');
         (new GenerateProductImages($id))->handle(new FakeProductImageGenerator);
         $request = ProductImageRequest::findOrFail($id);
-        $asset = ProductImageAsset::where('product_image_request_id', $id)->firstOrFail();
+        $raw = collect($request->results)->firstWhere('status', 'rauw');
+        $asset = ProductImageAsset::where('product_image_request_id', $id)->where('filename', $raw['filename'])->firstOrFail();
 
         return [$request, $asset, '/api/images/requests/'.$id.'/assets/'.$asset->id.'/seo'];
     }
@@ -176,7 +178,8 @@ class ProductImageSeoTest extends TestCase
         $fields = $this->fields();
         $this->putJson($url, ['image_version' => 1, 'revision' => 0, 'fields' => [...$fields, 'alt' => '']])->assertUnprocessable();
         $this->putJson($url, ['image_version' => 1, 'revision' => 0, 'fields' => $fields])->assertOk();
-        $second = ProductImageAsset::where('product_image_request_id', $request->id)->where('id', '!=', $asset->id)->firstOrFail();
+        $otherRaw = collect($request->results)->where('status', 'rauw')->first(fn ($result) => $result['filename'] !== $asset->filename);
+        $second = ProductImageAsset::where('product_image_request_id', $request->id)->where('filename', $otherRaw['filename'])->firstOrFail();
         app(ProductImageSeo::class)->save($second, $fields, 0);
         $this->assertSame('varkenswangen-ontvliesd-gestoofd-aardappelpuree-2.webp', app(ProductImageSeo::class)->record($second)->fields['filename']);
         $this->actingAsUser();
@@ -192,5 +195,45 @@ class ProductImageSeoTest extends TestCase
         $this->getJson($url)->assertJsonPath('seo.status', 'failed')->assertJsonPath('seo.source', 'none');
         $this->assertStringStartsWith('Voorbeeldmodus:', app(ProductImageSeo::class)->record($asset)->error);
         Http::assertNothingSent();
+    }
+
+    public function test_selected_preparation_is_sent_to_ai_and_enforced_on_save_and_download(): void
+    {
+        [$request] = $this->photos();
+        // Use the real plan builder and persist its stable style ID as generation does.
+        $context = ['product_type' => 'fish', 'product_name' => 'Zalmhaas', 'variant_groups' => ['airfryer']];
+        $plan = app(ProductImagePromptBuilder::class)->plans($context)[0];
+        $asset = ProductImageAsset::where('product_image_request_id', $request->id)->firstOrFail();
+        $request->update(['generation_context' => $context, 'results' => [[...$plan, 'filename' => $asset->filename, 'variant' => 1]]]);
+        $url = '/api/images/requests/'.$request->id.'/assets/'.$asset->id.'/seo';
+        config(['services.product_images.driver' => 'openai', 'services.product_images.openai.api_key' => 'test-key']);
+        Http::fake(['*' => Http::response(['output_text' => json_encode($this->fields())])]);
+        $this->runSeo($asset);
+        Http::assertSent(fn ($r) => json_decode($r['input'][1]['content'][0]['text'], true)['bereidingswijze'] === 'airfryer');
+        $metadata = $this->getJson($url)->assertOk()->assertJsonPath('seo.status', 'completed')->json('metadata');
+        foreach (['alt', 'title', 'caption', 'description'] as $field) {
+            $this->assertStringContainsString('bereid in de airfryer', $metadata[$field]);
+        }
+        $this->assertSame('varkenswangen-ontvliesd-gestoofd-aardappelpuree-airfryer.webp', $metadata['filename']);
+        $this->putJson($url, ['image_version' => 1, 'revision' => 1, 'fields' => $this->fields()])->assertOk()
+            ->assertJsonPath('metadata.filename', $metadata['filename']);
+        $result = $this->getJson('/api/images/requests/'.$request->id)->json('results.0');
+        $this->get($result['download_url'])->assertDownload($metadata['filename']);
+        $this->assertSame($metadata['alt'], app(ProductImageSeo::class)->record($asset)->fields['alt']);
+    }
+
+    public function test_reading_existing_prepared_seo_does_not_rewrite_saved_text(): void
+    {
+        [$request] = $this->photos();
+        $asset = ProductImageAsset::where('product_image_request_id', $request->id)->firstOrFail();
+        $row = app(ProductImageSeo::class)->record($asset);
+        $fields = ProductImageSeo::normalize($this->fields());
+        $row->update(['fields' => $fields, 'source' => 'manual', 'status' => 'completed', 'job_token' => null]);
+        $url = '/api/images/requests/'.$request->id.'/assets/'.$asset->id.'/seo';
+        $this->getJson($url)->assertOk()->assertJsonPath('metadata.alt', $fields['alt']);
+        $this->assertSame($fields, $row->fresh()->fields);
+        // Explicitly saving this older SEO adopts the new method rule.
+        $this->putJson($url, ['image_version' => 1, 'revision' => 0, 'fields' => $fields])->assertOk()
+            ->assertJsonPath('metadata.alt', $fields['alt'].' – bereid op de BBQ');
     }
 }

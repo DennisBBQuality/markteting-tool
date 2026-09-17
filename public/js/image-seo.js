@@ -25,6 +25,7 @@ async function openImageSeoEditor(assetId) {
     <div id="image-seo-form-${assetId}">
       <img class="image-seo-preview" src="${escHtml(result.url)}" alt="Te controleren productfoto">
       <p>Vijf velden voor deze fotoversie. Controleer wat werkelijk zichtbaar is; bijgerechten zijn serveersuggesties.</p>
+      <p>Bij BBQ, Pan, Oven en Airfryer wordt de gekozen bereidingswijze in alle vijf velden opgenomen. Bij opslaan wordt een ontbrekende vermelding aangevuld. Rauwe varianten krijgen geen bereidingswijze.</p>
       <p id="image-seo-status" role="status" aria-live="polite">SEO ophalen…</p>
       ${IMAGE_SEO_FIELDS.map(([key, label]) => `<div class="form-group"><label for="image-seo-${key}">${label}</label>
         <textarea id="image-seo-${key}" rows="${key === 'description' ? 3 : 2}" maxlength="${key === 'description' ? 1600 : 400}" oninput="imageSeoEditor.dirty = true">${escHtml(result.metadata?.[key] || '')}</textarea>
