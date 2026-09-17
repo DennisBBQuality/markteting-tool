@@ -69,9 +69,9 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
             }
 
             // Keep the empty fixed background next to an approved raw product example.
-            // For all other variants the approved exact-style example replaces the bundled example.
+            // Kitchen backgrounds must keep rotating even when a product quality anchor exists.
             $appendBundledReference = $styleReference !== null
-                && ($approvedReference === null || $plan['status'] === 'rauw');
+                && ($approvedReference === null || $plan['status'] === 'rauw' || isset($plan['kitchen_variant']));
             if ($appendBundledReference) {
                 $requestSources[] = [
                     'contents' => $this->normalizeStyleReference($styleReference),

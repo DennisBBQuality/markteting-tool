@@ -21,3 +21,19 @@ Een afzonderlijk door het team opgeslagen, goedgekeurd voorbeeld voor exact hetz
 ## Stoofgerechten
 
 Voor sucade/sukade en expliciet genoemde stoof-/sudderproducten bestaan de stijlen `bbq_buiten_stoof` en `serveerbeeld_stoof`. Deze gebruiken bewust geen gebundelde kamado-, steak- of brisketfoto: de bord-/panpresentatie en stoofstructuur worden in de prompt beschreven. Een goedgekeurd voorbeeld wordt alleen hergebruikt bij hetzelfde product en dezelfde nieuwe stoofstijl. Oudere foto's onder `bbq_buiten_algemeen` of `serveerbeeld_algemeen` blijven bewaard, maar worden niet automatisch als stoofvoorbeeld geselecteerd. Dennis' aangeleverde `Stoofgerecht final.webp` is inhoudelijk de presentatierichting voor deze wijziging; het bestand is niet automatisch geïmporteerd of als nieuwe bibliotheekreferentie opgeslagen.
+
+## Kiesbare keukenvarianten (16 september 2026)
+
+`keuken-pan.png`, `keuken-oven.png` en `keuken-airfryer.png` zijn ongewijzigde kopieën van de drie door Dennis in deze opdracht aangeleverde stijlvoorbeelden. Elk wordt uitsluitend bij de bijbehorende gekozen variant voor Vlees of Vis gebruikt. Bron: bijlagen met respectievelijk pan/fornuis, huishoudelijke oven en airfryer. Geen bewijs van echte fotografie, receptuur of geschiktheid van ieder product voor een apparaat.
+
+Alleen setting, apparaat, compositie en licht/kleur mogen worden overgenomen. Het voorbeeldgerecht, de kipstukken in de airfryer, aantallen, garing, korst en voedselstructuur mogen nooit een ander product bepalen of toevoegen. De daadwerkelijke productreferenties blijven leidend. Nieuwe stijl-ID's `keuken_{pan|oven|airfryer}_{productfamilie}` scheiden goedgekeurde kwaliteitsankers van elkaar en van de eerdere generieke keukenstijl. Deze uitbreiding wijzigt de bestaande rauwe en BBQ-voorbeelden niet.
+# Uitbreiding keukenachtergronden — 17 september 2026
+
+Tien aanvullende screenshots van Dennis, ongewijzigd opgenomen. Samen met de drie eerdere beelden zijn er vier Pan-, vijf Oven- en vier Airfryer-achtergronden. Opeenvolgende aanvragen van dezelfde gebruiker doorlopen per groep de reeks; tussentijdse opdrachten zonder die groep veranderen de reeks niet. Gelijktijdig ingestuurde aanvragen kunnen dezelfde stand lezen. De gekozen referentie-ID wordt vóór generatie in de opdrachtcontext vastgelegd. Oude opdrachten zonder zo'n ID behouden hun oorspronkelijke referentie.
+
+Bronmapping (screenshot-ID → lokaal bestand):
+- Pan: `6a4c77c8-b0b5-4da1-8f57-aa49bd3c03fc` → `keuken-pan-02.png`; `914b8427-1535-4ec1-8446-a4f1413b6d85` → `keuken-pan-03.png`; `d5c281f8-e3b3-4529-9e03-1b79e8ca0b1d` → `keuken-pan-04.png`.
+- Oven: `133261da-228a-4d0c-afaf-9b7a28cc3747` → `keuken-oven-02.png`; `c7057067-9eb7-452e-82eb-5fe77c5291ae` → `keuken-oven-03.png`; `c1b13750-ef43-4753-b2a1-a0e15f210c48` → `keuken-oven-04.png`; `971a4a87-5abc-435f-9c5f-bd94d06bc80d` → `keuken-oven-05.png`.
+- Airfryer: `61653fc8-b81f-4fbf-a21f-062d6917e646` → `keuken-airfryer-02.png`; `b6a27050-40e9-4cae-9e1e-9c132673259c` → `keuken-airfryer-03.png`; `5ef50e97-8c01-4864-b3ca-31ed6c8366a9` → `keuken-airfryer-04.png`.
+
+Alleen setting, licht, kleur en compositie: geen kopie van het voorbeeldgerecht, hoeveelheid, garing, logo's/displayteksten of screenshotranden. Het hoofdproduct kan in de pan, op de bakplaat of in de mand worden gepresenteerd, mits passend; nooit dezelfde portie nogmaals ernaast. Bij stoofvlees blijven jus en zachte structuur leidend. Een passend goedgekeurd productvoorbeeld mag de afwisselende keukenachtergrond niet vervangen. Deze wijziging bewerkt geen bronpixels en is nog geen visuele goedkeuring van echte gegenereerde resultaten.

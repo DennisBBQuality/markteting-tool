@@ -9,6 +9,19 @@ use RuntimeException;
 class ProductImageStyleLibrary
 {
     private const REFERENCES = [
+        'keuken_pan_02' => ['file' => 'keuken-pan-02.png', 'label' => 'Pan op inductie in lichte keuken'],
+        'keuken_pan_03' => ['file' => 'keuken-pan-03.png', 'label' => 'Pan op gasfornuis in lichte keuken'],
+        'keuken_pan_04' => ['file' => 'keuken-pan-04.png', 'label' => 'Pan met lichte keukenachtergrond'],
+        'keuken_oven_02' => ['file' => 'keuken-oven-02.png', 'label' => 'Bakplaat bij open huishoudoven'],
+        'keuken_oven_03' => ['file' => 'keuken-oven-03.png', 'label' => 'Bakplaat voor verlichte huishoudoven'],
+        'keuken_oven_04' => ['file' => 'keuken-oven-04.png', 'label' => 'Serveerplank voor huishoudoven'],
+        'keuken_oven_05' => ['file' => 'keuken-oven-05.png', 'label' => 'Bakplaat met bakpapier bij huishoudoven'],
+        'keuken_airfryer_02' => ['file' => 'keuken-airfryer-02.png', 'label' => 'Serveerplank bij airfryer in lichte keuken'],
+        'keuken_airfryer_03' => ['file' => 'keuken-airfryer-03.png', 'label' => 'Serveerplank bij airfryer met kruiden'],
+        'keuken_airfryer_04' => ['file' => 'keuken-airfryer-04.png', 'label' => 'Open airfryermand in lichte keuken'],
+        'keuken_pan' => ['file' => 'keuken-pan.png', 'label' => 'Lichte woonkeuken met pan en fornuis; alleen setting'],
+        'keuken_oven' => ['file' => 'keuken-oven.png', 'label' => 'Lichte woonkeuken met huishoudelijke oven; alleen setting'],
+        'keuken_airfryer' => ['file' => 'keuken-airfryer.png', 'label' => 'Lichte woonkeuken met airfryer; alleen setting'],
         'vis_rauw_zwart' => [
             'file' => 'vis-rauw-zwart.png',
             'label' => 'BBQuality-visvoorbeeld: zwarte achtergrond en ondergrond, niet het product',
@@ -50,6 +63,33 @@ class ProductImageStyleLibrary
             'label' => 'Rustiek totaalpakket op donker hout',
         ],
     ];
+
+    /** Fixed allowlist: never turn request input into a filesystem path. */
+    public function kitchenIds(string $group): array
+    {
+        return match ($group) {
+            'pan' => ['keuken_pan', 'keuken_pan_02', 'keuken_pan_03', 'keuken_pan_04'],
+            'oven' => ['keuken_oven', 'keuken_oven_02', 'keuken_oven_03', 'keuken_oven_04', 'keuken_oven_05'],
+            'airfryer' => ['keuken_airfryer', 'keuken_airfryer_02', 'keuken_airfryer_03', 'keuken_airfryer_04'],
+            default => [],
+        };
+    }
+
+    public function nextKitchenId(string $group, ?string $previous): ?string
+    {
+        $ids = $this->kitchenIds($group);
+        if ($ids === []) {
+            return null;
+        }
+        $index = array_search($previous, $ids, true);
+
+        return $ids[$index === false ? 0 : ($index + 1) % count($ids)];
+    }
+
+    public function kitchenId(string $group, mixed $selected): string
+    {
+        return in_array($selected, $this->kitchenIds($group), true) ? $selected : 'keuken_'.$group;
+    }
 
     /** @return array{id: string, path: string, filename: string, label: string}|null */
     public function reference(?string $id): ?array

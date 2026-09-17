@@ -8,16 +8,22 @@ use App\Jobs\RefineProductImage;
 use App\Models\ImagePrompt;
 use App\Models\ProductDossier;
 use App\Models\ProductImageAsset;
+use App\Models\ProductImageMetadata;
 use App\Models\ProductImageRequest;
 use App\Models\ProductImageRevision;
 use App\Models\ProductImageStyleReference;
 use App\Services\AiCredentialStore;
 use App\Services\ProductImageDelivery;
 use App\Services\ProductImageModelCatalog;
+use App\Services\ProductImagePromptBuilder;
+use App\Services\ProductImageSeo;
+use App\Services\ProductImageStyleLibrary;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class ProductImageController extends Controller
 {
@@ -87,7 +93,13 @@ class ProductImageController extends Controller
             'reference_names.*' => ['nullable', 'string', 'max:160'],
             'image_model' => ['nullable', 'string', 'max:120'],
             'accept_experimental' => ['sometimes', 'boolean'],
+            'variant_groups' => ['sometimes', 'required', 'array', 'min:1', 'max:5'],
+            'variant_groups.*' => ['required', 'string', 'distinct:strict', 'in:raw,bbq,pan,oven,airfryer'],
         ]);
+
+        if (isset($validated['variant_groups']) && ! in_array($validated['product_type'] ?? 'meat', ['meat', 'fish'], true)) {
+            throw ValidationException::withMessages(['variant_groups' => 'Deze varianten zijn alleen beschikbaar voor Vlees en Vis.']);
+        }
 
         $model = isset($validated['image_model'])
             ? $models->validateSelection($validated['image_model'], (bool) ($validated['accept_experimental'] ?? false))
@@ -125,6 +137,20 @@ class ProductImageController extends Controller
             'notes' => trim((string) ($validated['notes'] ?? '')),
             'components' => trim((string) ($validated['components'] ?? '')),
         ];
+        if (isset($validated['variant_groups'])) {
+            $context['variant_groups'] = array_values($validated['variant_groups']);
+            $library = app(ProductImageStyleLibrary::class);
+            foreach (array_intersect(['pan', 'oven', 'airfryer'], $context['variant_groups']) as $group) {
+                $previous = ProductImageRequest::query()
+                    ->where('user_id', $request->session()->get('userId'))
+                    ->whereNotNull('generation_context->kitchen_references->'.$group)
+                    ->latest('created_at')->latest('id')->first();
+                $context['kitchen_references'][$group] = $library->nextKitchenId(
+                    $group, $previous?->generation_context['kitchen_references'][$group] ?? null
+                );
+            }
+        }
+        $context['photo_count'] = count(app(ProductImagePromptBuilder::class)->plans($context));
 
         $imageRequest = ProductImageRequest::create([
             'user_id' => $request->session()->get('userId'),
@@ -187,7 +213,7 @@ class ProductImageController extends Controller
             }
 
             if ($request->query('format') === 'webp') {
-                return $this->webpResponse($imageRequest, $safeFilename, $contents, $asset->version ?? 1);
+                return $this->webpResponse($imageRequest, $safeFilename, $contents, $asset->version ?? 1, $asset);
             }
 
             if ($request->boolean('download')) {
@@ -221,15 +247,14 @@ class ProductImageController extends Controller
         $validated = $request->validate([
             'instruction' => ['required', 'string', 'min:5', 'max:1200'],
         ]);
-        if ($asset->refinement_status !== 'idle') {
-            return response()->json(['error' => 'Deze foto wordt al aangepast.'], 409);
-        }
-
-        $asset->update([
+        $claimed = ProductImageAsset::whereKey($asset->id)->where('refinement_status', 'idle')->update([
             'refinement_status' => 'queued',
             'refinement_error' => null,
             'last_instruction' => trim($validated['instruction']),
         ]);
+        if (! $claimed) {
+            return response()->json(['error' => 'Deze foto wordt al aangepast.'], 409);
+        }
         RefineProductImage::dispatch($imageRequest->id, $asset->id, trim($validated['instruction']))
             ->onConnection((string) config('services.product_images.queue_connection', 'deferred'));
 
@@ -302,18 +327,33 @@ class ProductImageController extends Controller
         if ($revision->product_image_asset_id !== $asset->id) {
             abort(404);
         }
-        $asset->revisions()->firstOrCreate(['version' => $asset->version], [
-            'instruction' => $asset->last_instruction,
-            'mime_type' => $asset->mime_type,
-            'contents_base64' => $asset->contents_base64,
-        ]);
-        $asset->update([
-            'contents_base64' => $revision->contents_base64,
-            'mime_type' => $revision->mime_type,
-            'version' => $asset->version + 1,
-            'last_instruction' => 'Versie '.$revision->version.' hersteld',
-            'refinement_error' => null,
-        ]);
+        DB::transaction(function () use ($asset, $revision) {
+            ProductImageRequest::whereKey($asset->product_image_request_id)->lockForUpdate()->firstOrFail();
+            $asset = ProductImageAsset::whereKey($asset->id)->lockForUpdate()->firstOrFail();
+            abort_if($asset->refinement_status !== 'idle', 409, 'Deze foto wordt al aangepast.');
+            $asset->revisions()->firstOrCreate(['version' => $asset->version], [
+                'instruction' => $asset->last_instruction,
+                'mime_type' => $asset->mime_type,
+                'contents_base64' => $asset->contents_base64,
+            ]);
+            $asset->update([
+                'contents_base64' => $revision->contents_base64,
+                'mime_type' => $revision->mime_type,
+                'version' => $asset->version + 1,
+                'last_instruction' => 'Versie '.$revision->version.' hersteld',
+                'refinement_error' => null,
+            ]);
+            $previous = ProductImageMetadata::where('product_image_asset_id', $asset->id)->where('image_version', $revision->version)->first();
+            if ($previous?->fields) {
+                ProductImageMetadata::create(['product_image_asset_id' => $asset->id, 'image_version' => $asset->version,
+                    'fields' => app(ProductImageSeo::class)->uniqueFilename($asset, $previous->fields), 'source' => $previous->source,
+                    'status' => 'completed', 'revision' => 1]);
+            }
+        });
+        $asset->refresh();
+        if (! app(ProductImageSeo::class)->record($asset)?->fields) {
+            app(ProductImageSeo::class)->queue($asset);
+        }
 
         return response()->json(['status' => 'restored', 'version' => $asset->fresh()->version]);
     }
@@ -325,11 +365,11 @@ class ProductImageController extends Controller
         }
     }
 
-    private function webpResponse(ProductImageRequest $request, string $filename, string $contents, int $version)
+    private function webpResponse(ProductImageRequest $request, string $filename, string $contents, int $version, ?ProductImageAsset $asset = null)
     {
         $delivery = app(ProductImageDelivery::class);
         $result = collect($request->results)->firstWhere('filename', $filename) ?? [];
-        $metadata = $delivery->metadata((array) $request->generation_context, $result, $version);
+        $metadata = $delivery->metadata((array) $request->generation_context, $result, $version, $asset);
         $path = 'product-images/'.$request->id.'/webp/'.hash('sha256', $contents).'.webp';
         if (! Storage::disk('local')->exists($path)) {
             Storage::disk('local')->put($path, $delivery->webp($contents));
@@ -367,7 +407,8 @@ class ProductImageController extends Controller
                 'needs_label_review' => ($imageRequest->generation_context['product_type'] ?? null) === 'sauce',
                 'url' => $url.'?v='.($storedAsset?->version ?? 1),
                 'download_url' => $url.'?download=1&format=webp&v='.($storedAsset?->version ?? 1),
-                'metadata' => app(ProductImageDelivery::class)->metadata((array) $imageRequest->generation_context, $result, $storedAsset?->version ?? 1),
+                'metadata' => app(ProductImageDelivery::class)->metadata((array) $imageRequest->generation_context, $result, $storedAsset?->version ?? 1, $storedAsset),
+                'seo' => $storedAsset ? app(ProductImageSeo::class)->payload($storedAsset) : null,
             ];
         })->values();
 
@@ -382,6 +423,7 @@ class ProductImageController extends Controller
                 : 0,
             'results' => $results,
             'context' => $imageRequest->generation_context,
+            'expected_count' => $imageRequest->status === 'completed' ? count($imageRequest->results ?? []) : ($imageRequest->generation_context['photo_count'] ?? 4),
             'error' => $imageRequest->error,
         ];
     }
@@ -389,9 +431,9 @@ class ProductImageController extends Controller
     private function failIfStalled(ProductImageRequest $imageRequest): ProductImageRequest
     {
         $queuedTooLong = $imageRequest->status === 'queued'
-            && $imageRequest->created_at?->lt(now()->subMinutes(2));
+            && $imageRequest->created_at?->lt(now()->subMinutes(isset($imageRequest->generation_context['variant_groups']) ? 30 : 2));
         $processingTooLong = $imageRequest->status === 'processing'
-            && $imageRequest->updated_at?->lt(now()->subMinutes(12));
+            && $imageRequest->updated_at?->lt(now()->subMinutes(isset($imageRequest->generation_context['variant_groups']) ? 21 : 12));
 
         if (! $queuedTooLong && ! $processingTooLong) {
             return $imageRequest;
@@ -418,11 +460,11 @@ class ProductImageController extends Controller
             'queued' => 'Opdracht ontvangen',
             'starting' => 'Beeldgenerator starten',
             'preparing' => 'Bronfoto voorbereiden',
-            'generating_prepared' => 'Twee bereide productfoto\'s maken',
+            'generating_prepared' => 'Bereide productfoto\'s maken',
             'generating_raw' => 'Twee rauwe productfoto\'s maken',
             'generating_product' => 'Verschillende productfoto’s maken',
             'saving' => 'Afbeeldingen controleren en opslaan',
-            'completed' => 'Vier productfoto\'s zijn klaar',
+            'completed' => 'De productfoto\'s zijn klaar',
             'failed' => 'Opdracht gestopt',
             default => 'Voortgang wordt bijgewerkt',
         };
@@ -433,5 +475,45 @@ class ProductImageController extends Controller
         if ($asset->product_image_request_id !== $imageRequest->id) {
             abort(404);
         }
+    }
+
+    public function seo(Request $request, ProductImageRequest $imageRequest, ProductImageAsset $asset, ProductImageSeo $seo): JsonResponse
+    {
+        $this->ensureOwner($request, $imageRequest);
+        $this->ensureAssetBelongsToRequest($imageRequest, $asset);
+
+        return response()->json($this->seoPayload($imageRequest, $asset, $seo));
+    }
+
+    public function saveSeo(Request $request, ProductImageRequest $imageRequest, ProductImageAsset $asset, ProductImageSeo $seo): JsonResponse
+    {
+        $this->ensureOwner($request, $imageRequest);
+        $this->ensureAssetBelongsToRequest($imageRequest, $asset);
+        $data = $request->validate(['image_version' => 'required|integer|min:1', 'revision' => 'required|integer|min:0', 'fields' => 'required|array']);
+        abort_if($asset->version !== (int) $data['image_version'], 409, 'De foto is gewijzigd. Open de actuele versie.');
+        $seo->save($asset, $data['fields'], $data['revision']);
+
+        return response()->json($this->seoPayload($imageRequest, $asset, $seo));
+    }
+
+    public function generateSeo(Request $request, ProductImageRequest $imageRequest, ProductImageAsset $asset, ProductImageSeo $seo): JsonResponse
+    {
+        $this->ensureOwner($request, $imageRequest);
+        $this->ensureAssetBelongsToRequest($imageRequest, $asset);
+        $data = $request->validate(['image_version' => 'required|integer|min:1', 'revision' => 'required|integer|min:0', 'replace_manual' => 'sometimes|boolean']);
+        abort_if($asset->version !== (int) $data['image_version'], 409, 'De foto is gewijzigd. Open de actuele versie.');
+        $seo->payload($asset); // Expire abandoned jobs before an explicit retry.
+        $seo->queue($asset, $data['revision'], $data['replace_manual'] ?? false);
+
+        return response()->json($this->seoPayload($imageRequest, $asset, $seo), 202);
+    }
+
+    private function seoPayload(ProductImageRequest $request, ProductImageAsset $asset, ProductImageSeo $seo): array
+    {
+        $result = collect($request->results ?? [])->firstWhere('filename', $asset->filename) ?? [];
+
+        return ['asset_id' => $asset->id, 'version' => $asset->version,
+            'metadata' => app(ProductImageDelivery::class)->metadata((array) $request->generation_context, $result, $asset->version, $asset),
+            'seo' => $seo->payload($asset)];
     }
 }

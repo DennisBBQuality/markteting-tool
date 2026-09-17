@@ -11,6 +11,7 @@ let productImageState = {
   previewUrls: [],
   mainIndex: 0,
   productType: 'meat',
+  variantGroups: ['raw', 'bbq', 'pan'],
   context: null,
   results: [],
   generating: false,
@@ -21,6 +22,13 @@ let productImageState = {
 };
 
 const PRODUCT_IMAGE_REQUEST_KEY = 'pitboard-product-image-request';
+const PRODUCT_IMAGE_VARIANTS = [
+  { id: 'raw', name: 'Rauwe variant', count: 2, detail: 'De twee bestaande rauwe settings' },
+  { id: 'bbq', name: 'BBQ', count: 2, detail: 'Buiten-BBQ en donkere serveersetting' },
+  { id: 'pan', name: 'Pan', count: 1, detail: 'Lichte keuken met pan en fornuis' },
+  { id: 'oven', name: 'Oven', count: 1, detail: 'Lichte keuken met huishoudelijke oven' },
+  { id: 'airfryer', name: 'Airfryer', count: 1, detail: 'Lichte keuken met airfryer' },
+];
 
 // Nederlandse stopwoorden voor bestandsnamen en titels
 const NL_STOPWOORDEN = [
@@ -42,6 +50,7 @@ function renderConverter() {
     previewUrls: [],
     mainIndex: 0,
     productType: 'meat',
+    variantGroups: ['raw', 'bbq', 'pan'],
     context: null,
     results: [],
     generating: Boolean(pendingRequestId),
@@ -73,11 +82,19 @@ function renderConverter() {
       <div class="product-image-form">
         <div class="form-group image-model-picker" id="image-model-picker-generator"></div>
         <div class="product-type-picker" role="radiogroup" aria-label="Soort opdracht">
-          <button type="button" class="active" data-type="meat" onclick="setProductImageType('meat')"><i class="fas fa-drumstick-bite"></i><strong>Vlees</strong><span>2 rauw + 2 bereid</span></button>
-          <button type="button" data-type="fish" onclick="setProductImageType('fish')"><i class="fas fa-fish"></i><strong>Vis</strong><span>2 rauw + 2 bereid</span></button>
+          <button type="button" class="active" data-type="meat" onclick="setProductImageType('meat')"><i class="fas fa-drumstick-bite"></i><strong>Vlees</strong><span>Kies zelf je varianten</span></button>
+          <button type="button" data-type="fish" onclick="setProductImageType('fish')"><i class="fas fa-fish"></i><strong>Vis</strong><span>Kies zelf je varianten</span></button>
           <button type="button" data-type="sauce" onclick="setProductImageType('sauce')"><i class="fas fa-bottle-droplet"></i><strong>Saus of rub</strong><span>2 productfoto's</span></button>
           <button type="button" data-type="bundle" onclick="setProductImageType('bundle')"><i class="fas fa-box-open"></i><strong>Totaalpakket</strong><span>2 totaalbeelden</span></button>
         </div>
+        <fieldset class="product-image-variants" id="product-image-variants">
+          <legend>Welke varianten wil je maken?</legend>
+          <div class="product-image-variant-options">
+            ${PRODUCT_IMAGE_VARIANTS.map(v => `<label><input type="checkbox" value="${v.id}" ${productImageState.variantGroups.includes(v.id) ? 'checked' : ''} onchange="setProductImageVariant('${v.id}', this.checked)"><span><strong>${v.name} <small>${v.count} foto${v.count === 1 ? '' : '’s'}</small></strong><span>${v.detail}</span></span></label>`).join('')}
+          </div>
+          <p id="product-image-variant-summary" role="status" aria-live="polite">5 foto’s geselecteerd. Meer varianten betekent meer verwerkingstijd en API-kosten.</p>
+          <small>De keukenachtergrond wisselt per nieuwe fotoset: 4 Pan-, 5 Oven- en 4 Airfryer-stijlen. De apparaten bepalen de setting; controleer zelf of de bereidingswijze geschikt is voor het product.</small>
+        </fieldset>
         <div class="product-image-fields">
           <div class="form-group"><label for="product-image-name">Productnaam *</label><input id="product-image-name" type="text" maxlength="160" placeholder="Bijvoorbeeld Black Angus picanha" oninput="updateProductImageForm()"></div>
           <div class="form-group"><label for="product-image-quantity">Exact aantal *</label><input id="product-image-quantity" type="number" min="1" max="100" value="1" oninput="updateProductImageForm()"><small>Dit aantal wordt in iedere foto aangehouden.</small></div>
@@ -118,7 +135,7 @@ function renderConverter() {
           onclick="startProductImageGeneration()" disabled>
           <i class="fas fa-wand-magic-sparkles"></i> Maak productfoto
         </button>
-        <span class="product-image-action-hint" id="product-image-action-hint">De afbeeldingen worden op de achtergrond gemaakt. Je mag ondertussen verder werken.</span>
+        <span class="product-image-action-hint" id="product-image-action-hint">Alleen de gekozen varianten worden gemaakt, met eigen SEO per foto. Je mag ondertussen verder werken.</span>
       </div>
 
       <div class="product-image-status hidden" id="product-image-status" role="status" aria-live="polite"></div>
@@ -391,9 +408,19 @@ function setProductImageType(type) {
   productImageState.productType = type;
   document.querySelectorAll('.product-type-picker button').forEach(button => button.classList.toggle('active', button.dataset.type === type));
   document.getElementById('product-image-components-group')?.classList.toggle('hidden', type !== 'bundle');
-  const labels = { meat: 'Maak 4 productfoto\'s', fish: 'Maak 4 productfoto\'s', sauce: 'Maak 2 productfoto\'s', bundle: 'Maak 2 totaalbeelden' };
-  const button = document.getElementById('product-image-generate-btn');
-  if (button) button.innerHTML = `<i class="fas fa-wand-magic-sparkles"></i> ${labels[type]}`;
+  updateProductImageForm();
+}
+
+function selectedProductImageCount() {
+  if (!['meat', 'fish'].includes(productImageState.productType)) return 2;
+  return PRODUCT_IMAGE_VARIANTS.reduce((total, variant) => total + (productImageState.variantGroups.includes(variant.id) ? variant.count : 0), 0);
+}
+
+function setProductImageVariant(id, checked) {
+  if (productImageState.generating || !PRODUCT_IMAGE_VARIANTS.some(v => v.id === id)) return;
+  const selected = new Set(productImageState.variantGroups);
+  if (checked) selected.add(id); else selected.delete(id);
+  productImageState.variantGroups = PRODUCT_IMAGE_VARIANTS.filter(v => selected.has(v.id)).map(v => v.id);
   updateProductImageForm();
 }
 
@@ -401,8 +428,20 @@ function updateProductImageForm() {
   const button = document.getElementById('product-image-generate-btn');
   const name = document.getElementById('product-image-name')?.value.trim();
   const quantity = Number(document.getElementById('product-image-quantity')?.value);
+  const count = selectedProductImageCount();
+  const variants = document.getElementById('product-image-variants');
+  if (variants) {
+    variants.classList.toggle('hidden', !['meat', 'fish'].includes(productImageState.productType));
+    variants.disabled = productImageState.generating;
+  }
+  document.querySelectorAll('#product-image-variants input').forEach(input => { input.checked = productImageState.variantGroups.includes(input.value); });
+  const summary = document.getElementById('product-image-variant-summary');
+  if (summary) summary.textContent = count ? `${count} foto${count === 1 ? '' : '’s'} geselecteerd. Meer varianten betekent meer verwerkingstijd en API-kosten.` : 'Kies minimaal één variant om foto’s te maken.';
   if (button) button.disabled = productImageState.generating || Boolean(productImageState.pasting) || !productImageState.files.length || !name || quantity < 1
-    || !ImageModelPicker.selection('generator');
+    || !count || !ImageModelPicker.selection('generator');
+  if (button && !productImageState.generating) button.innerHTML = count
+    ? `<i class="fas fa-wand-magic-sparkles"></i> Maak ${count} ${productImageState.productType === 'bundle' ? 'totaalbeelden' : count === 1 ? 'productfoto' : 'productfoto\'s'}`
+    : 'Kies minimaal één variant';
 }
 
 async function openProductPromptModal() {
@@ -466,6 +505,10 @@ async function saveProductImagePrompt() {
 
 async function startProductImageGeneration() {
   if (!productImageState.files.length || productImageState.generating) return;
+  if (!selectedProductImageCount()) {
+    updateProductImageForm();
+    return;
+  }
 
   const productName = document.getElementById('product-image-name')?.value.trim() || '';
   const quantity = Number(document.getElementById('product-image-quantity')?.value || 0);
@@ -481,6 +524,7 @@ async function startProductImageGeneration() {
   }
 
   productImageState.generating = true;
+  updateProductImageForm();
   const button = document.getElementById('product-image-generate-btn');
   const status = document.getElementById('product-image-status');
   const results = document.getElementById('product-image-results');
@@ -498,6 +542,9 @@ async function startProductImageGeneration() {
   formData.append('product_type', productImageState.productType);
   formData.append('product_name', productName);
   formData.append('quantity', String(quantity));
+  if (['meat', 'fish'].includes(productImageState.productType)) {
+    productImageState.variantGroups.forEach(group => formData.append('variant_groups[]', group));
+  }
   formData.append('notes', document.getElementById('product-image-notes')?.value.trim() || '');
   formData.append('components', document.getElementById('product-image-components')?.value.trim() || '');
   const headers = {};
@@ -517,12 +564,14 @@ async function startProductImageGeneration() {
     const data = await response.json();
     if (!response.ok) {
       const validationError = data.errors ? Object.values(data.errors).flat()[0] : null;
-      toast(data.error || validationError || data.message || 'Productfoto maken is mislukt.', 'error');
+      const message = data.error || validationError || data.message || 'Productfoto maken is mislukt.';
+      showProductImageError(message);
+      toast(message, 'error');
       return;
     }
 
     if (!data.request_id || data.status !== 'queued') {
-      toast('De achtergrondtaak kon niet worden gestart.', 'error');
+      showProductImageError('De achtergrondtaak kon niet worden gestart.');
       return;
     }
 
@@ -532,10 +581,13 @@ async function startProductImageGeneration() {
     pollProductImageRequest(data.request_id);
   } catch (error) {
     toast('De achtergrondtaak kon niet worden gestart.', 'error');
-    productImageState.generating = false;
-    updateProductImageForm();
-    button.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Maak productfoto';
-    status.classList.add('hidden');
+    showProductImageError('De achtergrondtaak kon niet worden gestart. Je keuzes en referenties zijn bewaard.');
+  } finally {
+    if (!productImageState.requestId) {
+      productImageState.generating = false;
+      updateProductImageForm();
+      if (productImageState.results.length) results.classList.remove('hidden');
+    }
   }
 }
 
@@ -545,6 +597,7 @@ function showProductImagePendingState(data = null) {
   if (!button || !status) return;
 
   productImageState.generating = true;
+  updateProductImageForm();
   button.disabled = true;
   button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Productfoto\'s worden gemaakt...';
   renderProductImageProgress(data || {
@@ -631,9 +684,16 @@ async function pollProductImageRequest(requestId) {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Status ophalen is mislukt.');
     productImageState.pollFailures = 0;
+    if (!productImageState.context && data.context) {
+      productImageState.context = data.context;
+      productImageState.productType = data.context.product_type || productImageState.productType;
+      if (Array.isArray(data.context.variant_groups)) productImageState.variantGroups = [...data.context.variant_groups];
+      document.querySelectorAll('.product-type-picker button').forEach(button => button.classList.toggle('active', button.dataset.type === productImageState.productType));
+      updateProductImageForm();
+    }
 
     if (data.status === 'completed') {
-      const expected = ['meat', 'fish'].includes(data.context?.product_type ?? 'meat') ? 4 : 2;
+      const expected = Number(data.expected_count ?? data.context?.photo_count ?? (['meat', 'fish'].includes(data.context?.product_type ?? 'meat') ? 4 : 2));
       if (!Array.isArray(data.results) || data.results.length !== expected) {
         throw new Error(`De beeldservice leverde niet de verwachte ${expected} productfoto's op.`);
       }
@@ -642,7 +702,7 @@ async function pollProductImageRequest(requestId) {
       productImageState.completedRequestId = requestId;
       finishProductImageRequest();
       renderProductImageResults();
-      toast(`${expected} productfoto's zijn klaar!`, 'success');
+      toast(expected === 1 ? 'Je productfoto is klaar!' : `${expected} productfoto's zijn klaar!`, 'success');
       return;
     }
     if (data.status === 'failed') {
@@ -680,8 +740,6 @@ function finishProductImageRequest(hideStatus = true) {
   const status = document.getElementById('product-image-status');
   if (button) {
     updateProductImageForm();
-    const labels = { meat: 'Maak 4 productfoto\'s', fish: 'Maak 4 productfoto\'s', sauce: 'Maak 2 productfoto\'s', bundle: 'Maak 2 totaalbeelden' };
-    button.innerHTML = `<i class="fas fa-wand-magic-sparkles"></i> ${labels[productImageState.productType]}`;
   }
   if (hideStatus) status?.classList.add('hidden');
 }
@@ -697,7 +755,7 @@ function renderProductImageResults() {
         <h3>Kies je favoriete productfoto</h3>
         ${productImageState.context?.image_model ? `<p>Gemaakt met ${escHtml(productImageState.context.image_model)}</p>` : ''}
       </div>
-      <span class="product-image-count"><i class="fas fa-check-circle"></i> ${productImageState.results.length} afbeeldingen</span>
+      <span class="product-image-count"><i class="fas fa-check-circle"></i> ${productImageState.results.length} ${productImageState.results.length === 1 ? 'afbeelding' : 'afbeeldingen'}</span>
       <button class="btn btn-outline btn-sm" type="button" onclick="linkImagesToDossier()">Koppel aan productdossier</button>
     </div>
     <div class="product-image-grid">
@@ -733,10 +791,7 @@ function renderProductImageResults() {
 }
 
 function openProductImageMetadata(assetId) {
-  const result = productImageState.results.find(item => Number(item.asset_id) === assetId);
-  const metadata = result?.metadata; if (!metadata) return;
-  const fields = [['filename','Bestandsnaam'],['title','Titel'],['alt','Alt-tekst'],['caption','Bijschrift'],['description','Beschrijving']];
-  openModal('Afbeelding · WEBP en SEO', `<p>De download is verliesvrij WEBP. Het origineel blijft beschikbaar voor bewerkingen.</p>${fields.map(([key,label]) => `<div class="form-group"><label>${label}</label><p>${escHtml(metadata[key])}</p><button class="btn btn-outline btn-sm" onclick="copyProductImageMetadata(${assetId},'${key}')">Kopiëren</button></div>`).join('')}<p>${escHtml(metadata.review_note)}</p>`, `<button class="btn btn-primary" onclick="copyProductImageMetadata(${assetId},'all')">Alle gegevens kopiëren</button><button class="btn btn-outline" onclick="closeModal()">Sluiten</button>`);
+  return openImageSeoEditor(assetId);
 }
 
 async function linkImagesToDossier() {

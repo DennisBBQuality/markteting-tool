@@ -111,6 +111,9 @@ Route::middleware('auth.custom')->group(function () {
     Route::put('/api/images/prompt', [ProductImageController::class, 'updatePrompt']);
     Route::post('/api/images/generate', [ProductImageController::class, 'generate'])->middleware('throttle:3,1');
     Route::get('/api/images/requests/{imageRequest}', [ProductImageController::class, 'status']);
+    Route::get('/api/images/requests/{imageRequest}/assets/{asset}/seo', [ProductImageController::class, 'seo']);
+    Route::put('/api/images/requests/{imageRequest}/assets/{asset}/seo', [ProductImageController::class, 'saveSeo']);
+    Route::post('/api/images/requests/{imageRequest}/assets/{asset}/seo/generate', [ProductImageController::class, 'generateSeo'])->middleware('throttle:12,1');
     Route::post('/api/images/requests/{imageRequest}/assets/{asset}/refine', [ProductImageController::class, 'refine'])->middleware('throttle:6,1');
     Route::post('/api/images/requests/{imageRequest}/assets/{asset}/style-library', [ProductImageController::class, 'addToStyleLibrary'])->middleware('throttle:12,1');
     Route::get('/api/images/requests/{imageRequest}/assets/{asset}/revisions', [ProductImageController::class, 'revisions']);

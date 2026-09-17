@@ -28,7 +28,7 @@ class OpenAiProductImageGeneratorTest extends TestCase
         Http::fake(['*' => Http::response(['data' => [['b64_json' => $encoded]]])]);
         $generator = app(OpenAiProductImageGenerator::class);
         $context = ['product_type' => 'meat', 'product_name' => 'Test ribeye', 'quantity' => 1, 'image_model' => 'gpt-image-2.5-sunburst'];
-        $this->assertCount(4, $generator->generateForProduct([$photo], ImagePrompt::DEFAULT_PRODUCT_PHOTO_PROMPT, $context));
+        $this->assertCount(5, $generator->generateForProduct([$photo], ImagePrompt::DEFAULT_PRODUCT_PHOTO_PROMPT, $context));
         $cookedRequests = 0;
         foreach (Http::recorded() as [$request]) {
             $fields = collect($request->data())->keyBy('name');
@@ -36,7 +36,9 @@ class OpenAiProductImageGeneratorTest extends TestCase
             if (str_contains($prompt, 'BRONBEHOUD BIJ BEREIDING')) {
                 $cookedRequests++;
                 $this->assertStringContainsString('FOTOGRAFIE BEREID VLEES: zacht diffuus zijlicht', $prompt);
-                $this->assertStringContainsString('geen referentie voor korst, vleesvezels', $prompt);
+                if (! str_contains($prompt, 'lichte moderne woonkeuken')) {
+                    $this->assertStringContainsString('geen referentie voor korst, vleesvezels', $prompt);
+                }
                 $this->assertStringContainsString('niet magerder of vetter op basis van algemene aannames over de diersoort', $prompt);
                 $this->assertStringContainsString('Een vetnaad mag dus glanzen zonder dat de hele korst een olieachtige glans krijgt', $prompt);
                 $this->assertStringNotContainsString('LEGE VASTE BBQUALITY', $prompt);
@@ -45,9 +47,9 @@ class OpenAiProductImageGeneratorTest extends TestCase
                 $this->assertStringNotContainsString('FOTOGRAFIE BEREID VLEES', $prompt);
             }
         }
-        $this->assertSame(2, $cookedRequests);
+        $this->assertSame(3, $cookedRequests);
         $generator->refine($photo, 'Behoud het vlees en pas het licht aan.', $context);
-        Http::assertSentCount(5);
+        Http::assertSentCount(6);
         foreach (Http::recorded() as [$request]) {
             $fields = collect($request->data())->keyBy('name');
             $this->assertSame('gpt-image-2.5-sunburst', $fields['model']['contents']);
@@ -97,8 +99,8 @@ class OpenAiProductImageGeneratorTest extends TestCase
             'product_type' => 'meat', 'product_name' => 'Kalfssucade', 'quantity' => 1, 'image_model' => 'gpt-image-2.5-sunburst',
         ]);
 
-        $this->assertSame(['bbq_buiten_stoof', 'serveerbeeld_stoof', 'rauw_studio', 'rauw_licht'], array_column($results, 'style_id'));
-        Http::assertSentCount(4);
+        $this->assertSame(['bbq_buiten_stoof', 'serveerbeeld_stoof', 'rauw_studio', 'rauw_licht', 'keuken_licht_stoof'], array_column($results, 'style_id'));
+        Http::assertSentCount(5);
         foreach (Http::recorded() as $index => [$request]) {
             $data = collect($request->data());
             $fields = $data->keyBy('name');
@@ -109,7 +111,7 @@ class OpenAiProductImageGeneratorTest extends TestCase
             $this->assertSame('1024x1024', $fields['size']['contents']);
             $this->assertSame('png', $fields['output_format']['contents']);
 
-            if ($index < 2) {
+            if ($index < 2 || $index === 4) {
                 $this->assertStringContainsString('GEEN SNIJPLAKKEN', $prompt);
                 $this->assertStringContainsString('BRONBEHOUD BIJ STOVEN', $prompt);
                 $this->assertStringNotContainsString('zichtbare plankrand', $prompt);
@@ -146,7 +148,7 @@ class OpenAiProductImageGeneratorTest extends TestCase
         ]);
         $encoded = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAFAgI/69VZ5QAAAABJRU5ErkJggg==';
         $responses = [];
-        foreach (range(0, 3) as $index) {
+        foreach (range(0, 4) as $index) {
             $responses[(string) $index] = new ClientResponse(new PsrResponse(
                 200,
                 ['Content-Type' => 'application/json'],
@@ -166,7 +168,7 @@ class OpenAiProductImageGeneratorTest extends TestCase
             'quantity' => 1,
         ]);
 
-        $this->assertCount(4, $results);
+        $this->assertCount(5, $results);
     }
 
     public function test_it_requests_two_prepared_and_two_raw_variants(): void
@@ -251,8 +253,8 @@ class OpenAiProductImageGeneratorTest extends TestCase
             'quantity' => 1,
         ]);
 
-        $this->assertCount(4, $results);
-        Http::assertSentCount(4);
+        $this->assertCount(5, $results);
+        Http::assertSentCount(5);
         Http::assertSent(function (Request $request) {
             $fields = collect($request->data())->keyBy('name');
 
@@ -345,12 +347,12 @@ class OpenAiProductImageGeneratorTest extends TestCase
         ]);
 
         $this->assertSame(
-            ['bbq_buiten_brisket', 'serveerbeeld_brisket', 'rauw_studio', 'rauw_licht'],
+            ['bbq_buiten_brisket', 'serveerbeeld_brisket', 'rauw_studio', 'rauw_licht', 'keuken_licht_brisket'],
             array_column($results, 'style_id'),
         );
 
         $requests = Http::recorded()->map(fn (array $record) => $record[0]);
-        $this->assertCount(4, $requests);
+        $this->assertCount(5, $requests);
 
         foreach ($requests as $index => $request) {
             $files = collect($request->data())

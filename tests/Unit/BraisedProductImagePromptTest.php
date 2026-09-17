@@ -16,7 +16,7 @@ class BraisedProductImagePromptTest extends TestCase
         $context = ['product_type' => 'meat', 'product_name' => $name, 'quantity' => 2, 'product_reference_count' => 2];
         $plans = $builder->plans($context);
 
-        $this->assertSame(['bereid', 'bereid', 'rauw', 'rauw'], array_column($plans, 'status'));
+        $this->assertSame(['bereid', 'bereid', 'rauw', 'rauw', 'bereid'], array_column($plans, 'status'));
         $this->assertSame(['bbq_buiten_stoof', 'serveerbeeld_stoof'], array_column(array_slice($plans, 0, 2), 'style_id'));
         $this->assertSame(['buiten_bbq', 'serveermoment'], array_column(array_slice($plans, 0, 2), 'scene_family'));
         $this->assertStringContainsString('rustiek keramisch bord buiten', $plans[0]['style']);

@@ -16,12 +16,72 @@ class ProductImagePromptBuilder
 
     public function plans(array $context): array
     {
-        return match ($context['product_type'] ?? 'meat') {
+        $plans = match ($context['product_type'] ?? 'meat') {
             'fish' => (new FishProductImageProfile)->plans(array_slice($this->meatPlans([]), 0, 2)),
             'sauce' => $this->saucePlans($context),
             'bundle' => $this->bundlePlans($context),
             default => $this->meatPlans($context),
         };
+        if (isset($context['variant_groups']) && in_array($context['product_type'] ?? 'meat', ['meat', 'fish'], true)) {
+            $selected = [];
+            foreach (['raw', 'bbq', 'pan', 'oven', 'airfryer'] as $group) {
+                if (! in_array($group, $context['variant_groups'], true)) {
+                    continue;
+                }
+                if (in_array($group, ['raw', 'bbq'], true)) {
+                    array_push($selected, ...array_slice($plans, $group === 'raw' ? 2 : 0, 2));
+                } else {
+                    $selected[] = $this->kitchenPlan($context, $group, $plans[1]['instruction']);
+                }
+            }
+
+            return $selected;
+        }
+        if (in_array($context['product_type'] ?? 'meat', ['meat', 'fish'], true)) {
+            $fish = ($context['product_type'] ?? 'meat') === 'fish';
+            $family = $fish ? 'vis' : $this->meatFamily((string) ($context['product_name'] ?? ''));
+            $plans[] = [
+                'status' => 'bereid', 'label' => ($fish ? 'Vis' : 'Vlees').' bereid · Keuken',
+                'style_id' => 'keuken_licht_'.$family, 'scene_family' => 'woonkeuken_licht',
+                'style_reference_id' => null, 'preparation' => $family === 'stoof' ? 'stoof' : null,
+                'style' => 'Een lichte moderne woonkeuken in een echt woonhuis, geen restaurant of buitenkeuken. Zacht diffuus raamlicht, gebroken wit, zandkleur, lichte steen en eventueel licht eiken. Een rustig licht aanrecht of eettafel met een licht keramisch bord; moderne keukenkastjes onscherp op de achtergrond. Het gerecht is de hoofdrolspeler. Geen barbecue, kamado, smoker, zwarte achterwand, donkere rustieke plank of oranje kleurzweem. Bescheiden huiselijke styling, geen steriele showroom. Behoud detail in lichte delen en realistische, natuurlijke voedselkleuren.',
+                'instruction' => $fish ? $plans[1]['instruction'] : ($family === 'stoof'
+                    ? $this->braisedPlans()[0]['instruction']
+                    : 'Toon een geloofwaardige keukenbereiding van exact het aangeleverde product, passend bij de snit: uit pan of oven op een licht bord. Geen verplichte grillstrepen, smoke ring, BBQ-rub of rook. Behoud identiteit en hoeveelheid. Bij stoofproducten: zacht gestoofd in jus, geen steakplakken. Bij een steak mag een bescheiden snijvlak de passende garing tonen; geen extra porties. Gebruik hoogstens bescheiden bijgerechten als serveersuggestie, nooit als claim over de verkochte productinhoud.'),
+            ];
+        }
+
+        return $plans;
+    }
+
+    private function kitchenPlan(array $context, string $group, string $fishInstruction): array
+    {
+        $referenceId = (new ProductImageStyleLibrary)->kitchenId($group, $context['kitchen_references'][$group] ?? null);
+        $presentation = match ($referenceId) {
+            'keuken_pan_02', 'keuken_pan_03', 'keuken_pan_04' => 'Het hoofdproduct ligt IN een passende pan op de kookplaat, met lichte keukenachtergrond zoals het stijlvoorbeeld. Geen tweede portie ernaast.',
+            'keuken_oven_02', 'keuken_oven_03', 'keuken_oven_05' => 'Het hoofdproduct ligt op een bakplaat voor de open huishoudoven, eventueel op bakpapier zoals het stijlvoorbeeld. Geen extra voedsel in de oven.',
+            'keuken_airfryer_04' => 'Het hoofdproduct ligt in de geopende airfryermand zoals het stijlvoorbeeld, uitsluitend als formaat en productbereiding dat geloofwaardig toelaten. Geen tweede portie ernaast. Stoofvlees met jus wordt in een passende schaal ernaast gepresenteerd, niet los in een geperforeerde mand.',
+            default => 'Het gerecht staat op de voorgrond op een bord of houten serveerplank, eventueel met bakpapier, zoals het stijlvoorbeeld.',
+        };
+        $fish = ($context['product_type'] ?? 'meat') === 'fish';
+        $family = $fish ? 'vis' : $this->meatFamily((string) ($context['product_name'] ?? ''));
+        $appliance = match ($group) {
+            'pan' => 'Een herkenbare koekenpan of passende stoofpan op een huishoudelijk fornuis of inductiekookplaat is zichtbaar. Geen oven of airfryer als hoofdapparaat.',
+            'oven' => 'Een herkenbare huishoudelijke keukenoven met geopende deur, ovenroosters en zacht warm ovenlicht is zichtbaar achter het gerecht. Geen pizzaoven, buitenoven of barbecue.',
+            'airfryer' => 'Een herkenbare moderne huishoudelijke airfryer met zichtbare lade of mand is zichtbaar. Geen extra hoofdproduct op de achtergrond. Geen oven of barbecue als vervanging.',
+        };
+        $preparation = $fish ? $fishInstruction : ($family === 'stoof'
+            ? $this->braisedPlans()[0]['instruction']
+            : 'Toon het aangeleverde vlees geloofwaardig bereid, met behoud van productidentiteit, snit en hoeveelheid. Geen verplichte grillstrepen, rookring of BBQ-rub. Geen verplichte snijplakken. Gebruik een bereiding en presentatie passend bij het product; maak van brisket of ribs geen roze steak.');
+
+        return [
+            'status' => 'bereid', 'label' => ($fish ? 'Vis' : 'Vlees').' bereid · '.ucfirst($group),
+            'style_id' => 'keuken_'.$group.'_'.$family, 'scene_family' => 'woonkeuken_licht',
+            'style_reference_id' => $referenceId, 'kitchen_variant' => $group,
+            'preparation' => $family === 'stoof' ? 'stoof' : null,
+            'style' => 'Een lichte moderne woonkeuken in een echt woonhuis, met zacht diffuus raamlicht, rustige gebroken witte en zandkleurige tinten, licht steen en natuurlijk hout. '.$presentation.' Het volledige hoofdproduct blijft in beeld. '.$appliance.' De omgeving is herkenbaar maar iets onscherp. Geen donkere BBQ-setting, kamado, smoker, studioachterwand of overdreven oranje kleurzweem. Natuurlijke voedselkleuren en subtiele glans, geen HDR of korreligheid. Neem geen apparaatmerken, logo’s, displayteksten, screenshotranden of interface-elementen uit het voorbeeld over.',
+            'instruction' => $preparation.' Het gekozen apparaat bepaalt de setting en is geen garantie of receptadvies dat ieder product uitsluitend daarin bereid kan worden. Behoud bij stoofvlees de zachte gestoofde structuur en jus, ook bij de airfryersetting; maak er geen krokante steak van. Past het hele product niet geloofwaardig in het apparaat, presenteer het ernaast, zonder het kleiner te maken of extra te portioneren. Toon het opgegeven hoofdproduct één keer: in de pan, op de bakplaat of in de mand OF ernaast, nooit dubbel. Hoogstens bescheiden garnering als serveersuggestie.',
+        ];
     }
 
     public function prompt(string $basePrompt, array $context, array $plan): string
@@ -52,9 +112,9 @@ class ProductImagePromptBuilder
             $this->referenceInstruction($context, $plan),
             $plan['instruction'],
             'BEELDSTIJL: '.$plan['style'],
-            $braised ? self::BRAISED_PHOTOGRAPHY : ($cooked
+            ($plan['scene_family'] ?? '') === 'woonkeuken_licht' ? str_replace('plankrand', isset($plan['kitchen_variant']) ? 'rand van bord, plank, bakplaat of pan' : 'bordrand', $braised ? self::BRAISED_PHOTOGRAPHY : self::COOKED_PHOTOGRAPHY) : ($braised ? self::BRAISED_PHOTOGRAPHY : ($cooked
                 ? self::COOKED_PHOTOGRAPHY
-                : 'FOTOGRAFISCHE KWALITEIT: echte voedselstructuur, natuurlijke kleur, realistische vezels, vet en vocht. Vermijd plastic, wasachtig, overdreven glad of uniform vlees, uitgebeten hooglichten, kunstmatige glans, gitzwarte korst en generieke stockfoto-uitstraling.'),
+                : 'FOTOGRAFISCHE KWALITEIT: echte voedselstructuur, natuurlijke kleur, realistische vezels, vet en vocht. Vermijd plastic, wasachtig, overdreven glad of uniform vlees, uitgebeten hooglichten, kunstmatige glans, gitzwarte korst en generieke stockfoto-uitstraling.')),
             $cooked
                 ? 'Lever precies één vierkante, fotorealistische afbeelding zonder watermerk, toegevoegde reclametekst of fantasielogo. Voeg geen hoofdproducten toe buiten het opgegeven aantal.'
                 : 'Lever precies één vierkante, fotorealistische afbeelding zonder watermerk, toegevoegde reclametekst of fantasielogo. Voeg nooit een tweede hoofdproduct toe.',
@@ -180,6 +240,10 @@ class ProductImagePromptBuilder
             ? (bool) $plan['bundled_reference_added']
             : ($plan['style_reference_id'] ?? null) !== null;
 
+        if (isset($plan['kitchen_variant'])) {
+            return self::kitchenReferenceInstruction($count, $approvedAdded, $bundledAdded);
+        }
+
         if ($plan['status'] === 'bereid') {
             return $this->cookedReferenceInstruction($count, $approvedAdded, $bundledAdded, ($plan['preparation'] ?? null) === 'stoof');
         }
@@ -203,6 +267,19 @@ class ProductImagePromptBuilder
         }
 
         return "REFERENTIEROLLEN: afbeelding 1 t/m {$count} zijn uitsluitend productreferenties en zijn leidend voor het hoofdproduct. De allerlaatste afbeelding is uitsluitend een goedgekeurd BBQuality-STIJLVOORBEELD. Neem daarvan alleen fotografie, sfeer, licht, camerastandpunt, kadrering en type omgeving over. Kopieer nooit het vlees, gerecht, aantal, merk, tekst, verpakking of accessoires uit het stijlvoorbeeld. Bij conflict winnen de productreferenties altijd.";
+    }
+
+    public static function kitchenReferenceInstruction(int $count, bool $approved, bool $bundled): string
+    {
+        $text = "REFERENTIEROLLEN KEUKEN: afbeelding 1 t/m {$count} zijn uitsluitend productreferenties en bepalen identiteit, vorm en aantal van het hoofdproduct. ";
+        if ($approved) {
+            $text .= 'De volgende afbeelding is een goedgekeurde foto van exact dit product en deze keukenvariant; gebruik die als kwaliteitsanker zonder afwijkende productvorm of hoeveelheid over te nemen. Neem de achtergrond daarvan niet over: het laatste keukenstijlvoorbeeld bepaalt de gekozen omgeving. ';
+        }
+        if ($bundled) {
+            $text .= 'De allerlaatste afbeelding is uitsluitend een KEUKENSTIJLVOORBEELD voor apparaat, licht, kleur, achtergrond en compositie. Neem nooit het voorbeeldgerecht, de diersoort, snit, aantallen, garing, korst, saus of voedselstructuur over. Kopieer geen extra voedsel uit de pan, oven of airfryer. ';
+        }
+
+        return $text.'De actuele productreferenties en productspecifieke bereidingsregels gaan altijd voor op het voorbeeldgerecht.';
     }
 
     private function cookedReferenceInstruction(int $count, bool $approvedAdded, bool $bundledAdded, bool $braised = false): string
@@ -282,7 +359,7 @@ class ProductImagePromptBuilder
             'ribs' => ['sparerib', 'spare rib', 'ribs', 'ribfinger', 'rib finger'],
             'steak' => ['steak', 'biefstuk', 'picanha', 'ribeye', 'entrecote', 'tomahawk', 't-bone', 'côte de boeuf'],
             // An explicitly named steak keeps its existing plan; ordinary sucade defaults to stewing.
-            'stoof' => ['sucade', 'sukade', 'stoofvlees', 'suddervlees', 'stooflappen', 'sudderlappen'],
+            'stoof' => ['sucade', 'sukade', 'stoofvlees', 'suddervlees', 'stooflappen', 'sudderlappen', 'varkenswangen', 'varkens wangen', 'runderwangen', 'runder wangen'],
         ] as $family => $terms) {
             foreach ($terms as $term) {
                 if (str_contains($name, $term)) {
