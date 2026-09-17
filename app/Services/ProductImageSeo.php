@@ -16,6 +16,11 @@ class ProductImageSeo
 {
     public const FIELDS = ['filename', 'alt', 'title', 'caption', 'description'];
 
+    public static function normalizeForImage(array $fields, array $context, array $result): array
+    {
+        return self::normalize(ProductImagePreparationSeo::complete(self::normalize($fields), $context, $result));
+    }
+
     public static function normalize(array $fields): array
     {
         $clean = [];
@@ -110,11 +115,13 @@ class ProductImageSeo
         $fields = self::normalize($fields);
         DB::transaction(function () use ($asset, $fields, $revision) {
             // Serialize filenames per photoset, and edits against image refinement.
-            ProductImageRequest::whereKey($asset->product_image_request_id)->lockForUpdate()->firstOrFail();
+            $request = ProductImageRequest::whereKey($asset->product_image_request_id)->lockForUpdate()->firstOrFail();
             $current = ProductImageAsset::whereKey($asset->id)->lockForUpdate()->firstOrFail();
             abort_if($current->version !== $asset->version || $current->refinement_status !== 'idle', 409, 'De foto is gewijzigd. Open de actuele versie.');
             $row = ProductImageMetadata::firstOrCreate(['product_image_asset_id' => $asset->id, 'image_version' => $asset->version]);
             abort_if($row->revision !== $revision, 409, 'De SEO is intussen gewijzigd. Open de actuele velden voordat je opnieuw opslaat.');
+            $result = collect($request->results)->firstWhere('filename', $asset->filename) ?? [];
+            $fields = self::normalizeForImage($fields, (array) $request->generation_context, $result);
             $row->update(['fields' => $this->uniqueFilename($asset, $fields), 'source' => 'manual', 'status' => 'completed',
                 'revision' => $row->revision + 1, 'job_token' => null, 'error' => null]);
         });
