@@ -58,12 +58,14 @@ class FishProductImageProfile
             'PRODUCTVORM EN LIGGING: de eerste productreferentie bepaalt het exemplaar. Behoud de oorspronkelijke lengte-breedte-dikteverhouding, contour, taps toelopende delen en herkenbare onregelmatigheden. Leg het product natuurlijk en stabiel plat op de breedste rustzijde, met de lange as overwegend horizontaal door het beeld. Nooit rechtop zetten, op de smalle kop laten balanceren, tegen iets leunen of als een dik verticaal blok presenteren. Een andere camerahoek mag de fysieke ligging niet veranderen. Aanvullende aanzichten verduidelijken hetzelfde product; maak geen geïdealiseerde tussenvorm.',
             "REFERENTIEROLLEN: afbeelding 1 t/m {$count} zijn de echte productreferenties en de enige bron voor productidentiteit, vorm, huid of schaal en hoeveelheid. Ze bepalen niet de nieuwe achtergrond. De hoofdfoto blijft leidend; bij bereiding zijn uitsluitend natuurlijke veranderingen door garing toegestaan.",
         ];
-        if ($plan['approved_reference_added'] ?? false) {
+        if (isset($plan['kitchen_variant'])) {
+            $parts[] = ProductImagePromptBuilder::kitchenReferenceInstruction($count, (bool) ($plan['approved_reference_added'] ?? false), (bool) ($plan['bundled_reference_added'] ?? true));
+        } elseif ($plan['approved_reference_added'] ?? false) {
             $index = $count + 1;
             $parts[] = "Afbeelding {$index} is een goedgekeurde eerdere foto van exact dit visproduct en deze variantstijl. Gebruik die als kwaliteitsanker, nooit voor een afwijkende vorm, extra producten of overdreven glans. De actuele productreferenties en de expliciete liggingsregels blijven leidend.";
         }
         $bundled = $plan['bundled_reference_added'] ?? (($plan['style_reference_id'] ?? null) !== null);
-        if ($bundled) {
+        if ($bundled && ! isset($plan['kitchen_variant'])) {
             $parts[] = $cooked
                 ? 'De allerlaatste afbeelding is uitsluitend het bestaande BBQuality-sfeervoorbeeld voor de omgeving, camerahoek en compositie van bereid vlees. Neem die achtergrondstijl over, maar nooit het vlees, de bark, vetnaden, vleesvezels, gaarheid, kruidenlaag of het aantal. Gebruik de visregels voor materiaal en zacht licht.'
                 : 'De allerlaatste afbeelding is uitsluitend het BBQuality-voorbeeld voor de ZWARTE ACHTERGROND EN ZWARTE ONDERGROND, met subtiele structuur en reflectie. Het bevat een voorbeeldvis: kopieer die vis nooit, ook niet de zalmkleur, vorm, dikte, snit, soort of hoeveelheid. Het voorbeeld is geen extra productreferentie. Eventuele lichte marges rond referentiebeelden horen niet bij de achtergrond.';

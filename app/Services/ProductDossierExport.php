@@ -72,7 +72,7 @@ class ProductDossierExport
                         $asset = ProductImageAsset::where('product_image_request_id', $images->id)->where('filename', $result['filename'])->first();
 
                         return [
-                            ...app(ProductImageDelivery::class)->metadata((array) $images->generation_context, $result, $asset?->version ?? 1),
+                            ...app(ProductImageDelivery::class)->metadata((array) $images->generation_context, $result, $asset?->version ?? 1, $asset),
                             'local_download_url' => '/api/images/requests/'.$images->id.'/generated/'.rawurlencode(pathinfo($result['filename'], PATHINFO_FILENAME)).'?download=1&format=webp',
                             'requires_visual_review' => true,
                         ];

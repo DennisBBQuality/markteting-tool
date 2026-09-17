@@ -6,6 +6,7 @@ use App\Models\ProductImageAsset;
 use App\Models\ProductImageRequest;
 use App\Services\ProductImageGenerationException;
 use App\Services\ProductImageRefiner;
+use App\Services\ProductImageSeo;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Http\UploadedFile;
@@ -56,6 +57,7 @@ class RefineProductImage implements ShouldQueue
         }
 
         DB::transaction(function () use ($asset, $contents): void {
+            $asset = ProductImageAsset::whereKey($asset->id)->lockForUpdate()->firstOrFail();
             $asset->revisions()->firstOrCreate(['version' => $asset->version], [
                 'instruction' => $asset->last_instruction,
                 'mime_type' => $asset->mime_type,
@@ -69,6 +71,7 @@ class RefineProductImage implements ShouldQueue
                 'refinement_error' => null,
             ]);
         });
+        app(ProductImageSeo::class)->queueAutomatically($asset->fresh());
     }
 
     public function failed(?Throwable $exception): void

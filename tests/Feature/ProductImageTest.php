@@ -128,7 +128,7 @@ class ProductImageTest extends TestCase
         );
     }
 
-    public function test_background_job_returns_exactly_two_prepared_and_two_raw_private_images(): void
+    public function test_background_job_returns_exactly_three_prepared_and_two_raw_private_images(): void
     {
         Storage::fake('local');
         Queue::fake();
@@ -147,7 +147,7 @@ class ProductImageTest extends TestCase
             ->assertJsonPath('status', 'completed')
             ->assertJsonPath('progress', 100)
             ->assertJsonPath('progress_step', 'completed')
-            ->assertJsonCount(4, 'results')
+            ->assertJsonCount(5, 'results')
             ->assertJsonPath('results.0.label', 'Vlees bereid')
             ->assertJsonPath('results.1.label', 'Vlees bereid')
             ->assertJsonPath('results.2.label', 'Vlees rauw')

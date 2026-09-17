@@ -6,6 +6,8 @@ use App\Models\ProductImageAsset;
 use App\Models\ProductImageRequest;
 use App\Services\ProductImageGenerationException;
 use App\Services\ProductImageGenerator;
+use App\Services\ProductImagePromptBuilder;
+use App\Services\ProductImageSeo;
 use App\Services\ProductImageWorkflowGenerator;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -22,7 +24,7 @@ class GenerateProductImages implements ShouldQueue
 
     public int $tries = 1;
 
-    public int $timeout = 600;
+    public int $timeout = 1200;
 
     public bool $failOnTimeout = true;
 
@@ -80,6 +82,9 @@ class GenerateProductImages implements ShouldQueue
             'completed_at' => now(),
         ]);
         $this->deleteSources($request);
+        foreach (ProductImageAsset::where('product_image_request_id', $request->id)->get() as $asset) {
+            app(ProductImageSeo::class)->queueAutomatically($asset);
+        }
     }
 
     public function failed(?Throwable $exception): void
@@ -103,7 +108,10 @@ class GenerateProductImages implements ShouldQueue
     /** @param mixed $images */
     private function storeValidatedResults(ProductImageRequest $request, $images): array
     {
-        $expected = in_array($request->generation_context['product_type'] ?? 'meat', ['meat', 'fish'], true) ? 4 : 2;
+        $expectedStatuses = is_array($request->generation_context)
+            ? array_column(app(ProductImagePromptBuilder::class)->plans($request->generation_context), 'status')
+            : ['bereid', 'bereid', 'rauw', 'rauw'];
+        $expected = count($expectedStatuses);
         if (! is_array($images) || count($images) !== $expected) {
             throw new RuntimeException("De beeldservice leverde niet exact {$expected} afbeeldingen op.");
         }
@@ -136,8 +144,11 @@ class GenerateProductImages implements ShouldQueue
             ];
         }
 
-        if ($expected === 4 && (($counts['bereid'] ?? 0) !== 2 || ($counts['rauw'] ?? 0) !== 2)) {
-            throw new RuntimeException('De beeldservice leverde niet twee bereide en twee rauwe afbeeldingen op.');
+        $expectedCounts = array_count_values($expectedStatuses);
+        ksort($counts);
+        ksort($expectedCounts);
+        if ($counts !== $expectedCounts) {
+            throw new RuntimeException('De beeldservice leverde niet het juiste aantal bereide en rauwe afbeeldingen op.');
         }
 
         DB::transaction(function () use ($request, $assets): void {

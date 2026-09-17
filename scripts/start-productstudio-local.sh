@@ -28,7 +28,7 @@ if ! launchctl list nl.bbquality.productstudio-images >/dev/null 2>&1; then
   launchctl submit -l nl.bbquality.productstudio-images -p /bin/bash \
     -o "$studio_project_dir/storage/logs/productstudio-images.out.log" \
     -e "$studio_project_dir/storage/logs/productstudio-images.error.log" \
-    -- /bin/bash -c 'cd "$1" && exec "$2" artisan queue:work database --queue=images --sleep=2 --timeout=600 --tries=1 --max-time=3600' studio-images "$studio_project_dir" "$studio_php"
+    -- /bin/bash -c 'cd "$1" && exec "$2" artisan queue:work database --queue=images --sleep=2 --timeout=1200 --tries=1 --max-time=3600' studio-images "$studio_project_dir" "$studio_php"
 fi
 "$studio_php" artisan queue:restart
 printf '%s\n' 'Productstudio: http://127.0.0.1:8000/ (lokale server, tekstworker en beeldworker)'

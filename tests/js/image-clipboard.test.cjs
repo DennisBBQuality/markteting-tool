@@ -9,7 +9,7 @@ function harness() {
   const field = id => {
     if (!fields.has(id)) fields.set(id, {
       value: '', innerHTML: '', textContent: '', disabled: false, isConnected: true,
-      classList: { add() {}, toggle() {} }, focus() { this.focused = true; },
+      classList: { add() {}, remove() {}, toggle() {} }, focus() { this.focused = true; },
     });
     return fields.get(id);
   };
@@ -162,22 +162,22 @@ test('removing a pasted photo releases its preview and upload duplicate handling
   assert.equal(h.field('product-image-generate-btn').disabled, true);
 });
 
-test('fish selection keeps references and name, shows four photos and remains selected after completion', () => {
+test('fish selection keeps references and name, shows five photos and remains selected after completion', () => {
   const h = harness(); h.context.uploads = [file()];
   h.run("handleProductImageFiles(uploads); setProductImageType('fish')");
   assert.equal(h.run('productImageState.productType'), 'fish');
   assert.equal(h.run('productImageState.files.length'), 1);
   assert.equal(h.field('product-image-name').value, 'Testproduct');
-  assert.match(h.field('product-image-generate-btn').innerHTML, /Maak 4 productfoto/);
+  assert.match(h.field('product-image-generate-btn').innerHTML, /Maak 5 productfoto/);
   assert.equal(h.field('product-image-generate-btn').disabled, false);
   h.run('finishProductImageRequest()');
-  assert.match(h.field('product-image-generate-btn').innerHTML, /Maak 4 productfoto/);
+  assert.match(h.field('product-image-generate-btn').innerHTML, /Maak 5 productfoto/);
 });
 
-test('polling accepts four fish results, not two; existing sauce and bundle counts remain two', async () => {
-  for (const [type, count, valid] of [['fish', 4, true], ['fish', 2, false], ['meat', 4, true], ['sauce', 2, true], ['bundle', 2, true]]) {
+test('polling accepts legacy four and new five-photo sets; sauce and bundle remain two', async () => {
+  for (const [type, count, valid, expected] of [['fish', 1, true, 1], ['meat', 7, true, 7], ['fish', 4, true], ['fish', 5, true, 5], ['fish', 4, false, 5], ['fish', 2, false], ['meat', 5, true, 5], ['meat', 4, true], ['sauce', 2, true], ['bundle', 2, true]]) {
     const h = harness();
-    h.context.fetch = async () => ({ ok: true, status: 200, json: async () => ({ status: 'completed', context: { product_type: type }, results: Array.from({ length: count }, () => ({})) }) });
+    h.context.fetch = async () => ({ ok: true, status: 200, json: async () => ({ status: 'completed', expected_count: expected, context: { product_type: type }, results: Array.from({ length: count }, () => ({})) }) });
     h.context.renderProductImageResults = () => {};
     h.context.showProductImageError = error => { h.context.error = error; };
     h.run('productImageState.requestId = "test"; productImageState.pollFailures = 3');
@@ -187,4 +187,43 @@ test('polling accepts four fish results, not two; existing sauce and bundle coun
     assert.equal(h.run('productImageState.results.length'), valid ? count : 0);
     assert.equal(Boolean(h.context.retry), !valid);
   }
+});
+
+test('variant selection counts 0 to 7, survives type changes and cannot change during generation', () => {
+  const h = harness(); h.context.uploads = [file()]; h.run('handleProductImageFiles(uploads)');
+  assert.equal(h.run('selectedProductImageCount()'), 5);
+  h.run("setProductImageVariant('oven', true); setProductImageVariant('airfryer', true)");
+  assert.equal(h.run('selectedProductImageCount()'), 7);
+  h.run("setProductImageVariant('oven', true); setProductImageVariant('bogus', true)");
+  assert.equal(h.run('selectedProductImageCount()'), 7);
+  h.run("setProductImageType('sauce')"); assert.equal(h.run('selectedProductImageCount()'), 2);
+  h.run("setProductImageType('fish')"); assert.equal(h.run('selectedProductImageCount()'), 7);
+  h.run("productImageState.generating = true; updateProductImageForm(); setProductImageVariant('pan', false)");
+  assert.equal(h.field('product-image-variants').disabled, true);
+  assert.equal(h.run('selectedProductImageCount()'), 7);
+  h.run("productImageState.generating = false; PRODUCT_IMAGE_VARIANTS.forEach(v => setProductImageVariant(v.id, false))");
+  assert.equal(h.run('selectedProductImageCount()'), 0);
+  assert.equal(h.field('product-image-generate-btn').disabled, true);
+  assert.match(h.field('product-image-variant-summary').textContent, /minimaal één/);
+  h.run("setProductImageVariant('oven', true)");
+  assert.match(h.field('product-image-generate-btn').innerHTML, /Maak 1 productfoto$/);
+  assert.equal(h.field('product-image-generate-btn').disabled, false);
+});
+
+test('request submits only selected groups; a failed start unlocks controls and preserves choices', async () => {
+  const h = harness(); h.context.uploads = [file()]; h.context.FormData = FormData;
+  h.context.getCookie = () => 'test-token';
+  h.run("handleProductImageFiles(uploads); productImageState.variantGroups = ['oven', 'airfryer']; updateProductImageForm()");
+  let submitted;
+  h.context.fetch = async (url, options) => { submitted = options.body; return { ok: false, status: 422, json: async () => ({ message: 'Voorbeeldfout' }) }; };
+  await h.run('startProductImageGeneration()');
+  assert.deepEqual(submitted.getAll('variant_groups[]'), ['oven', 'airfryer']);
+  assert.equal(h.run('productImageState.generating'), false);
+  assert.equal(h.field('product-image-variants').disabled, false);
+  assert.equal(h.run('selectedProductImageCount()'), 2);
+  assert.match(h.field('product-image-status').innerHTML, /Voorbeeldfout/);
+  assert.equal(h.run('productImageState.files.length'), 1);
+  h.run("setProductImageType('sauce')");
+  await h.run('startProductImageGeneration()');
+  assert.deepEqual(submitted.getAll('variant_groups[]'), []);
 });

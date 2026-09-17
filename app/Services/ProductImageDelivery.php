@@ -2,12 +2,13 @@
 
 namespace App\Services;
 
+use App\Models\ProductImageAsset;
 use Illuminate\Support\Str;
 use RuntimeException;
 
 class ProductImageDelivery
 {
-    public function metadata(array $context, array $result, int $version): array
+    public function metadata(array $context, array $result, int $version, ?ProductImageAsset $asset = null): array
     {
         $name = trim((string) ($context['product_name'] ?? 'Product')) ?: 'Product';
         $state = match ($result['status'] ?? '') {
@@ -15,7 +16,7 @@ class ProductImageDelivery
         };
         $variant = max(1, (int) ($result['variant'] ?? 1));
 
-        return [
+        $fallback = [
             'filename' => Str::limit(Str::slug($name), 120, '').'-'.$state.'-variant-'.$variant.'-v'.$version.'.webp',
             'title' => $name.' – '.$state,
             'alt' => $name.($state === 'productfoto' ? '' : ', '.$state),
@@ -23,6 +24,13 @@ class ProductImageDelivery
             'description' => 'Productfoto van '.$name.($state === 'productfoto' ? '' : ' ('.$state.')').'.',
             'mime_type' => 'image/webp',
             'review_note' => 'Controleer de zichtbare inhoud. Zet alt-tekst en bijschrift in de mediavelden van de website; alleen bestandsmetadata is niet voldoende.',
+        ];
+        $stored = $asset ? app(ProductImageSeo::class)->record($asset) : null;
+
+        return [...$fallback, ...($stored?->fields ?? []),
+            'review_note' => $stored?->fields
+                ? 'Controleer de zichtbare inhoud vóór publicatie. Bijgerechten zijn serveersuggesties. Vul deze teksten ook in de mediavelden van de website in.'
+                : 'Nog geen beeldspecifieke SEO. Dit zijn basisvelden; maak SEO of vul de velden handmatig in.',
         ];
     }
 
