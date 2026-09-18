@@ -18,7 +18,7 @@ function harness() {
   const context = vm.createContext({
     document: { getElementById: field, querySelectorAll: () => [] }, navigator: { clipboard: { read: async () => [] } },
     sessionStorage: { removeItem() {} },
-    File, Date, URL: { createObjectURL: () => `blob:${++urls}`, revokeObjectURL() {} },
+    File, Date, URLSearchParams, URL: { createObjectURL: () => `blob:${++urls}`, revokeObjectURL() {} },
     toast: text => messages.push(text), escHtml: String, formatFileSize: String,
     ImageModelPicker: { selection: () => ({ image_model: 'test-model' }) },
   });
@@ -30,6 +30,17 @@ function harness() {
 const file = (name = 'test.png', type = 'image/png', size = 8) => new File([new Uint8Array(size)], name, { type });
 const item = (type = 'image/png', size = 8) => ({ types: [type], getType: async () => new Blob([new Uint8Array(size)], { type }) });
 const pasteEvent = (files, editable = false) => ({ clipboardData: { files }, target: { closest: () => editable }, preventDefault() { this.prevented = true; } });
+
+test('recovery links only accept a photoset UUID and do not start generation', () => {
+  const h = harness();
+  const id = '11111111-2222-7333-8444-555555555555';
+  assert.equal(h.run(`productImageRecoveryId('?image_request=${id}')`), id);
+  for (const value of ['', '?image_request=../private', '?image_request=https://example.test', '?image_request=bad']) {
+    h.context.search = value;
+    assert.equal(h.run('productImageRecoveryId(search)'), null);
+  }
+  assert.equal(h.run('productImageState.generating'), false);
+});
 
 test('WEBP requires a descriptive SEO name and still enforces sauce label review', () => {
   const h = harness();

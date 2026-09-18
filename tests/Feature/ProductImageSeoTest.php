@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Console\Commands\UpgradeImageSeoStorage;
 use App\Jobs\GenerateProductImages;
 use App\Jobs\GenerateProductImageSeo;
 use App\Jobs\RefineProductImage;
@@ -15,6 +16,7 @@ use App\Services\ProductImageSeoAnalyzer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
@@ -105,6 +107,23 @@ class ProductImageSeoTest extends TestCase
         $this->assertStringContainsString('verbinding', $response->json('seo.error'));
         $this->assertStringNotContainsString('private-provider-details', $response->getContent());
         $this->assertNotEmpty($asset->fresh()->contents_base64);
+    }
+
+    public function test_existing_failed_photo_can_recover_storage_and_finish_seo_without_regenerating_pixels(): void
+    {
+        [$request, $asset, $url] = $this->photos();
+        $pixels = $asset->contents_base64;
+        Schema::drop('product_image_download_names');
+        DB::table('migrations')->where('migration', UpgradeImageSeoStorage::MIGRATION)->delete();
+        $this->getJson($url)->assertJsonPath('seo.storage_ready', false);
+        $this->assertFalse(Schema::hasTable('product_image_download_names'), 'Reading SEO must never migrate.');
+        $analyzer = $this->mock(ProductImageSeoAnalyzer::class);
+        $analyzer->shouldReceive('analyze')->once()->andReturn($this->fields());
+        $this->runSeo($asset, $analyzer);
+        $this->getJson($url)->assertJsonPath('seo.storage_ready', true)->assertJsonPath('seo.ready', true);
+        $this->assertSame($pixels, $asset->fresh()->contents_base64);
+        $this->assertSame($request->results, $request->fresh()->results);
+        Http::assertNothingSent();
     }
 
     public function test_names_are_unique_across_photosets_and_users_and_ai_uses_a_visible_alternative(): void
