@@ -7,6 +7,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -20,6 +21,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => RequireAdmin::class,
             'manager_or_admin' => RequireManagerOrAdmin::class,
         ]);
+
+        // Resolve and validate our session user before per-user rate limiting.
+        $middleware->prependToPriorityList(ThrottleRequests::class, RequireAuth::class);
 
         $middleware->validateCsrfTokens(except: [
             // 'api/*',

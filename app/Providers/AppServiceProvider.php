@@ -7,6 +7,9 @@ use App\Services\FakeProductImageGenerator;
 use App\Services\OpenAiProductImageGenerator;
 use App\Services\ProductImageGenerator;
 use App\Services\ProductImageRefiner;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
 
@@ -36,6 +39,30 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Numeric throttle middleware otherwise shares one IP bucket across all
+        // routes: our custom auth does not populate Laravel's default guard.
+        foreach ([
+            'image-models' => 30,
+            'image-model-refresh' => 3,
+            'image-generation' => 3,
+            'image-seo-generation' => 12,
+            'image-refinement' => 6,
+            'image-style-library' => 12,
+        ] as $name => $attempts) {
+            RateLimiter::for($name, function (Request $request) use ($attempts) {
+                $user = $request->attributes->get('authenticatedUser');
+
+                return Limit::perMinute($attempts)
+                    ->by($user ? 'user:'.$user->id : 'ip:'.$request->ip())
+                    ->response(function (Request $request, array $headers) {
+                        $seconds = max(1, (int) ($headers['Retry-After'] ?? 60));
+
+                        return response()->json([
+                            'error' => "Deze fotofunctie is te vaak kort achter elkaar gebruikt. Probeer het over {$seconds} seconden opnieuw. Je invoer en bestaande foto's blijven bewaard.",
+                            'retry_after' => $seconds,
+                        ], 429, $headers);
+                    });
+            });
+        }
     }
 }

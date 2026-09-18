@@ -106,16 +106,16 @@ Route::middleware('auth.custom')->group(function () {
 
     // Product images
     Route::get('/api/images/prompt', [ProductImageController::class, 'prompt']);
-    Route::get('/api/images/models', [ProductImageController::class, 'models'])->middleware('throttle:30,1');
-    Route::post('/api/images/models/refresh', [ProductImageController::class, 'refreshModels'])->middleware('throttle:3,1');
+    Route::get('/api/images/models', [ProductImageController::class, 'models'])->middleware('throttle:image-models');
+    Route::post('/api/images/models/refresh', [ProductImageController::class, 'refreshModels'])->middleware('throttle:image-model-refresh');
     Route::put('/api/images/prompt', [ProductImageController::class, 'updatePrompt']);
-    Route::post('/api/images/generate', [ProductImageController::class, 'generate'])->middleware('throttle:3,1');
+    Route::post('/api/images/generate', [ProductImageController::class, 'generate'])->middleware('throttle:image-generation');
     Route::get('/api/images/requests/{imageRequest}', [ProductImageController::class, 'status']);
     Route::get('/api/images/requests/{imageRequest}/assets/{asset}/seo', [ProductImageController::class, 'seo']);
     Route::put('/api/images/requests/{imageRequest}/assets/{asset}/seo', [ProductImageController::class, 'saveSeo']);
-    Route::post('/api/images/requests/{imageRequest}/assets/{asset}/seo/generate', [ProductImageController::class, 'generateSeo'])->middleware('throttle:12,1');
-    Route::post('/api/images/requests/{imageRequest}/assets/{asset}/refine', [ProductImageController::class, 'refine'])->middleware('throttle:6,1');
-    Route::post('/api/images/requests/{imageRequest}/assets/{asset}/style-library', [ProductImageController::class, 'addToStyleLibrary'])->middleware('throttle:12,1');
+    Route::post('/api/images/requests/{imageRequest}/assets/{asset}/seo/generate', [ProductImageController::class, 'generateSeo'])->middleware('throttle:image-seo-generation');
+    Route::post('/api/images/requests/{imageRequest}/assets/{asset}/refine', [ProductImageController::class, 'refine'])->middleware('throttle:image-refinement');
+    Route::post('/api/images/requests/{imageRequest}/assets/{asset}/style-library', [ProductImageController::class, 'addToStyleLibrary'])->middleware('throttle:image-style-library');
     Route::get('/api/images/requests/{imageRequest}/assets/{asset}/revisions', [ProductImageController::class, 'revisions']);
     Route::post('/api/images/requests/{imageRequest}/assets/{asset}/revisions/{revision}/restore', [ProductImageController::class, 'restore']);
     // Keep the protected URL extensionless so nginx never mistakes it for a public static PNG.
