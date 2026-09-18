@@ -43,7 +43,7 @@ test('WEBP requires a descriptive SEO name and still enforces sauce label review
     assert.equal(h.context.event.prevented, true);
   }
   assert.deepEqual(opened, [1, 1]);
-  h.run('productImageState.results = [{asset_id: 1, metadata: {filename: "saus-op-houten-tafel.webp"}}]');
+  h.run('productImageState.results = [{asset_id: 1, seo: {ready: true}, metadata: {filename: "saus-op-houten-tafel.webp"}}]');
   assert.equal(h.run('prepareProductImageDownload(event, 1)'), true);
   h.run('productImageState.results[0].needs_label_review = true');
   assert.equal(h.run('prepareProductImageDownload(event, 1)'), false);
@@ -197,14 +197,14 @@ test('fish selection keeps references and name, shows five photos and remains se
 test('polling accepts legacy four and new five-photo sets; sauce and bundle remain two', async () => {
   for (const [type, count, valid, expected] of [['fish', 1, true, 1], ['meat', 7, true, 7], ['fish', 4, true], ['fish', 5, true, 5], ['fish', 4, false, 5], ['fish', 2, false], ['meat', 5, true, 5], ['meat', 4, true], ['sauce', 2, true], ['bundle', 2, true]]) {
     const h = harness();
-    h.context.fetch = async () => ({ ok: true, status: 200, json: async () => ({ status: 'completed', expected_count: expected, context: { product_type: type }, results: Array.from({ length: count }, () => ({})) }) });
+    h.context.fetch = async () => ({ ok: true, status: 200, json: async () => ({ status: 'completed', expected_count: expected, context: { product_type: type }, results: Array.from({ length: count }, () => ({seo: {ready: true}, metadata: {filename: 'test.webp', alt: 'Testfoto', title: 'Test', caption: 'Foto.', description: 'Testfoto op tafel.'}})) }) });
     h.context.renderProductImageResults = () => {};
     h.context.showProductImageError = error => { h.context.error = error; };
     h.run('productImageState.requestId = "test"; productImageState.pollFailures = 3');
     // Error counter resets after a valid server response, so capture any scheduled retry.
     h.context.setTimeout = () => { h.context.retry = true; return 1; };
     await h.run('pollProductImageRequest("test")');
-    assert.equal(h.run('productImageState.results.length'), valid ? count : 0);
+    assert.equal(h.run('productImageState.results.length'), count);
     assert.equal(Boolean(h.context.retry), !valid);
   }
 });
@@ -228,6 +228,29 @@ test('variant selection counts 0 to 7, survives type changes and cannot change d
   h.run("setProductImageVariant('oven', true)");
   assert.match(h.field('product-image-generate-btn').innerHTML, /Maak 1 productfoto$/);
   assert.equal(h.field('product-image-generate-btn').disabled, false);
+});
+
+test('photos without complete SEO never announce success; failed SEO preserves recovery', async () => {
+  for (const status of ['processing_seo', 'seo_failed', 'completed']) {
+    const h = harness();
+    h.context.renderProductImageResults = () => {};
+    h.context.setTimeout = () => { h.context.retry = true; return 1; };
+    h.context.sessionStorage.removeItem = () => { h.context.removed = true; };
+    h.context.fetch = async () => ({ok: true, status: 200, json: async () => ({status, progress: 90, progress_step: 'processing_seo', results: [{asset_id: 1, seo: {ready: false, status: status === 'processing_seo' ? 'queued' : 'failed'}, metadata: {filename: ''}}]})});
+    h.run('productImageState.requestId = "test"; productImageState.generating = true');
+    await h.run('pollProductImageRequest("test")');
+    assert.equal(h.messages.length, 0);
+    assert.equal(h.context.removed, undefined);
+    assert.equal(h.run('productImageState.results.length'), 1);
+    assert.equal(Boolean(h.context.retry), status === 'processing_seo');
+    if (status !== 'processing_seo') assert.match(h.field('product-image-status').innerHTML, /SEO is nog niet compleet/);
+  }
+});
+
+test('ready flag alone cannot bypass incomplete fields', () => {
+  const h = harness();
+  h.run('productImageState.results = [{seo: {ready: true}, metadata: {filename: "test.webp", alt: "Foto", title: "Test", caption: "Foto.", description: " "}}]');
+  assert.equal(h.run('productImagesSeoReady()'), false);
 });
 
 test('request submits only selected groups; a failed start unlocks controls and preserves choices', async () => {

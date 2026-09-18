@@ -31,7 +31,7 @@ async function openImageSeoEditor(assetId) {
         <textarea id="image-seo-${key}" rows="${key === 'description' ? 3 : 2}" maxlength="${key === 'description' ? 1600 : 400}" oninput="imageSeoEditor.dirty = true">${escHtml(result.metadata?.[key] || '')}</textarea>
         <button type="button" class="btn btn-outline btn-sm" onclick="copyImageSeo('${key}')">Kopiëren</button></div>`).join('')}
       <p>De opgeslagen bestandsnaam wordt ook bij de WEBP-download gebruikt. Versies blijven intern bewaard.</p>
-      <p>Gebruik een unieke beschrijvende bestandsnaam zonder cijfers. Bij een dubbele naam kies je een ander zichtbaar detail. De WEBP-download is beschikbaar zodra een geldige SEO-bestandsnaam is opgeslagen.</p>
+      <p>Gebruik een unieke beschrijvende bestandsnaam zonder cijfers. Bij een dubbele naam kies je een ander zichtbaar detail. De WEBP-download is beschikbaar zodra alle vijf SEO-velden voor deze fotoversie volledig zijn opgeslagen.</p>
     </div>`, `<button class="btn btn-primary" id="image-seo-save" onclick="saveImageSeo()">SEO opslaan</button>
       <button class="btn btn-outline" id="image-seo-generate" onclick="generateImageSeo()">SEO opnieuw maken</button>
       <button class="btn btn-outline" onclick="copyImageSeo('all')">Alles kopiëren</button>
@@ -56,6 +56,10 @@ function applyImageSeo(editor, data) {
   if (Number(data.seo.revision) < editor.revision) return;
   const result = productImageState.results.find(item => Number(item.asset_id) === Number(editor.assetId));
   if (result) { result.metadata = data.metadata; result.seo = data.seo; }
+  if (typeof renderProductImageResults === 'function') renderProductImageResults();
+  if (typeof productImagesSeoReady === 'function' && productImagesSeoReady()) {
+    if (typeof finishProductImageRequest === 'function') finishProductImageRequest();
+  }
   const pending = ['queued', 'processing'].includes(data.seo.status);
   document.getElementById('image-seo-generate').disabled = pending || editor.busy;
   if (!editor.dirty) {
@@ -63,12 +67,12 @@ function applyImageSeo(editor, data) {
     editor.revision = Number(data.seo.revision);
     editor.source = data.seo.source;
   }
-  imageSeoMessage(editor, data.seo.error || (pending
+  imageSeoMessage(editor, data.seo.storage_ready === false ? 'De nieuwe SEO-opslag ontbreekt op de server. De beheerder moet de Laravel-migratie voor product_image_download_names uitvoeren. Je foto is bewaard.' : data.seo.error || (pending
     ? 'AI analyseert deze foto. Je kunt de velden ook handmatig invullen en opslaan.'
     : editor.dirty && Number(data.seo.revision) !== editor.revision
       ? 'Er is nieuwe SEO beschikbaar. Je invoer blijft staan; kopieer eventuele correcties en open dit venster opnieuw.'
-      : data.seo.source === 'ai' ? 'SEO op basis van deze foto is klaar. Controleer de teksten vóór publicatie.'
-        : data.seo.source === 'manual' ? 'Handmatig opgeslagen SEO.' : 'Dit zijn nog basisvelden. Maak SEO of vul ze zelf in.'));
+      : data.seo.ready && data.seo.source === 'ai' ? 'Alle vijf SEO-velden voor deze foto zijn ingevuld en opgeslagen. Controleer de teksten vóór publicatie.'
+        : data.seo.ready && data.seo.source === 'manual' ? 'Handmatig opgeslagen SEO.' : 'De SEO is nog niet afgerond. Maak SEO of vul alle vijf velden in.'));
   if (pending) setTimeout(() => refreshImageSeo(editor), 2500);
 }
 

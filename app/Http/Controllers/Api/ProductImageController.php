@@ -370,6 +370,7 @@ class ProductImageController extends Controller
         $delivery = app(ProductImageDelivery::class);
         $result = collect($request->results)->firstWhere('filename', $filename) ?? [];
         $metadata = $delivery->metadata((array) $request->generation_context, $result, $version, $asset);
+        abort_unless($asset && app(ProductImageSeo::class)->payload($asset)['ready'], 422, 'De SEO is nog niet volledig afgerond en opgeslagen. De foto blijft bewaard.');
         abort_if($metadata['filename'] === '' || preg_match('/[0-9]/', $metadata['filename']), 422,
             'Maak of sla eerst de SEO op met een unieke beschrijvende bestandsnaam zonder cijfers. De foto blijft bewaard.');
         $path = 'product-images/'.$request->id.'/webp/'.hash('sha256', $contents).'.webp';
@@ -414,12 +415,25 @@ class ProductImageController extends Controller
             ];
         })->values();
 
+        $readyCount = $results->filter(fn ($result) => $result['seo']['ready'] ?? false)->count();
+        $pendingCount = $results->filter(fn ($result) => in_array($result['seo']['status'] ?? 'idle', ['queued', 'processing'], true) || $result['refinement_status'] !== 'idle')->count();
+        $workflowStatus = $imageRequest->status;
+        $progress = max(0, min(100, (int) $imageRequest->progress));
+        $step = $imageRequest->progress_step;
+        if ($workflowStatus === 'completed' && ($results->isEmpty() || $readyCount !== $results->count())) {
+            $workflowStatus = $pendingCount > 0 ? 'processing_seo' : 'seo_failed';
+            $progress = 90 + (int) floor(9 * $readyCount / max(1, $results->count()));
+            $step = $workflowStatus;
+        }
+
         return [
             'request_id' => $imageRequest->id,
-            'status' => $imageRequest->status,
-            'progress' => max(0, min(100, (int) $imageRequest->progress)),
-            'progress_step' => $imageRequest->progress_step,
-            'progress_label' => $this->progressLabel($imageRequest->progress_step),
+            'status' => $workflowStatus,
+            'image_status' => $imageRequest->status,
+            'seo_summary' => ['ready' => $readyCount, 'total' => $results->count(), 'pending' => $pendingCount],
+            'progress' => $progress,
+            'progress_step' => $step,
+            'progress_label' => $this->progressLabel($step),
             'elapsed_seconds' => $imageRequest->created_at
                 ? max(0, (int) $imageRequest->created_at->diffInSeconds($imageRequest->completed_at ?? now()))
                 : 0,
@@ -466,7 +480,9 @@ class ProductImageController extends Controller
             'generating_raw' => 'Twee rauwe productfoto\'s maken',
             'generating_product' => 'Verschillende productfoto’s maken',
             'saving' => 'Afbeeldingen controleren en opslaan',
-            'completed' => 'De productfoto\'s zijn klaar',
+            'processing_seo' => 'Foto’s opgeslagen; SEO per foto analyseren en controleren',
+            'seo_failed' => 'Foto’s bewaard; SEO nog niet afgerond',
+            'completed' => 'Alle productfoto’s en SEO zijn klaar',
             'failed' => 'Opdracht gestopt',
             default => 'Voortgang wordt bijgewerkt',
         };

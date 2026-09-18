@@ -81,7 +81,7 @@ class FishProductImageTest extends TestCase
         $this->assertSame('fish', $request->generation_context['product_type']);
         (new GenerateProductImages($request->id))->handle(app(ProductImageGenerator::class));
         $results = $this->getJson('/api/images/requests/'.$request->id)
-            ->assertOk()->assertJsonPath('status', 'completed')->assertJsonCount(5, 'results')->json('results');
+            ->assertOk()->assertJsonPath('image_status', 'completed')->assertJsonPath('status', 'processing_seo')->assertJsonCount(5, 'results')->json('results');
         $this->assertSame(['Vis bereid', 'Vis bereid', 'Vis rauw', 'Vis rauw', 'Vis bereid · Keuken'], array_column($results, 'label'));
         $this->assertSame([1, 2, 1, 2, 3], array_column($results, 'variant'));
         foreach ($results as $result) {

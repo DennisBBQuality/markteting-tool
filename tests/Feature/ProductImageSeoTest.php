@@ -13,9 +13,11 @@ use App\Services\ProductImagePromptBuilder;
 use App\Services\ProductImageSeo;
 use App\Services\ProductImageSeoAnalyzer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -53,6 +55,56 @@ class ProductImageSeoTest extends TestCase
     {
         $row = app(ProductImageSeo::class)->record($asset);
         (new GenerateProductImageSeo($asset->id, $asset->version, $row->job_token))->handle($analyzer ?? app(ProductImageSeoAnalyzer::class));
+    }
+
+    public function test_photoset_is_only_ready_after_all_five_fields_of_every_current_photo_are_saved(): void
+    {
+        [$request, $asset] = $this->photos();
+        $url = '/api/images/requests/'.$request->id;
+        $this->getJson($url)->assertJsonPath('status', 'processing_seo')->assertJsonPath('seo_summary.ready', 0);
+        $assets = ProductImageAsset::where('product_image_request_id', $request->id)->get();
+        $names = ['licht-bord', 'donker-bord', 'houten-tafel', 'zwarte-achtergrond', 'lichte-keuken'];
+        foreach ($assets as $index => $photo) {
+            app(ProductImageSeo::class)->save($photo, [...$this->fields(), 'filename' => 'varkenswangen-'.$names[$index].'.webp'], 0);
+        }
+        $this->getJson($url)->assertJsonPath('status', 'completed')->assertJsonPath('progress', 100)
+            ->assertJsonPath('seo_summary.ready', 5)->assertJsonPath('results.0.seo.ready', true);
+        $row = app(ProductImageSeo::class)->record($asset);
+        $row->update(['fields' => [...$row->fields, 'description' => ' ']]);
+        $response = $this->getJson($url)->assertJsonPath('status', 'seo_failed')->assertJsonPath('seo_summary.ready', 4);
+        $photo = collect($response->json('results'))->firstWhere('asset_id', $asset->id);
+        $this->getJson($photo['download_url'])->assertUnprocessable();
+        $this->assertDatabaseCount('product_image_assets', 5);
+        app(ProductImageSeo::class)->save($asset, [...$this->fields(), 'filename' => 'varkenswangen-eigen-presentatie.webp'], 1);
+        $this->getJson($url)->assertJsonPath('status', 'completed');
+    }
+
+    public function test_missing_filename_storage_fails_before_paid_analysis_and_is_visible_on_existing_failures(): void
+    {
+        [$request, $asset, $url] = $this->photos();
+        // Test database only. Production schema is changed exclusively by migrations.
+        Schema::drop('product_image_download_names');
+        $analyzer = $this->mock(ProductImageSeoAnalyzer::class);
+        $analyzer->shouldNotReceive('analyze');
+        $this->getJson($url)->assertJsonPath('seo.storage_ready', false)->assertJsonPath('seo.error', ProductImageSeo::STORAGE_ERROR);
+        $this->runSeo($asset, $analyzer);
+        $this->getJson($url)->assertJsonPath('seo.status', 'failed')->assertJsonPath('seo.ready', false)
+            ->assertJsonPath('seo.error', ProductImageSeo::STORAGE_ERROR);
+        $this->assertSame($request->results, $request->fresh()->results);
+        $this->assertNotEmpty($asset->fresh()->contents_base64);
+        Http::assertNothingSent();
+    }
+
+    public function test_connection_failure_has_safe_actionable_error_and_preserves_photo(): void
+    {
+        [, $asset, $url] = $this->photos();
+        $analyzer = $this->mock(ProductImageSeoAnalyzer::class);
+        $analyzer->shouldReceive('analyze')->once()->andThrow(new ConnectionException('private-provider-details'));
+        $this->runSeo($asset, $analyzer);
+        $response = $this->getJson($url)->assertJsonPath('seo.status', 'failed')->assertJsonPath('seo.ready', false);
+        $this->assertStringContainsString('verbinding', $response->json('seo.error'));
+        $this->assertStringNotContainsString('private-provider-details', $response->getContent());
+        $this->assertNotEmpty($asset->fresh()->contents_base64);
     }
 
     public function test_names_are_unique_across_photosets_and_users_and_ai_uses_a_visible_alternative(): void
