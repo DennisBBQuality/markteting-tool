@@ -219,7 +219,7 @@ function showApp() {
   document.getElementById('nav-settings').style.display = App.currentUser.rol === 'admin' ? '' : 'none';
 
   loadGlobalData().then(() => {
-    navigateTo('dashboard');
+    navigateTo(typeof productImageRecoveryId === 'function' && productImageRecoveryId() ? 'converter' : 'dashboard');
   });
 }
 

@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -30,6 +31,12 @@ class UpgradeImageSeoStorage extends Command
             return self::FAILURE;
         }
 
+        return Cache::store('database')->lock('pitboard-image-seo-storage-upgrade', 120)
+            ->block(10, fn () => $this->upgrade());
+    }
+
+    private function upgrade(): int
+    {
         $recorded = DB::table('migrations')->where('migration', self::MIGRATION)->exists();
         $exists = Schema::hasTable('product_image_download_names');
         if ($recorded !== $exists) {

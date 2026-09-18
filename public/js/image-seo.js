@@ -67,7 +67,7 @@ function applyImageSeo(editor, data) {
     editor.revision = Number(data.seo.revision);
     editor.source = data.seo.source;
   }
-  imageSeoMessage(editor, data.seo.storage_ready === false ? 'De nieuwe SEO-opslag ontbreekt op de server. De beheerder moet de Laravel-migratie voor product_image_download_names uitvoeren. Je foto is bewaard.' : data.seo.error || (pending
+  imageSeoMessage(editor, data.seo.error || (pending
     ? 'AI analyseert deze foto. Je kunt de velden ook handmatig invullen en opslaan.'
     : editor.dirty && Number(data.seo.revision) !== editor.revision
       ? 'Er is nieuwe SEO beschikbaar. Je invoer blijft staan; kopieer eventuele correcties en open dit venster opnieuw.'

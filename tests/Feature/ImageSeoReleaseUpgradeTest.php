@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Console\Commands\UpgradeImageSeoStorage;
+use App\Services\ProductImageSeo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -60,5 +61,16 @@ class ImageSeoReleaseUpgradeTest extends TestCase
         Schema::drop('product_image_download_names');
         $this->artisan('pitboard:upgrade-image-seo-storage')->assertFailed();
         $this->assertFalse(Schema::hasTable('product_image_download_names'));
+    }
+
+    public function test_opted_in_seo_write_can_run_only_the_targeted_upgrade_and_releases_the_shared_lock(): void
+    {
+        Schema::drop('product_image_download_names');
+        DB::table('migrations')->where('migration', UpgradeImageSeoStorage::MIGRATION)->delete();
+        app(ProductImageSeo::class)->ensureStorageReady(repair: true);
+        $this->assertTrue(Schema::hasTable('product_image_download_names'));
+        $this->assertDatabaseCount('cache_locks', 0);
+        app(ProductImageSeo::class)->ensureStorageReady(repair: true);
+        $this->assertSame(1, DB::table('migrations')->where('migration', UpgradeImageSeoStorage::MIGRATION)->count());
     }
 }

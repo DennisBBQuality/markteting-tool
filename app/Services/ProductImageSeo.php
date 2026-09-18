@@ -6,6 +6,7 @@ use App\Jobs\GenerateProductImageSeo;
 use App\Models\ProductImageAsset;
 use App\Models\ProductImageMetadata;
 use App\Models\ProductImageRequest;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -15,12 +16,24 @@ use Throwable;
 
 class ProductImageSeo
 {
-    public const STORAGE_ERROR = 'De SEO-opslag is nog niet bijgewerkt op de server. Laat de beheerder de bestaande Laravel-migratie voor product_image_download_names uitvoeren. De foto blijft bewaard; daarna kan alleen de SEO opnieuw worden gemaakt.';
+    public const STORAGE_ERROR = 'De SEO-opslag moet nog worden bijgewerkt. Kies SEO opnieuw maken: de applicatie probeert dan eerst de gerichte opslagupdate. De foto blijft bewaard. Als dit opnieuw mislukt, moet de beheerder de migratiestatus controleren.';
 
     public const FIELDS = ['filename', 'alt', 'title', 'caption', 'description'];
 
-    public function ensureStorageReady(): void
+    public function ensureStorageReady(bool $repair = false): void
     {
+        // Only an authorized SEO write/job may opt in. Reads and filename
+        // reservation transactions must never execute database migrations.
+        if ($repair && ! Schema::hasTable('product_image_download_names')) {
+            try {
+                if (Artisan::call('pitboard:upgrade-image-seo-storage') !== 0) {
+                    throw new ProductImageSeoException(self::STORAGE_ERROR);
+                }
+            } catch (Throwable $exception) {
+                Log::warning('Targeted image SEO storage upgrade failed', ['exception_class' => get_class($exception)]);
+                throw new ProductImageSeoException(self::STORAGE_ERROR);
+            }
+        }
         if (! Schema::hasTable('product_image_download_names')) {
             throw new ProductImageSeoException(self::STORAGE_ERROR);
         }
@@ -142,6 +155,7 @@ class ProductImageSeo
     public function save(ProductImageAsset $asset, array $fields, int $revision): void
     {
         $fields = self::normalize($fields);
+        $this->ensureStorageReady(repair: true);
         DB::transaction(function () use ($asset, $fields, $revision) {
             // Serialize filenames per photoset, and edits against image refinement.
             $request = ProductImageRequest::whereKey($asset->product_image_request_id)->lockForUpdate()->firstOrFail();

@@ -39,7 +39,7 @@ class GenerateProductImageSeo implements ShouldQueue
             return;
         }
         try {
-            app(ProductImageSeo::class)->ensureStorageReady();
+            app(ProductImageSeo::class)->ensureStorageReady(repair: true);
             $asset = ProductImageAsset::findOrFail($this->assetId);
             if ($asset->version !== $this->version) {
                 $this->failed(null);

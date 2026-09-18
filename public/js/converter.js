@@ -22,6 +22,11 @@ let productImageState = {
 };
 
 const PRODUCT_IMAGE_REQUEST_KEY = 'pitboard-product-image-request';
+// Reopen an existing owned photoset without regenerating images or SEO.
+function productImageRecoveryId(search = window.location.search) {
+  const id = new URLSearchParams(search).get('image_request');
+  return /^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id || '') ? id : null;
+}
 const PRODUCT_IMAGE_VARIANTS = [
   { id: 'raw', name: 'Rauwe variant', count: 2, detail: 'De twee bestaande rauwe settings' },
   { id: 'bbq', name: 'BBQ', count: 2, detail: 'Buiten-BBQ en donkere serveersetting' },
@@ -44,7 +49,7 @@ function renderConverter() {
 
   productImageState.previewUrls.forEach(url => URL.revokeObjectURL(url));
   if (productImageState.pollTimer) clearTimeout(productImageState.pollTimer);
-  const pendingRequestId = sessionStorage.getItem(PRODUCT_IMAGE_REQUEST_KEY);
+  const pendingRequestId = productImageRecoveryId() || sessionStorage.getItem(PRODUCT_IMAGE_REQUEST_KEY);
   productImageState = {
     files: [],
     previewUrls: [],
