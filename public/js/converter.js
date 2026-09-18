@@ -552,7 +552,7 @@ async function startProductImageGeneration() {
   }
   formData.append('notes', document.getElementById('product-image-notes')?.value.trim() || '');
   formData.append('components', document.getElementById('product-image-components')?.value.trim() || '');
-  const headers = {};
+  const headers = { Accept: 'application/json' };
   const xsrfToken = typeof getCookie === 'function' ? getCookie('XSRF-TOKEN') : null;
   if (xsrfToken) headers['X-XSRF-TOKEN'] = xsrfToken;
 
@@ -563,6 +563,19 @@ async function startProductImageGeneration() {
     const response = await fetch('/api/images/generate', { method: 'POST', headers, body: formData });
     if (response.status === 401) {
       showLogin();
+      return;
+    }
+
+    if (response.status === 429) {
+      // A rejected start is not a failed background job. Never automatically
+      // retry this paid POST; preserve the user's references and previous set.
+      const seconds = Number(response.headers.get('Retry-After'));
+      const wait = Number.isFinite(seconds) && seconds > 0
+        ? `Probeer het over ${Math.ceil(seconds)} seconden opnieuw.`
+        : 'Wacht even en probeer het opnieuw.';
+      const message = `De fotogenerator is tijdelijk begrensd. ${wait} Deze poging heeft geen nieuwe foto-opdracht gestart. Je invoer en bestaande foto's zijn bewaard.`;
+      showProductImageError(message);
+      toast(message, 'error');
       return;
     }
 

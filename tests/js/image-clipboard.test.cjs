@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const fs = require('node:fs');
 const { File, Blob } = require('node:buffer');
+const { FormData } = globalThis;
 
 function harness() {
   const fields = new Map();
@@ -30,6 +31,31 @@ function harness() {
 const file = (name = 'test.png', type = 'image/png', size = 8) => new File([new Uint8Array(size)], name, { type });
 const item = (type = 'image/png', size = 8) => ({ types: [type], getType: async () => new Blob([new Uint8Array(size)], { type }) });
 const pasteEvent = (files, editable = false) => ({ clipboardData: { files }, target: { closest: () => editable }, preventDefault() { this.prevented = true; } });
+
+test('rate-limited generation preserves input and results, explains wait and never retries a paid POST', async () => {
+  for (const retryAfter of ['42', null, 'invalid']) {
+    const h = harness();
+    h.context.uploads = [file()];
+    h.run('handleProductImageFiles(uploads); productImageState.results = [{asset_id: 1}]');
+    const calls = [];
+    Object.assign(h.context, { FormData, getCookie: () => 'test-csrf', fetch: async (url, options) => {
+      calls.push([url, options]);
+      return {status: 429, headers: {get: () => retryAfter}, json: () => { throw Error('Could be a non-JSON 429'); }};
+    }});
+    await h.run('startProductImageGeneration()');
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0][1].method, 'POST');
+    assert.equal(calls[0][1].headers.Accept, 'application/json');
+    assert.equal(h.run('productImageState.files.length'), 1);
+    assert.equal(h.run('productImageState.results[0].asset_id'), 1);
+    assert.equal(h.run('productImageState.requestId'), null);
+    assert.equal(h.run('productImageState.generating'), false);
+    assert.equal(h.field('product-image-generate-btn').disabled, false);
+    assert.equal(h.field('product-image-name').value, 'Testproduct');
+    assert.match(h.field('product-image-status').innerHTML, /geen nieuwe foto-opdracht gestart/);
+    assert.match(h.messages[0], retryAfter === '42' ? /42 seconden/ : /Wacht even/);
+  }
+});
 
 test('recovery links only accept a photoset UUID and do not start generation', () => {
   const h = harness();
