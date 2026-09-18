@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\ProductImageGenerationException;
 use App\Services\ProductImageGenerator;
 use App\Services\ProductImageRefiner;
+use App\Services\ProductImageSeo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
@@ -155,7 +156,7 @@ class ProductImageTest extends TestCase
 
         Storage::disk('local')->assertMissing($imageRequest->source_path);
 
-        foreach ($response->json('results') as $result) {
+        foreach ($response->json('results') as $index => $result) {
             $asset = basename(parse_url($result['url'], PHP_URL_PATH));
             $this->assertStringNotContainsString('.', $asset);
             $filename = $asset.'.png';
@@ -170,10 +171,15 @@ class ProductImageTest extends TestCase
                 ->assertHeader('Content-Type', 'image/png')
                 ->assertHeader('X-Content-Type-Options', 'nosniff');
 
+            $this->getJson($result['download_url'])->assertUnprocessable();
+            $name = ['test-vlees-buiten', 'test-vlees-tafel', 'test-vlees-rauw-donker', 'test-vlees-rauw-licht', 'test-vlees-keuken'][$index].'.webp';
+            $stored = ProductImageAsset::findOrFail($result['asset_id']);
+            app(ProductImageSeo::class)->save($stored, [...$result['metadata'], 'filename' => $name], 0);
+            $name = app(ProductImageSeo::class)->record($stored)->fields['filename'];
             $this->get($result['download_url'])
                 ->assertOk()
                 ->assertHeader('Content-Type', 'image/webp')
-                ->assertDownload($result['metadata']['filename']);
+                ->assertDownload($name);
         }
     }
 

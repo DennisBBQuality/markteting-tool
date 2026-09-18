@@ -31,6 +31,26 @@ const file = (name = 'test.png', type = 'image/png', size = 8) => new File([new 
 const item = (type = 'image/png', size = 8) => ({ types: [type], getType: async () => new Blob([new Uint8Array(size)], { type }) });
 const pasteEvent = (files, editable = false) => ({ clipboardData: { files }, target: { closest: () => editable }, preventDefault() { this.prevented = true; } });
 
+test('WEBP requires a descriptive SEO name and still enforces sauce label review', () => {
+  const h = harness();
+  const opened = [];
+  h.context.openImageSeoEditor = id => opened.push(id);
+  h.context.event = {preventDefault() { this.prevented = true; }};
+  for (const filename of ['', 'saus-op-tafel-2.webp']) {
+    h.context.filename = filename;
+    h.run('productImageState.results = [{asset_id: 1, metadata: {filename}}]');
+    assert.equal(h.run('prepareProductImageDownload(event, 1)'), false);
+    assert.equal(h.context.event.prevented, true);
+  }
+  assert.deepEqual(opened, [1, 1]);
+  h.run('productImageState.results = [{asset_id: 1, metadata: {filename: "saus-op-houten-tafel.webp"}}]');
+  assert.equal(h.run('prepareProductImageDownload(event, 1)'), true);
+  h.run('productImageState.results[0].needs_label_review = true');
+  assert.equal(h.run('prepareProductImageDownload(event, 1)'), false);
+  h.field('product-label-approved-1').checked = true;
+  assert.equal(h.run('prepareProductImageDownload(event, 1)'), true);
+});
+
 test('paste button adds a local image preview and enables generation without changing product data', async () => {
   const h = harness();
   h.context.navigator.clipboard.read = async () => [item()];

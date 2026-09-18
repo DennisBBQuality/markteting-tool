@@ -1140,8 +1140,8 @@ input, select, textarea { font: inherit; }
   box-shadow: var(--shadow);
 }
 
-.product-image-result-visual { position: relative; aspect-ratio: 3 / 2; overflow: hidden; background: #EEEAE6; }
-.product-image-result-visual img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.product-image-result-visual { position: relative; aspect-ratio: 4 / 3; overflow: hidden; background: #EEEAE6; }
+.product-image-result-visual img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .product-image-result-badge {
   position: absolute;
   top: 12px;

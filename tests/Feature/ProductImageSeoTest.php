@@ -55,6 +55,57 @@ class ProductImageSeoTest extends TestCase
         (new GenerateProductImageSeo($asset->id, $asset->version, $row->job_token))->handle($analyzer ?? app(ProductImageSeoAnalyzer::class));
     }
 
+    public function test_names_are_unique_across_photosets_and_users_and_ai_uses_a_visible_alternative(): void
+    {
+        [, $first] = $this->photos();
+        app(ProductImageSeo::class)->save($first, $this->fields(), 0);
+        [, $second, $url] = $this->photos();
+        $analyzer = $this->mock(ProductImageSeoAnalyzer::class);
+        $analyzer->shouldReceive('analyze')->once()->andReturn([...$this->fields(),
+            'filename_alternatives' => ['varkenswangen-ontvliesd-op-licht-bord.webp', 'varkenswangen-ontvliesd-in-woonkeuken.webp']]);
+        $this->runSeo($second, $analyzer);
+        $this->getJson($url)->assertJsonPath('metadata.filename', 'varkenswangen-ontvliesd-op-licht-bord.webp')
+            ->assertJsonPath('seo.status', 'completed');
+        $this->assertCount(5, app(ProductImageSeo::class)->record($second)->fields);
+        $this->assertDatabaseCount('product_image_download_names', 2);
+    }
+
+    public function test_manual_numeric_name_is_rejected_and_old_name_stays_reserved_after_renaming(): void
+    {
+        [, $first, $url] = $this->photos();
+        $this->putJson($url, ['image_version' => 1, 'revision' => 0,
+            'fields' => [...$this->fields(), 'filename' => 'varkenswangen-op-bord-2.webp']])->assertUnprocessable()->assertJsonValidationErrors('filename');
+        app(ProductImageSeo::class)->save($first, $this->fields(), 0);
+        app(ProductImageSeo::class)->save($first, [...$this->fields(), 'filename' => 'varkenswangen-op-licht-bord.webp'], 1);
+        [, , $secondUrl] = $this->photos();
+        $this->putJson($secondUrl, ['image_version' => 1, 'revision' => 0, 'fields' => $this->fields()])
+            ->assertUnprocessable()->assertJsonValidationErrors('filename');
+        $this->assertDatabaseCount('product_image_download_names', 2);
+    }
+
+    public function test_historical_names_without_reservation_are_respected_and_exhausted_ai_names_fail_safely(): void
+    {
+        [, $first] = $this->photos();
+        app(ProductImageSeo::class)->record($first)->update(['status' => 'completed', 'fields' => ProductImageSeo::normalize($this->fields())]);
+        [, $second, $url] = $this->photos();
+        $analyzer = $this->mock(ProductImageSeoAnalyzer::class);
+        $analyzer->shouldReceive('analyze')->once()->andReturn([...$this->fields(),
+            'filename_alternatives' => [$this->fields()['filename'], 'varkenswangen-op-bord-2.webp']]);
+        $this->runSeo($second, $analyzer);
+        $this->getJson($url)->assertJsonPath('seo.status', 'failed')->assertJsonPath('metadata.filename', '');
+        $this->assertStringContainsString('geen volgnummer', app(ProductImageSeo::class)->record($second)->error);
+        $this->assertDatabaseCount('product_image_download_names', 0);
+    }
+
+    public function test_same_photo_can_save_its_own_reserved_name_again(): void
+    {
+        [, $asset] = $this->photos();
+        app(ProductImageSeo::class)->save($asset, $this->fields(), 0);
+        app(ProductImageSeo::class)->save($asset, [...$this->fields(), 'alt' => 'Verbeterde omschrijving van dezelfde foto'], 1);
+        $this->assertSame(2, app(ProductImageSeo::class)->record($asset)->revision);
+        $this->assertDatabaseCount('product_image_download_names', 1);
+    }
+
     public function test_every_photo_gets_its_own_analysis_of_actual_pixels_and_download_name(): void
     {
         [$request, $asset, $url] = $this->photos();
@@ -180,8 +231,10 @@ class ProductImageSeoTest extends TestCase
         $this->putJson($url, ['image_version' => 1, 'revision' => 0, 'fields' => $fields])->assertOk();
         $otherRaw = collect($request->results)->where('status', 'rauw')->first(fn ($result) => $result['filename'] !== $asset->filename);
         $second = ProductImageAsset::where('product_image_request_id', $request->id)->where('filename', $otherRaw['filename'])->firstOrFail();
-        app(ProductImageSeo::class)->save($second, $fields, 0);
-        $this->assertSame('varkenswangen-ontvliesd-gestoofd-aardappelpuree-2.webp', app(ProductImageSeo::class)->record($second)->fields['filename']);
+        $secondUrl = str_replace('/assets/'.$asset->id, '/assets/'.$second->id, $url);
+        $this->putJson($secondUrl, ['image_version' => 1, 'revision' => 0, 'fields' => $fields])->assertUnprocessable()->assertJsonValidationErrors('filename');
+        app(ProductImageSeo::class)->save($second, [...$fields, 'filename' => 'varkenswangen-ontvliesd-op-licht-bord.webp'], 0);
+        $this->assertSame('varkenswangen-ontvliesd-op-licht-bord.webp', app(ProductImageSeo::class)->record($second)->fields['filename']);
         $this->actingAsUser();
         $this->getJson($url)->assertNotFound();
         $this->putJson($url, ['image_version' => 1, 'revision' => 1, 'fields' => $fields])->assertNotFound();
@@ -225,7 +278,8 @@ class ProductImageSeoTest extends TestCase
     public function test_reading_existing_prepared_seo_does_not_rewrite_saved_text(): void
     {
         [$request] = $this->photos();
-        $asset = ProductImageAsset::where('product_image_request_id', $request->id)->firstOrFail();
+        $prepared = collect($request->results)->firstWhere('status', 'bereid');
+        $asset = ProductImageAsset::where('product_image_request_id', $request->id)->where('filename', $prepared['filename'])->firstOrFail();
         $row = app(ProductImageSeo::class)->record($asset);
         $fields = ProductImageSeo::normalize($this->fields());
         $row->update(['fields' => $fields, 'source' => 'manual', 'status' => 'completed', 'job_token' => null]);

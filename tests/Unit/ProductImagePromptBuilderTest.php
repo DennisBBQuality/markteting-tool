@@ -289,7 +289,7 @@ class ProductImagePromptBuilderTest extends TestCase
         $this->assertStringNotContainsString('kwaliteitsanker', $prompt);
     }
 
-    public function test_non_cooked_plans_and_prompts_remain_byte_identical_to_the_baseline(): void
+    public function test_non_cooked_plans_and_prompts_remain_identical_except_for_the_website_format(): void
     {
         // Captured before the cooked-only revision; not generated from the implementation under test.
         $baseline = [
@@ -309,11 +309,14 @@ class ProductImagePromptBuilderTest extends TestCase
                 if ($plan['status'] === 'bereid') {
                     continue;
                 }
-                $this->assertSame($baseline[$type.'.'.$index], hash('sha256', json_encode($plan).$builder->prompt(ImagePrompt::DEFAULT_PRODUCT_PHOTO_PROMPT, $context, $plan)));
+                // Preserve the old content baseline; only the separately tested output format changed.
+                $prompt = str_replace('liggende 4:3', 'vierkante', $builder->prompt(ImagePrompt::DEFAULT_PRODUCT_PHOTO_PROMPT, $context, $plan));
+                $this->assertSame($baseline[$type.'.'.$index], hash('sha256', json_encode($plan).$prompt));
                 if ($type === 'meat') {
                     $plan['approved_reference_added'] = true;
                     $plan['bundled_reference_added'] = $index === 2;
-                    $this->assertSame($baseline[$type.'.'.$index.'.approved'], hash('sha256', json_encode($plan).$builder->prompt(ImagePrompt::DEFAULT_PRODUCT_PHOTO_PROMPT, $context, $plan)));
+                    $prompt = str_replace('liggende 4:3', 'vierkante', $builder->prompt(ImagePrompt::DEFAULT_PRODUCT_PHOTO_PROMPT, $context, $plan));
+                    $this->assertSame($baseline[$type.'.'.$index.'.approved'], hash('sha256', json_encode($plan).$prompt));
                 }
             }
         }

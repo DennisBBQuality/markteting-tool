@@ -36,7 +36,7 @@ class ProductImagePreparationSeo
             return $fields;
         }
         $base = substr($fields['filename'], 0, -5);
-        if (! preg_match('/(?:^|-)'.preg_quote($method, '/').'(?:-|$)/i', $base)) {
+        if ($fields['filename'] !== '' && ! preg_match('/(?:^|-)'.preg_quote($method, '/').'(?:-|$)/i', $base)) {
             $fields['filename'] = rtrim(Str::limit($base, 179 - strlen($method), ''), '-').'-'.$method.'.webp';
         }
         $appliance = $method === 'bbq' ? '(?:bbq|barbecue)' : preg_quote($method, '/');

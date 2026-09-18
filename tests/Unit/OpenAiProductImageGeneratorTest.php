@@ -5,6 +5,7 @@ namespace Tests\Unit;
 use App\Models\ImagePrompt;
 use App\Models\ProductImageStyleReference;
 use App\Services\OpenAiProductImageGenerator;
+use App\Services\ProductImageFormat;
 use App\Services\ProductImageGenerationException;
 use App\Services\ProductImageModelCatalog;
 use GuzzleHttp\Psr7\Response as PsrResponse;
@@ -24,7 +25,7 @@ class OpenAiProductImageGeneratorTest extends TestCase
         config(['services.product_images.driver' => 'openai', 'services.product_images.openai.api_key' => 'test-key']);
         app(ProductImageModelCatalog::class)->saveDefault('gpt-image-2');
         $photo = UploadedFile::fake()->image('test-reference.png', 40, 40);
-        $encoded = base64_encode(file_get_contents($photo->getRealPath()));
+        $encoded = base64_encode(ProductImageFormat::placeholder());
         Http::fake(['*' => Http::response(['data' => [['b64_json' => $encoded]]])]);
         $generator = app(OpenAiProductImageGenerator::class);
         $context = ['product_type' => 'meat', 'product_name' => 'Test ribeye', 'quantity' => 1, 'image_model' => 'gpt-image-2.5-sunburst'];
@@ -54,7 +55,8 @@ class OpenAiProductImageGeneratorTest extends TestCase
             $fields = collect($request->data())->keyBy('name');
             $this->assertSame('gpt-image-2.5-sunburst', $fields['model']['contents']);
             $this->assertSame('high', $fields['quality']['contents']);
-            $this->assertSame('1024x1024', $fields['size']['contents']);
+            $this->assertSame('1536x1152', $fields['size']['contents']);
+            $this->assertStringContainsString(ProductImageFormat::INSTRUCTION, $fields['prompt']['contents']);
             $this->assertSame('png', $fields['output_format']['contents']);
             $this->assertFalse($fields->has('input_fidelity'));
         }
@@ -73,11 +75,25 @@ class OpenAiProductImageGeneratorTest extends TestCase
         }
     }
 
+    public function test_square_provider_output_is_not_silently_cropped_or_retried(): void
+    {
+        config(['services.product_images.driver' => 'openai', 'services.product_images.openai.api_key' => 'test-key']);
+        $square = UploadedFile::fake()->image('square.png', 64, 64);
+        Http::fake(['*' => Http::response(['data' => [['b64_json' => base64_encode(file_get_contents($square->getRealPath()))]]])]);
+        $this->expectException(ProductImageGenerationException::class);
+        $this->expectExceptionMessage('1536 × 1152');
+        try {
+            app(OpenAiProductImageGenerator::class)->refine($square, 'Pas licht aan.', ['image_model' => 'gpt-image-2.5-flare']);
+        } finally {
+            Http::assertSentCount(1);
+        }
+    }
+
     public function test_sucade_requests_stew_scenes_and_only_reuses_approved_stew_references(): void
     {
         config(['services.product_images.driver' => 'openai', 'services.product_images.openai.api_key' => 'test-key']);
         $source = UploadedFile::fake()->image('sucade.png', 40, 40);
-        $encoded = base64_encode(file_get_contents($source->getRealPath()));
+        $encoded = base64_encode(ProductImageFormat::placeholder());
         $approvedId = null;
         foreach (['bbq_buiten_algemeen', 'serveerbeeld_algemeen', 'bbq_buiten_stoof'] as $styleId) {
             $reference = ProductImageStyleReference::create([
@@ -108,7 +124,7 @@ class OpenAiProductImageGeneratorTest extends TestCase
             $prompt = $fields['prompt']['contents'];
             $this->assertSame('gpt-image-2.5-sunburst', $fields['model']['contents']);
             $this->assertSame('high', $fields['quality']['contents']);
-            $this->assertSame('1024x1024', $fields['size']['contents']);
+            $this->assertSame('1536x1152', $fields['size']['contents']);
             $this->assertSame('png', $fields['output_format']['contents']);
 
             if ($index < 2 || $index === 4) {
@@ -146,7 +162,7 @@ class OpenAiProductImageGeneratorTest extends TestCase
             'quality' => 'high',
             'timeout' => 30,
         ]);
-        $encoded = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAFAgI/69VZ5QAAAABJRU5ErkJggg==';
+        $encoded = base64_encode(ProductImageFormat::placeholder());
         $responses = [];
         foreach (range(0, 4) as $index) {
             $responses[(string) $index] = new ClientResponse(new PsrResponse(
@@ -184,7 +200,7 @@ class OpenAiProductImageGeneratorTest extends TestCase
         ]);
 
         $approvedPhoto = UploadedFile::fake()->image('approved.png', 100, 100);
-        $encoded = base64_encode((string) file_get_contents($approvedPhoto->getRealPath()));
+        $encoded = base64_encode(ProductImageFormat::placeholder());
         Http::fakeSequence()
             ->push(['data' => [['b64_json' => $encoded], ['b64_json' => $encoded]]])
             ->push(['data' => [['b64_json' => $encoded], ['b64_json' => $encoded]]]);
@@ -219,7 +235,7 @@ class OpenAiProductImageGeneratorTest extends TestCase
                 && $cornerAlpha === 0
                 && $fields->get('model')['contents'] === 'gpt-image-2'
                 && $fields->get('n')['contents'] === 2
-                && $fields->get('size')['contents'] === '1024x1024'
+                && $fields->get('size')['contents'] === '1536x1152'
                 && $fields->get('output_format')['contents'] === 'png'
                 && ! $fields->has('response_format')
                 && $fields->get('quality')['contents'] === 'high'
@@ -242,7 +258,7 @@ class OpenAiProductImageGeneratorTest extends TestCase
             'quality' => 'high',
             'timeout' => 30,
         ]);
-        $encoded = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAFAgI/69VZ5QAAAABJRU5ErkJggg==';
+        $encoded = base64_encode(ProductImageFormat::placeholder());
         Http::fake(['*' => Http::response(['data' => [['b64_json' => $encoded]]])]);
 
         $results = app(OpenAiProductImageGenerator::class)->generateForProduct([
@@ -259,7 +275,7 @@ class OpenAiProductImageGeneratorTest extends TestCase
             $fields = collect($request->data())->keyBy('name');
 
             return ($fields->get('quality')['contents'] ?? null) === 'high'
-                && ($fields->get('size')['contents'] ?? null) === '1024x1024'
+                && ($fields->get('size')['contents'] ?? null) === '1536x1152'
                 && ($fields->get('output_format')['contents'] ?? null) === 'png'
                 && ($fields->get('n')['contents'] ?? null) === 1;
         });
@@ -297,7 +313,7 @@ class OpenAiProductImageGeneratorTest extends TestCase
             'size' => '1024x1024',
             'timeout' => 30,
         ]);
-        $encoded = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAFAgI/69VZ5QAAAABJRU5ErkJggg==';
+        $encoded = base64_encode(ProductImageFormat::placeholder());
         Http::fake(['*' => Http::response(['data' => [['b64_json' => $encoded]]])]);
 
         $results = app(OpenAiProductImageGenerator::class)->generateForProduct([
@@ -334,7 +350,7 @@ class OpenAiProductImageGeneratorTest extends TestCase
             'size' => '1024x1024',
             'timeout' => 30,
         ]);
-        $encoded = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAFAgI/69VZ5QAAAABJRU5ErkJggg==';
+        $encoded = base64_encode(ProductImageFormat::placeholder());
         Http::fake(['*' => Http::response(['data' => [['b64_json' => $encoded]]])]);
 
         $results = app(OpenAiProductImageGenerator::class)->generateForProduct([
@@ -388,7 +404,7 @@ class OpenAiProductImageGeneratorTest extends TestCase
             'timeout' => 30,
         ]);
         $approvedPhoto = UploadedFile::fake()->image('approved.png', 100, 100);
-        $encoded = base64_encode((string) file_get_contents($approvedPhoto->getRealPath()));
+        $encoded = base64_encode(ProductImageFormat::placeholder());
         ProductImageStyleReference::create([
             'product_name' => 'Black Angus brisket',
             'product_key' => 'black-angus-brisket',

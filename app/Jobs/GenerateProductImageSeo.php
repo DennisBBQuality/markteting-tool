@@ -11,6 +11,7 @@ use App\Services\ProductImageSeoException;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class GenerateProductImageSeo implements ShouldQueue
@@ -56,9 +57,11 @@ class GenerateProductImageSeo implements ShouldQueue
 
                     return;
                 }
-                $row->update(['fields' => app(ProductImageSeo::class)->uniqueFilename($current, ProductImageSeo::normalizeForImage($fields, (array) $request->generation_context, $result)),
+                $row->update(['fields' => app(ProductImageSeo::class)->uniqueFilename($current, ProductImageSeo::normalizeForImage($fields, (array) $request->generation_context, $result), $fields['filename_alternatives'] ?? []),
                     'source' => 'ai', 'status' => 'completed', 'error' => null, 'job_token' => null, 'revision' => $row->revision + 1]);
             });
+        } catch (ValidationException $e) {
+            $this->failed(new ProductImageSeoException($e->errors()['filename'][0] ?? 'De SEO-velden zijn ongeldig. De vorige gegevens zijn bewaard.'));
         } catch (Throwable $e) {
             $this->failed($e);
         }

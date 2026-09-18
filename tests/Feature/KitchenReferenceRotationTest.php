@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\ProductImageRequest;
 use App\Models\ProductImageStyleReference;
 use App\Services\OpenAiProductImageGenerator;
+use App\Services\ProductImageFormat;
 use App\Services\ProductImagePromptBuilder;
 use App\Services\ProductImageStyleLibrary;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -80,7 +81,7 @@ class KitchenReferenceRotationTest extends TestCase
     {
         config(['services.product_images.driver' => 'openai', 'services.product_images.openai.api_key' => 'test-key']);
         $source = UploadedFile::fake()->image('product.png', 20, 20);
-        $encoded = base64_encode(file_get_contents($source->getRealPath()));
+        $encoded = base64_encode(ProductImageFormat::placeholder());
         $anchor = ProductImageStyleReference::create([
             'product_name' => 'Voorbeeldvis', 'product_key' => ProductImageStyleReference::productKey('Voorbeeldvis'),
             'product_type' => 'fish', 'status' => 'bereid', 'style_id' => 'keuken_airfryer_vis',
