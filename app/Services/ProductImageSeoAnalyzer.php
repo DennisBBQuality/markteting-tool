@@ -44,6 +44,12 @@ class ProductImageSeoAnalyzer
             });
         }
         $text = $response->json('output_text');
+        if ($response->json('status') === 'incomplete') {
+            throw new ProductImageSeoException('De beeldanalyse gaf een onvolledig antwoord. Er is geen gedeeltelijke SEO opgeslagen. Probeer alleen de SEO opnieuw.');
+        }
+        if (collect($response->json('output', []))->flatMap(fn ($item) => $item['content'] ?? [])->contains('type', 'refusal')) {
+            throw new ProductImageSeoException('De beeldanalyse heeft deze aanvraag geweigerd. Er zijn geen SEO-velden ingevuld; de foto blijft bewaard.');
+        }
         if (! is_string($text)) {
             $text = collect($response->json('output', []))->flatMap(fn ($item) => $item['content'] ?? [])
                 ->where('type', 'output_text')->pluck('text')->implode('');
@@ -68,6 +74,7 @@ class ProductImageSeoAnalyzer
             .'filename: korte beschrijvende bestandsnaam, product eerst, daarna passende zichtbare bereiding/presentatie en onderscheidend detail. Kleine letters, één koppelteken tussen woorden, geen spaties of underscores, .webp. Geen variant-1-v1, geen keywordlijst. Voorbeeld van schrijfwijze (geen feiten over deze foto): varkenswangen-ontvliesd-gestoofd-aardappelpuree.webp. '
             .'UNIEKE BESTANDSNAAM: gebruik geen cijfers, volgnummers, versienummers, datums, hashes of willekeurige codes. Gebruik ook geen uitgeschreven volgnummers zoals twee of tweede om een kopie uniek te maken. Kies onderscheidende daadwerkelijk zichtbare details, bijvoorbeeld ondergrond, achtergrond, servies, camerahoek of garnering; verzin die nooit voor de naam. Schrijf noodzakelijke getallen uit zonder de productidentiteit te veranderen. filename_alternatives: twee tot vijf andere inhoudelijk passende bestandsnamen voor DEZELFDE foto, volgens dezelfde regels en met de gekozen bereidingswijze indien van toepassing. De server kiest een beschikbare naam; het zijn geen namen voor andere foto’s. Laat ook alt, title, caption en description de eigen zichtbare details van deze foto beschrijven, geen algemene herhaalde standaardtekst. '
             .'alt: natuurlijke bondige beschrijving van wat zichtbaar is, geen verkooppraat, geen keywordstapeling. '
+            .'Volg Google Search Central image SEO: korte maar beschrijvende bestandsnamen, relevante afbeeldingstitels en nuttige alt-tekst die de zichtbare afbeelding in haar productcontext beschrijft. Geen reeks synoniemen, zoekwoordenstapeling of rankingbelofte. Vul alle vijf velden volledig met foto-specifieke tekst; alleen de productnaam herhalen is geen volledige beeldbeschrijving. Deze vijf verplichte velden zijn de BBQuality-opleverregel, niet vijf afzonderlijke verplichte Google-velden. '
             .'title: productnaam plus korte onderscheidende presentatie, bij een bereide foto met bijgerechten duidelijk serveersuggestie. '
             .'caption: één menselijke zin, bij bereid beginnen met Serveersuggestie:. '
             .'description: één of twee concrete zinnen over deze foto en het bijbehorende BBQuality-product. Bijgerechten zijn uitsluitend serveersuggestie, niet inbegrepen en geen productingrediënten. Geen ongeverifieerd bereidingsadvies. '

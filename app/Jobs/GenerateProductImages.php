@@ -74,17 +74,19 @@ class GenerateProductImages implements ShouldQueue
         $results = $this->storeValidatedResults($request, $generatedImages);
 
         $request->update([
-            'status' => 'completed',
-            'progress' => 100,
-            'progress_step' => 'completed',
+            'status' => 'processing',
+            'progress' => 90,
+            'progress_step' => 'processing_seo',
             'results' => $results,
             'error' => null,
-            'completed_at' => now(),
+            'completed_at' => null,
         ]);
         $this->deleteSources($request);
         foreach (ProductImageAsset::where('product_image_request_id', $request->id)->get() as $asset) {
             app(ProductImageSeo::class)->queueAutomatically($asset);
         }
+        // This records image-job completion only. The API gates overall completion on every current SEO record.
+        $request->update(['status' => 'completed', 'progress' => 100, 'progress_step' => 'completed', 'completed_at' => now()]);
     }
 
     public function failed(?Throwable $exception): void

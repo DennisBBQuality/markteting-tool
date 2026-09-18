@@ -9,8 +9,11 @@ use App\Services\ProductImageSeo;
 use App\Services\ProductImageSeoAnalyzer;
 use App\Services\ProductImageSeoException;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -36,6 +39,7 @@ class GenerateProductImageSeo implements ShouldQueue
             return;
         }
         try {
+            app(ProductImageSeo::class)->ensureStorageReady();
             $asset = ProductImageAsset::findOrFail($this->assetId);
             if ($asset->version !== $this->version) {
                 $this->failed(null);
@@ -70,8 +74,13 @@ class GenerateProductImageSeo implements ShouldQueue
     public function failed(?Throwable $exception): void
     {
         // Never persist provider payloads, credentials or untrusted exception text.
-        $safe = $exception instanceof ProductImageSeoException
-            ? $exception->getMessage() : 'De SEO-analyse is niet afgerond. De foto en eventuele vorige SEO zijn bewaard. Probeer opnieuw of vul de velden handmatig in.';
+        $safe = match (true) {
+            $exception instanceof ProductImageSeoException => $exception->getMessage(),
+            $exception instanceof ConnectionException => 'De verbinding met de SEO-beeldanalyse is onderbroken of duurde te lang. De foto is bewaard. Probeer alleen de SEO opnieuw.',
+            $exception instanceof QueryException => 'De SEO kon niet in de database worden opgeslagen. De foto is bewaard. Laat de beheerder de SEO-opslag controleren.',
+            default => 'De SEO-analyse is niet afgerond. De foto en eventuele vorige SEO zijn bewaard. Probeer opnieuw of vul de velden handmatig in.',
+        };
+        Log::warning('Image SEO failed', ['asset_id' => $this->assetId, 'version' => $this->version, 'exception_class' => $exception ? get_class($exception) : 'job_timeout']);
         ProductImageMetadata::where('job_token', $this->token)->update(['status' => 'failed', 'error' => $safe, 'job_token' => null]);
     }
 }

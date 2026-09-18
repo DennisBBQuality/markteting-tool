@@ -145,9 +145,10 @@ class ProductImageTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertJsonPath('status', 'completed')
-            ->assertJsonPath('progress', 100)
-            ->assertJsonPath('progress_step', 'completed')
+            ->assertJsonPath('image_status', 'completed')
+            ->assertJsonPath('status', 'processing_seo')
+            ->assertJsonPath('progress', 90)
+            ->assertJsonPath('progress_step', 'processing_seo')
             ->assertJsonCount(5, 'results')
             ->assertJsonPath('results.0.label', 'Vlees bereid')
             ->assertJsonPath('results.1.label', 'Vlees bereid')

@@ -8,13 +8,32 @@ use App\Models\ProductImageMetadata;
 use App\Models\ProductImageRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class ProductImageSeo
 {
+    public const STORAGE_ERROR = 'De SEO-opslag is nog niet bijgewerkt op de server. Laat de beheerder de bestaande Laravel-migratie voor product_image_download_names uitvoeren. De foto blijft bewaard; daarna kan alleen de SEO opnieuw worden gemaakt.';
+
     public const FIELDS = ['filename', 'alt', 'title', 'caption', 'description'];
+
+    public function ensureStorageReady(): void
+    {
+        if (! Schema::hasTable('product_image_download_names')) {
+            throw new ProductImageSeoException(self::STORAGE_ERROR);
+        }
+    }
+
+    public static function completeFields(?array $fields): bool
+    {
+        try {
+            return $fields !== null && self::normalize($fields)['filename'] === ($fields['filename'] ?? null);
+        } catch (ValidationException) {
+            return false;
+        }
+    }
 
     public static function normalizeForImage(array $fields, array $context, array $result): array
     {
@@ -66,8 +85,12 @@ class ProductImageSeo
             $row->refresh();
         }
 
+        $storageReady = Schema::hasTable('product_image_download_names');
+
         return ['status' => $row?->status ?? 'idle', 'source' => $row?->source ?? 'none',
-            'revision' => $row?->revision ?? 0, 'error' => $row?->error, 'image_version' => $asset->version];
+            'ready' => $row?->status === 'completed' && self::completeFields($row?->fields) && $asset->refinement_status === 'idle',
+            'storage_ready' => $storageReady,
+            'revision' => $row?->revision ?? 0, 'error' => $storageReady ? $row?->error : self::STORAGE_ERROR, 'image_version' => $asset->version];
     }
 
     public function queue(ProductImageAsset $asset, ?int $expectedRevision = null, bool $replaceManual = false, bool $alreadyBackground = false): void
@@ -136,6 +159,7 @@ class ProductImageSeo
     /** Caller holds the asset/photoset locks. A unique DB key also protects parallel photosets. */
     public function uniqueFilename(ProductImageAsset $asset, array $fields, array $alternatives = []): array
     {
+        $this->ensureStorageReady();
         $request = ProductImageRequest::findOrFail($asset->product_image_request_id);
         $result = collect($request->results)->firstWhere('filename', $asset->filename) ?? [];
         foreach (array_unique(array_filter([$fields['filename'], ...array_slice($alternatives, 0, 5)], 'is_string')) as $candidate) {

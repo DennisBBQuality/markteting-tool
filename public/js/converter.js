@@ -618,6 +618,7 @@ function renderProductImageProgress(data) {
     { key: 'preparing', label: 'Foto voorbereiden' },
     { key: 'generating_product', label: 'Varianten maken' },
     { key: 'saving', label: 'Controleren en opslaan' },
+    { key: 'processing_seo', label: 'SEO per foto afronden' },
   ];
   const aliases = { starting: 'queued', generating_prepared: 'generating_product', generating_raw: 'generating_product' };
   const activeKey = aliases[data.progress_step] || data.progress_step || 'queued';
@@ -683,6 +684,7 @@ async function pollProductImageRequest(requestId) {
     }
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Status ophalen is mislukt.');
+    if (productImageState.requestId !== requestId) return;
     productImageState.pollFailures = 0;
     if (!productImageState.context && data.context) {
       productImageState.context = data.context;
@@ -692,7 +694,13 @@ async function pollProductImageRequest(requestId) {
       updateProductImageForm();
     }
 
-    if (data.status === 'completed') {
+    if (Array.isArray(data.results) && data.results.length) {
+      productImageState.results = data.results;
+      productImageState.context = data.context || productImageState.context;
+      productImageState.completedRequestId = requestId;
+      renderProductImageResults();
+    }
+    if (data.status === 'completed' && productImagesSeoReady(data.results)) {
       const expected = Number(data.expected_count ?? data.context?.photo_count ?? (['meat', 'fish'].includes(data.context?.product_type ?? 'meat') ? 4 : 2));
       if (!Array.isArray(data.results) || data.results.length !== expected) {
         throw new Error(`De beeldservice leverde niet de verwachte ${expected} productfoto's op.`);
@@ -702,7 +710,12 @@ async function pollProductImageRequest(requestId) {
       productImageState.completedRequestId = requestId;
       finishProductImageRequest();
       renderProductImageResults();
-      toast(expected === 1 ? 'Je productfoto is klaar!' : `${expected} productfoto's zijn klaar!`, 'success');
+      toast(expected === 1 ? 'Je productfoto en alle SEO-velden zijn klaar!' : `${expected} productfoto's en alle SEO-velden zijn klaar!`, 'success');
+      return;
+    }
+    if (data.status === 'seo_failed' || (data.status === 'completed' && !productImagesSeoReady(data.results))) {
+      finishProductImageRequest(false, true);
+      showProductImageError('De foto’s zijn bewaard, maar de SEO is nog niet compleet. Open SEO-gegevens bij de gemarkeerde foto’s. Maak alleen de SEO opnieuw; de foto’s hoeven niet opnieuw gemaakt te worden.');
       return;
     }
     if (data.status === 'failed') {
@@ -729,12 +742,12 @@ async function pollProductImageRequest(requestId) {
   }
 }
 
-function finishProductImageRequest(hideStatus = true) {
+function finishProductImageRequest(hideStatus = true, keepRecovery = false) {
   if (productImageState.pollTimer) clearTimeout(productImageState.pollTimer);
   productImageState.pollTimer = null;
   productImageState.generating = false;
   productImageState.requestId = null;
-  sessionStorage.removeItem(PRODUCT_IMAGE_REQUEST_KEY);
+  if (!keepRecovery) sessionStorage.removeItem(PRODUCT_IMAGE_REQUEST_KEY);
 
   const button = document.getElementById('product-image-generate-btn');
   const status = document.getElementById('product-image-status');
@@ -744,9 +757,24 @@ function finishProductImageRequest(hideStatus = true) {
   if (hideStatus) status?.classList.add('hidden');
 }
 
+function productImagesSeoReady(results = productImageState.results) {
+  return Array.isArray(results) && results.length > 0 && results.every(result => result.seo?.ready === true &&
+    ['filename', 'alt', 'title', 'caption', 'description'].every(key => typeof result.metadata?.[key] === 'string' && result.metadata[key].trim() !== ''));
+}
+
 function renderProductImageResults() {
   const container = document.getElementById('product-image-results');
   if (!container) return;
+  // SEO polling must not reset a user's label check or unfinished refinement input.
+  const drafts = new Map();
+  document.querySelectorAll('.product-image-result-card[data-asset]').forEach(card => {
+    const id = card.dataset.asset;
+    drafts.set(`${id}:${card.dataset.version}`, {
+      approved: document.getElementById(`product-label-approved-${id}`)?.checked,
+      text: document.getElementById(`product-refinement-text-${id}`)?.value || '',
+      open: !document.getElementById(`product-refinement-${id}`)?.classList.contains('hidden'),
+    });
+  });
 
   container.innerHTML = `
     <div class="product-image-results-header">
@@ -755,12 +783,12 @@ function renderProductImageResults() {
         <h3>Kies je favoriete productfoto</h3>
         ${productImageState.context?.image_model ? `<p>Gemaakt met ${escHtml(productImageState.context.image_model)}</p>` : ''}
       </div>
-      <span class="product-image-count"><i class="fas fa-check-circle"></i> ${productImageState.results.length} ${productImageState.results.length === 1 ? 'afbeelding' : 'afbeeldingen'}</span>
+      <span class="product-image-count"><i class="fas ${productImagesSeoReady() ? 'fa-check-circle' : 'fa-clock'}"></i> ${productImageState.results.length} afbeeldingen · SEO ${productImageState.results.filter(item => item.seo?.ready).length}/${productImageState.results.length} klaar</span>
       <button class="btn btn-outline btn-sm" type="button" onclick="linkImagesToDossier()">Koppel aan productdossier</button>
     </div>
     <div class="product-image-grid">
       ${productImageState.results.map(result => `
-        <article class="product-image-result-card">
+        <article class="product-image-result-card" data-asset="${Number(result.asset_id)}" data-version="${Number(result.version || 1)}">
           <div class="product-image-result-visual">
             <img src="${escHtml(result.url)}" alt="${escHtml(result.metadata?.alt || result.label)}">
             <span class="product-image-result-badge ${result.status}">${escHtml(result.label)}</span>
@@ -773,7 +801,7 @@ function renderProductImageResults() {
             <div class="product-result-buttons">
               <button class="btn btn-outline btn-sm" type="button" onclick="openAddProductImageStyle(${Number(result.asset_id)})" ${result.in_style_library ? 'disabled' : ''}><i class="fas ${result.in_style_library ? 'fa-circle-check' : 'fa-bookmark'}"></i> ${result.in_style_library ? 'In stijlbibliotheek' : 'Voeg toe aan stijlbibliotheek'}</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="toggleProductImageRefinement(${Number(result.asset_id)})" ${result.refinement_status !== 'idle' ? 'disabled' : ''}><i class="fas ${result.refinement_status !== 'idle' ? 'fa-spinner fa-spin' : 'fa-pen'}"></i> ${result.refinement_status !== 'idle' ? 'Wordt aangepast…' : 'Deze foto aanpassen'}</button>
-              <button class="btn btn-outline btn-sm" type="button" onclick="openProductImageMetadata(${Number(result.asset_id)})">SEO-gegevens</button>
+              <button class="btn btn-outline btn-sm" type="button" onclick="openProductImageMetadata(${Number(result.asset_id)})">${result.seo?.ready ? 'SEO-gegevens ✓' : ['queued', 'processing'].includes(result.seo?.status) ? 'SEO wordt gemaakt…' : 'SEO niet afgerond'}</button>
               <a class="btn btn-primary btn-sm" href="${escHtml(result.download_url)}" onclick="return prepareProductImageDownload(event, ${Number(result.asset_id)})"><i class="fas fa-download"></i> Download WEBP</a>
             </div>
           </div>
@@ -787,6 +815,16 @@ function renderProductImageResults() {
         </article>
       `).join('')}
     </div>`;
+  productImageState.results.forEach(result => {
+    const id = Number(result.asset_id);
+    const draft = drafts.get(`${id}:${Number(result.version || 1)}`);
+    if (!draft) return;
+    const checkbox = document.getElementById(`product-label-approved-${id}`);
+    if (checkbox) checkbox.checked = !!draft.approved;
+    const input = document.getElementById(`product-refinement-text-${id}`);
+    if (input) input.value = draft.text;
+    if (draft.open) document.getElementById(`product-refinement-${id}`)?.classList.remove('hidden');
+  });
   container.classList.remove('hidden');
 }
 
@@ -796,7 +834,7 @@ function openProductImageMetadata(assetId) {
 
 function prepareProductImageDownload(event, assetId) {
   const result = productImageState.results.find(item => Number(item.asset_id) === Number(assetId));
-  if (!result?.metadata?.filename || /[0-9]/.test(result.metadata.filename)) {
+  if (!result?.seo?.ready || !result?.metadata?.filename || /[0-9]/.test(result.metadata.filename)) {
     event.preventDefault();
     toast('Maak of sla eerst de SEO op met een unieke beschrijvende bestandsnaam zonder cijfers.', 'error');
     openImageSeoEditor(assetId);
@@ -939,7 +977,15 @@ async function pollProductImageRefinement(requestId, assetId, oldVersion) {
       setTimeout(() => pollProductImageRefinement(requestId, assetId, oldVersion), 2500);
       return;
     }
-    toast('De gekozen foto is aangepast. De andere foto’s zijn ongewijzigd.', 'success');
+    if (['queued', 'processing'].includes(selected?.seo?.status)) {
+      setTimeout(() => pollProductImageRefinement(requestId, assetId, oldVersion), 2500);
+      return;
+    }
+    if (!productImagesSeoReady([selected])) {
+      toast('De aangepaste foto is bewaard, maar de SEO is nog niet afgerond. Open de SEO bij deze foto.', 'error');
+      return;
+    }
+    toast('De gekozen foto en alle SEO-velden zijn klaar. De andere foto’s zijn ongewijzigd.', 'success');
   } catch (error) {
     setTimeout(() => pollProductImageRefinement(requestId, assetId, oldVersion), 5000);
   }
