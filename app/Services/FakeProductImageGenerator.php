@@ -6,14 +6,12 @@ use Illuminate\Http\UploadedFile;
 
 class FakeProductImageGenerator implements ProductImageGenerator, ProductImageRefiner, ProductImageWorkflowGenerator
 {
-    private const PLACEHOLDER_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAAFklEQVQImWNcZW7EwMDAxMDAwMDAAAANhgEXu1wcnAAAAABJRU5ErkJggg==';
-
     public function generate(UploadedFile $source, string $basePrompt, ?callable $reportProgress = null): array
     {
         if ($reportProgress) {
             $reportProgress('preparing', 15);
         }
-        $contents = base64_decode(self::PLACEHOLDER_PNG, true);
+        $contents = ProductImageFormat::placeholder();
 
         if ($contents === false) {
             throw new ProductImageGenerationException('De lokale voorbeeldafbeelding kon niet worden gemaakt.');
@@ -37,7 +35,7 @@ class FakeProductImageGenerator implements ProductImageGenerator, ProductImageRe
         if ($reportProgress) {
             $reportProgress('preparing', 15);
         }
-        $contents = base64_decode(self::PLACEHOLDER_PNG, true);
+        $contents = ProductImageFormat::placeholder();
         if (! is_string($contents)) {
             throw new ProductImageGenerationException('De lokale voorbeeldafbeelding kon niet worden gemaakt.');
         }

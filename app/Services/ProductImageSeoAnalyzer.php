@@ -15,8 +15,9 @@ class ProductImageSeoAnalyzer
             throw new ProductImageSeoException('Voorbeeldmodus: geen AI-beeldanalyse uitgevoerd. Vul de SEO handmatig in of stel de AI-koppeling in.');
         }
         $schema = ['type' => 'object', 'additionalProperties' => false,
-            'required' => ProductImageSeo::FIELDS,
-            'properties' => array_fill_keys(ProductImageSeo::FIELDS, ['type' => 'string']),
+            'required' => [...ProductImageSeo::FIELDS, 'filename_alternatives'],
+            'properties' => [...array_fill_keys(ProductImageSeo::FIELDS, ['type' => 'string']),
+                'filename_alternatives' => ['type' => 'array', 'items' => ['type' => 'string'], 'minItems' => 2, 'maxItems' => 5]],
         ];
         $response = Http::withToken($key)->acceptJson()->connectTimeout(15)->timeout(120)
             ->post(config('services.product_content.endpoint'), [
@@ -52,7 +53,8 @@ class ProductImageSeoAnalyzer
             throw new ProductImageSeoException('De AI gaf geen volledige SEO-velden. De foto en vorige SEO zijn bewaard.');
         }
 
-        return ProductImageSeo::normalizeForImage($fields, $context, $result);
+        return [...ProductImageSeo::normalizeForImage($fields, $context, $result),
+            'filename_alternatives' => array_slice(array_values(array_filter((array) ($fields['filename_alternatives'] ?? []), 'is_string')), 0, 5)];
     }
 
     public function instructions(): string
@@ -64,6 +66,7 @@ class ProductImageSeoAnalyzer
             .'BEREIDINGSWIJZE: dit aparte invoerveld is de door de medewerker gekozen bereidingsvariant voor deze gegenereerde serveersuggestie. Bij bbq, pan, oven of airfryer is vermelding verplicht in ALLE vijf velden: filename bevat respectievelijk bbq, pan, oven of airfryer als los koppeltekenwoord. Verwerk in alt, title, caption en description natuurlijk de formulering bereid op de BBQ, bereid in de pan, bereid in de oven of bereid in de airfryer. Alleen een apparaat op de achtergrond noemen is niet voldoende. Noem geen andere kookmethode. Dit beschrijft de bedoelde serveersuggestie, niet een uitgevoerde praktijktest, receptadvies of gegarandeerde productgeschiktheid. Bij een lege bereidingswijze niets afleiden uit de productnaam, het variantnummer of achtergrondapparaten; rauwe beelden krijgen geen bereidingsclaim. '
             .'Correcte Nederlandse samenstellingen: Varkens wangen wordt varkenswangen, aardappelpuree blijft één woord. Verander geen merk, ras of productidentiteit. '
             .'filename: korte beschrijvende bestandsnaam, product eerst, daarna passende zichtbare bereiding/presentatie en onderscheidend detail. Kleine letters, één koppelteken tussen woorden, geen spaties of underscores, .webp. Geen variant-1-v1, geen keywordlijst. Voorbeeld van schrijfwijze (geen feiten over deze foto): varkenswangen-ontvliesd-gestoofd-aardappelpuree.webp. '
+            .'UNIEKE BESTANDSNAAM: gebruik geen cijfers, volgnummers, versienummers, datums, hashes of willekeurige codes. Gebruik ook geen uitgeschreven volgnummers zoals twee of tweede om een kopie uniek te maken. Kies onderscheidende daadwerkelijk zichtbare details, bijvoorbeeld ondergrond, achtergrond, servies, camerahoek of garnering; verzin die nooit voor de naam. Schrijf noodzakelijke getallen uit zonder de productidentiteit te veranderen. filename_alternatives: twee tot vijf andere inhoudelijk passende bestandsnamen voor DEZELFDE foto, volgens dezelfde regels en met de gekozen bereidingswijze indien van toepassing. De server kiest een beschikbare naam; het zijn geen namen voor andere foto’s. Laat ook alt, title, caption en description de eigen zichtbare details van deze foto beschrijven, geen algemene herhaalde standaardtekst. '
             .'alt: natuurlijke bondige beschrijving van wat zichtbaar is, geen verkooppraat, geen keywordstapeling. '
             .'title: productnaam plus korte onderscheidende presentatie, bij een bereide foto met bijgerechten duidelijk serveersuggestie. '
             .'caption: één menselijke zin, bij bereid beginnen met Serveersuggestie:. '

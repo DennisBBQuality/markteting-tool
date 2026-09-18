@@ -7,6 +7,7 @@ use App\Jobs\GenerateProductImageSeo;
 use App\Models\ProductImageRequest;
 use App\Services\FakeProductImageGenerator;
 use App\Services\OpenAiProductImageGenerator;
+use App\Services\ProductImageFormat;
 use App\Services\ProductImagePromptBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -103,7 +104,7 @@ class ProductImageVariantsTest extends TestCase
     {
         config(['services.product_images.driver' => 'openai', 'services.product_images.openai.api_key' => 'test-key']);
         $source = UploadedFile::fake()->image('vis.png', 20, 20);
-        $encoded = base64_encode(file_get_contents($source->getRealPath()));
+        $encoded = base64_encode(ProductImageFormat::placeholder());
         Http::fake(['*' => Http::response(['data' => [['b64_json' => $encoded]]])]);
         $results = app(OpenAiProductImageGenerator::class)->generateForProduct([$source], '', [
             'product_type' => 'fish', 'product_name' => 'Testvis', 'variant_groups' => ['airfryer'], 'quantity' => 1,

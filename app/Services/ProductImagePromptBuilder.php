@@ -116,8 +116,8 @@ class ProductImagePromptBuilder
                 ? self::COOKED_PHOTOGRAPHY
                 : 'FOTOGRAFISCHE KWALITEIT: echte voedselstructuur, natuurlijke kleur, realistische vezels, vet en vocht. Vermijd plastic, wasachtig, overdreven glad of uniform vlees, uitgebeten hooglichten, kunstmatige glans, gitzwarte korst en generieke stockfoto-uitstraling.')),
             $cooked
-                ? 'Lever precies één vierkante, fotorealistische afbeelding zonder watermerk, toegevoegde reclametekst of fantasielogo. Voeg geen hoofdproducten toe buiten het opgegeven aantal.'
-                : 'Lever precies één vierkante, fotorealistische afbeelding zonder watermerk, toegevoegde reclametekst of fantasielogo. Voeg nooit een tweede hoofdproduct toe.',
+                ? 'Lever precies één liggende 4:3, fotorealistische afbeelding zonder watermerk, toegevoegde reclametekst of fantasielogo. Voeg geen hoofdproducten toe buiten het opgegeven aantal.'
+                : 'Lever precies één liggende 4:3, fotorealistische afbeelding zonder watermerk, toegevoegde reclametekst of fantasielogo. Voeg nooit een tweede hoofdproduct toe.',
         ];
 
         if ($notes !== '') {

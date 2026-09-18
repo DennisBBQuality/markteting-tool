@@ -36,9 +36,15 @@ class ProductImageSeo
         $name = preg_replace('/\.webp$/i', '', $clean['filename']);
         $name = preg_replace('/varkens[\s_-]+wangen/i', 'varkenswangen', $name);
         $name = preg_replace('/aardappel[\s_-]+puree/i', 'aardappelpuree', $name);
+        if (preg_match('/\p{N}/u', $name)) {
+            throw ValidationException::withMessages(['filename' => 'Gebruik een bestandsnaam zonder cijfers of volgnummers. Beschrijf een herkenbaar detail van deze foto.']);
+        }
         $slug = trim(Str::limit(Str::slug(str_replace('_', ' ', $name)), 180, ''), '-');
         if ($slug === '') {
             throw ValidationException::withMessages(['filename' => 'Gebruik een beschrijvende bestandsnaam.']);
+        }
+        if (preg_match('/[0-9]/', $slug)) {
+            throw ValidationException::withMessages(['filename' => 'Gebruik een bestandsnaam zonder cijfers of volgnummers. Beschrijf een herkenbaar detail van deze foto.']);
         }
         $clean['filename'] = $slug.'.webp';
 
@@ -127,19 +133,30 @@ class ProductImageSeo
         });
     }
 
-    /** Caller holds the photoset lock; only current versions reserve download names. */
-    public function uniqueFilename(ProductImageAsset $asset, array $fields): array
+    /** Caller holds the asset/photoset locks. A unique DB key also protects parallel photosets. */
+    public function uniqueFilename(ProductImageAsset $asset, array $fields, array $alternatives = []): array
     {
-        $used = ProductImageMetadata::join('product_image_assets as a', 'a.id', '=', 'product_image_metadata.product_image_asset_id')
-            ->where('a.product_image_request_id', $asset->product_image_request_id)->where('a.id', '!=', $asset->id)
-            ->whereColumn('a.version', 'product_image_metadata.image_version')->get(['product_image_metadata.*'])
-            ->pluck('fields')->map(fn ($item) => $item['filename'] ?? '')->all();
-        $base = substr($fields['filename'], 0, -5);
-        $n = 2;
-        while (in_array($fields['filename'], $used, true)) {
-            $fields['filename'] = $base.'-'.$n++.'.webp';
+        $request = ProductImageRequest::findOrFail($asset->product_image_request_id);
+        $result = collect($request->results)->firstWhere('filename', $asset->filename) ?? [];
+        foreach (array_unique(array_filter([$fields['filename'], ...array_slice($alternatives, 0, 5)], 'is_string')) as $candidate) {
+            try {
+                $candidateFields = self::normalizeForImage([...$fields, 'filename' => $candidate], (array) $request->generation_context, $result);
+            } catch (ValidationException) {
+                continue;
+            }
+            $name = $candidateFields['filename'];
+            // Old metadata is deliberately not migrated or renamed. Respect those names too.
+            if (ProductImageMetadata::where('product_image_asset_id', '!=', $asset->id)->where('fields->filename', $name)->exists()) {
+                continue;
+            }
+            $reserved = DB::table('product_image_download_names')->insertOrIgnore([
+                'filename' => $name, 'product_image_asset_id' => $asset->id,
+            ]);
+            if ($reserved || DB::table('product_image_download_names')->where('filename', $name)->where('product_image_asset_id', $asset->id)->exists()) {
+                return $candidateFields;
+            }
         }
 
-        return $fields;
+        throw ValidationException::withMessages(['filename' => 'Deze bestandsnaam is al in gebruik. Beschrijf een ander zichtbaar detail van deze foto of maak de SEO opnieuw. Er wordt geen volgnummer toegevoegd.']);
     }
 }

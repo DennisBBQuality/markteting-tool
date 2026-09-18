@@ -370,6 +370,8 @@ class ProductImageController extends Controller
         $delivery = app(ProductImageDelivery::class);
         $result = collect($request->results)->firstWhere('filename', $filename) ?? [];
         $metadata = $delivery->metadata((array) $request->generation_context, $result, $version, $asset);
+        abort_if($metadata['filename'] === '' || preg_match('/[0-9]/', $metadata['filename']), 422,
+            'Maak of sla eerst de SEO op met een unieke beschrijvende bestandsnaam zonder cijfers. De foto blijft bewaard.');
         $path = 'product-images/'.$request->id.'/webp/'.hash('sha256', $contents).'.webp';
         if (! Storage::disk('local')->exists($path)) {
             Storage::disk('local')->put($path, $delivery->webp($contents));

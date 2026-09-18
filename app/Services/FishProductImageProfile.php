@@ -72,7 +72,7 @@ class FishProductImageProfile
         }
         $parts[] = $plan['instruction'];
         $parts[] = 'BEELDSTIJL: '.$plan['style'];
-        $parts[] = 'FOTOGRAFIE VIS: zacht gericht of diffuus licht, natuurlijke kleuren en rustige contrasten. Geloofwaardige fijne voedselstructuur en plaatselijke subtiele vochtglans, zonder korreligheid, HDR, verscherpingsranden, plastic, wasachtige oppervlakken of een overal glimmende laklaag. Houd het volledige product in beeld met ademruimte rondom, geen beeldvullende macro-opname. Voeg geen tekst, watermerk, merk of verpakking toe. Lever precies één vierkante afbeelding.';
+        $parts[] = 'FOTOGRAFIE VIS: zacht gericht of diffuus licht, natuurlijke kleuren en rustige contrasten. Geloofwaardige fijne voedselstructuur en plaatselijke subtiele vochtglans, zonder korreligheid, HDR, verscherpingsranden, plastic, wasachtige oppervlakken of een overal glimmende laklaag. Houd het volledige product in beeld met ademruimte rondom, geen beeldvullende macro-opname. Voeg geen tekst, watermerk, merk of verpakking toe. Lever precies één liggende 4:3-afbeelding.';
         if (trim((string) ($context['notes'] ?? '')) !== '') {
             $parts[] = 'EXTRA INFORMATIE VAN DE MEDEWERKER: '.trim($context['notes']);
         }

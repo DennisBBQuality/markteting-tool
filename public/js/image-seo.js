@@ -31,6 +31,7 @@ async function openImageSeoEditor(assetId) {
         <textarea id="image-seo-${key}" rows="${key === 'description' ? 3 : 2}" maxlength="${key === 'description' ? 1600 : 400}" oninput="imageSeoEditor.dirty = true">${escHtml(result.metadata?.[key] || '')}</textarea>
         <button type="button" class="btn btn-outline btn-sm" onclick="copyImageSeo('${key}')">Kopiëren</button></div>`).join('')}
       <p>De opgeslagen bestandsnaam wordt ook bij de WEBP-download gebruikt. Versies blijven intern bewaard.</p>
+      <p>Gebruik een unieke beschrijvende bestandsnaam zonder cijfers. Bij een dubbele naam kies je een ander zichtbaar detail. De WEBP-download is beschikbaar zodra een geldige SEO-bestandsnaam is opgeslagen.</p>
     </div>`, `<button class="btn btn-primary" id="image-seo-save" onclick="saveImageSeo()">SEO opslaan</button>
       <button class="btn btn-outline" id="image-seo-generate" onclick="generateImageSeo()">SEO opnieuw maken</button>
       <button class="btn btn-outline" onclick="copyImageSeo('all')">Alles kopiëren</button>

@@ -218,7 +218,7 @@ class ProductStudioReliabilityTest extends TestCase
         $this->assertSame(2, imagesy($decoded));
         $this->assertSame(imagecolorat($image, 0, 0), imagecolorat($decoded, 0, 0));
         $metadata = $delivery->metadata(['product_name' => 'Black Angus brisket'], ['status' => 'rauw', 'variant' => 1], 2);
-        $this->assertSame('black-angus-brisket-rauw-variant-1-v2.webp', $metadata['filename']);
+        $this->assertSame('', $metadata['filename']); // No invented or numbered fallback before photo-specific SEO.
         $this->assertSame('Black Angus brisket, rauw', $metadata['alt']);
         imagedestroy($image);
         imagedestroy($decoded);

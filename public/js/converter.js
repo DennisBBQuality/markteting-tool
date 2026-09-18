@@ -71,7 +71,7 @@ function renderConverter() {
         <div>
           <span class="product-image-eyebrow">AI productfotografie</span>
           <h3 id="product-image-title">Productfoto Generator</h3>
-          <p>Maak betrouwbare productfoto's vanuit maximaal vijf echte referentiefoto's.</p>
+          <p>Maak betrouwbare productfoto's vanuit maximaal vijf echte referentiefoto's. Websiteformaat: liggend 4:3 (1536 × 1152 pixels).</p>
           <p><i class="fas fa-circle-check" style="color:var(--success);"></i> BBQuality-stijlbibliotheek actief: eigen rauwe setting voor vlees en vis, met verschillende bereide sferen.</p>
         </div>
         <button class="btn btn-outline" type="button" onclick="openProductPromptModal()">
@@ -774,7 +774,7 @@ function renderProductImageResults() {
               <button class="btn btn-outline btn-sm" type="button" onclick="openAddProductImageStyle(${Number(result.asset_id)})" ${result.in_style_library ? 'disabled' : ''}><i class="fas ${result.in_style_library ? 'fa-circle-check' : 'fa-bookmark'}"></i> ${result.in_style_library ? 'In stijlbibliotheek' : 'Voeg toe aan stijlbibliotheek'}</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="toggleProductImageRefinement(${Number(result.asset_id)})" ${result.refinement_status !== 'idle' ? 'disabled' : ''}><i class="fas ${result.refinement_status !== 'idle' ? 'fa-spinner fa-spin' : 'fa-pen'}"></i> ${result.refinement_status !== 'idle' ? 'Wordt aangepast…' : 'Deze foto aanpassen'}</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="openProductImageMetadata(${Number(result.asset_id)})">SEO-gegevens</button>
-              <a class="btn btn-primary btn-sm" href="${escHtml(result.download_url)}" ${result.needs_label_review ? `onclick="return confirmProductLabelReview(event, ${Number(result.asset_id)})"` : ''}><i class="fas fa-download"></i> Download WEBP</a>
+              <a class="btn btn-primary btn-sm" href="${escHtml(result.download_url)}" onclick="return prepareProductImageDownload(event, ${Number(result.asset_id)})"><i class="fas fa-download"></i> Download WEBP</a>
             </div>
           </div>
           ${result.needs_label_review ? `<label class="product-label-warning"><input type="checkbox" id="product-label-approved-${Number(result.asset_id)}"><span><strong>Etiketcontrole verplicht.</strong> Ik heb iedere letter, het logo en de kleuren vergeleken met de echte referentiefoto.</span></label>` : ''}
@@ -792,6 +792,17 @@ function renderProductImageResults() {
 
 function openProductImageMetadata(assetId) {
   return openImageSeoEditor(assetId);
+}
+
+function prepareProductImageDownload(event, assetId) {
+  const result = productImageState.results.find(item => Number(item.asset_id) === Number(assetId));
+  if (!result?.metadata?.filename || /[0-9]/.test(result.metadata.filename)) {
+    event.preventDefault();
+    toast('Maak of sla eerst de SEO op met een unieke beschrijvende bestandsnaam zonder cijfers.', 'error');
+    openImageSeoEditor(assetId);
+    return false;
+  }
+  return result.needs_label_review ? confirmProductLabelReview(event, assetId) : true;
 }
 
 async function linkImagesToDossier() {

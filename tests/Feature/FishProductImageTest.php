@@ -8,6 +8,7 @@ use App\Models\ProductImageAsset;
 use App\Models\ProductImageRequest;
 use App\Models\ProductImageStyleReference;
 use App\Services\OpenAiProductImageGenerator;
+use App\Services\ProductImageFormat;
 use App\Services\ProductImageGenerator;
 use App\Services\ProductImagePromptBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -84,7 +85,7 @@ class FishProductImageTest extends TestCase
         $this->assertSame(['Vis bereid', 'Vis bereid', 'Vis rauw', 'Vis rauw', 'Vis bereid · Keuken'], array_column($results, 'label'));
         $this->assertSame([1, 2, 1, 2, 3], array_column($results, 'variant'));
         foreach ($results as $result) {
-            $this->get($result['download_url'])->assertOk()->assertHeader('Content-Type', 'image/webp');
+            $this->getJson($result['download_url'])->assertUnprocessable(); // Wait for image-specific SEO; no numbered fallback.
         }
         $this->assertSame(5, ProductImageAsset::where('product_image_request_id', $request->id)->count());
     }
@@ -93,7 +94,7 @@ class FishProductImageTest extends TestCase
     {
         config(['services.product_images.driver' => 'openai', 'services.product_images.openai.api_key' => 'test-key']);
         $photo = UploadedFile::fake()->image('testvis.png', 40, 40);
-        $encoded = base64_encode(file_get_contents($photo->getRealPath()));
+        $encoded = base64_encode(ProductImageFormat::placeholder());
         // Even an identically named product saved under meat must never leak into fish.
         ProductImageStyleReference::create([
             'product_name' => 'Testvis', 'product_key' => 'testvis', 'product_type' => 'meat',

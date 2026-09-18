@@ -247,7 +247,7 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
                 throw new ProductImageGenerationException('De beeldservice leverde een ongeldige afbeelding op.');
             }
 
-            $images[] = $contents;
+            $images[] = ProductImageFormat::validate($contents);
         }
 
         return $images;
@@ -285,9 +285,9 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
     {
         $parameters = [
             'model' => $model,
-            'prompt' => $prompt,
+            'prompt' => $prompt."\n\n".ProductImageFormat::INSTRUCTION,
             'n' => 1,
-            'size' => (string) config('services.product_images.openai.size'),
+            'size' => ProductImageFormat::SIZE,
             'output_format' => 'png',
             'quality' => (string) config('services.product_images.openai.quality', 'high'),
             'background' => 'opaque',
@@ -318,7 +318,7 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
             throw new ProductImageGenerationException('De beeldservice leverde een ongeldige afbeelding op.');
         }
 
-        return $contents;
+        return ProductImageFormat::validate($contents);
     }
 
     private function userFacingApiError(Response $response): string

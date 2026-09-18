@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\ProductImageAsset;
-use Illuminate\Support\Str;
 use RuntimeException;
 
 class ProductImageDelivery
@@ -14,10 +13,9 @@ class ProductImageDelivery
         $state = match ($result['status'] ?? '') {
             'rauw' => 'rauw', 'bereid' => 'bereid', default => 'productfoto',
         };
-        $variant = max(1, (int) ($result['variant'] ?? 1));
-
         $fallback = [
-            'filename' => Str::limit(Str::slug($name), 120, '').'-'.$state.'-variant-'.$variant.'-v'.$version.'.webp',
+            // A photo-specific, reserved name must come from SEO, not a numbered fallback.
+            'filename' => '',
             'title' => $name.' – '.$state,
             'alt' => $name.($state === 'productfoto' ? '' : ', '.$state),
             'caption' => $name.' | BBQuality',
