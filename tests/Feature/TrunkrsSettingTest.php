@@ -86,7 +86,7 @@ class TrunkrsSettingTest extends TestCase
 
     public function test_every_endpoint_requires_an_active_admin_and_csrf(): void
     {
-        $routes = [['GET', ''], ['PUT', ''], ['POST', '/connect'], ['POST', '/poll'], ['POST', '/stop'], ['POST', '/sync']];
+        $routes = [['GET', ''], ['PUT', ''], ['POST', '/connect'], ['POST', '/poll'], ['POST', '/stop'], ['POST', '/sync'], ['POST', '/initialize']];
         foreach ($routes as [$method, $path]) {
             $this->json($method, self::URL.$path)->assertUnauthorized();
         }
@@ -259,5 +259,21 @@ class TrunkrsSettingTest extends TestCase
         $this->assertSame(1, DB::table('migrations')->where('migration', UpgradeTrunkrsSettings::MIGRATION)->count());
         DB::table('migrations')->where('migration', UpgradeTrunkrsSettings::MIGRATION)->delete();
         $this->artisan('pitboard:upgrade-trunkrs-settings')->assertFailed();
+    }
+
+    public function test_admin_can_initialize_only_missing_trunkrs_tables_without_hosting_access(): void
+    {
+        $this->actingAsUser(['rol' => 'admin']);
+        foreach (['trunkrs_settings', 'trunkrs_reports', 'trunkrs_connections'] as $table) {
+            Schema::drop($table);
+        }
+        DB::table('migrations')->whereIn('migration', [UpgradeTrunkrsSettings::MIGRATION, '2026_09_11_160000_create_trunkrs_reports_tables'])->delete();
+        $before = DB::table('users')->get()->toJson();
+        $this->postJson(self::URL.'/initialize')->assertUnprocessable();
+        $this->postJson(self::URL.'/initialize', ['confirm' => true, 'command' => 'migrate:fresh'])->assertOk();
+        $this->assertSame($before, DB::table('users')->get()->toJson());
+        $this->assertDatabaseCount('trunkrs_reports', 0);
+        $this->postJson(self::URL.'/initialize', ['confirm' => true])->assertOk();
+        $this->getJson(self::URL)->assertJsonPath('ready', true);
     }
 }

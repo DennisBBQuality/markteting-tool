@@ -62,6 +62,7 @@ Route::middleware('auth.custom')->group(function () {
     Route::get('/api/users', [UserController::class, 'index']);
     Route::middleware('admin')->group(function () {
         Route::get('/api/settings/trunkrs', [TrunkrsSettingController::class, 'show']);
+        Route::post('/api/settings/trunkrs/initialize', [TrunkrsSettingController::class, 'initialize'])->middleware('throttle:trunkrs-setup');
         Route::put('/api/settings/trunkrs', [TrunkrsSettingController::class, 'update'])->middleware('throttle:trunkrs-setup');
         Route::post('/api/settings/trunkrs/connect', [TrunkrsSettingController::class, 'start'])->middleware('throttle:trunkrs-setup');
         Route::post('/api/settings/trunkrs/poll', [TrunkrsSettingController::class, 'poll'])->middleware('throttle:trunkrs-poll');

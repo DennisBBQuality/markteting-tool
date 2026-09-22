@@ -11,6 +11,7 @@ use App\Services\Trunkrs\TrunkrsDashboard;
 use App\Services\Trunkrs\TrunkrsException;
 use App\Services\Trunkrs\TrunkrsMicrosoftAuth;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -19,6 +20,23 @@ use Illuminate\Support\Str;
 
 class TrunkrsSettingController extends Controller
 {
+    public function initialize(Request $request)
+    {
+        $request->validate(['confirm' => 'accepted']);
+        // Fixed additive upgrade only: no user-supplied paths, commands or options.
+        try {
+            $exit = Artisan::call('pitboard:upgrade-trunkrs-settings');
+        } catch (\Throwable) {
+            $exit = 1;
+        }
+        $this->audit($request, $exit === 0 ? 'storage_prepared' : 'storage_failed');
+        if ($exit !== 0 || ! $this->ready()) {
+            return response()->json(['error' => 'Trunkrs-opslag kon niet veilig worden voorbereid. Bestaande tabellen zijn niet automatisch hersteld of vervangen.'], 503);
+        }
+
+        return response()->json(['message' => 'Trunkrs-opslag is gereed. Bestaande Pitboard-gegevens zijn behouden.']);
+    }
+
     private function ready(): bool
     {
         return Schema::hasTable('trunkrs_settings') && Schema::hasTable('trunkrs_connections') && Schema::hasTable('trunkrs_reports');

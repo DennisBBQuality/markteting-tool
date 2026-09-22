@@ -20,22 +20,27 @@ class UpgradeTrunkrsSettings extends Command
         if (! Schema::hasTable('migrations') || ! Schema::hasTable('users')) {
             return self::SUCCESS;
         }
-        if (! Schema::hasTable('trunkrs_connections') || ! Schema::hasTable('trunkrs_reports')) {
-            $this->error('Trunkrs prerequisite tables are missing; no changes performed.');
-
-            return self::FAILURE;
-        }
 
         return Cache::store('database')->lock('pitboard-trunkrs-settings-upgrade', 120)->block(10, function () {
-            $recorded = DB::table('migrations')->where('migration', self::MIGRATION)->exists();
-            $exists = Schema::hasTable('trunkrs_settings');
-            if ($recorded !== $exists) {
-                $this->error('Trunkrs settings schema and migration history disagree; no automatic repair performed.');
+            $migrations = [
+                '2026_09_11_160000_create_trunkrs_reports_tables' => ['trunkrs_connections', 'trunkrs_reports'],
+                self::MIGRATION => ['trunkrs_settings'],
+            ];
+            // Check ALL prerequisites before any writes. Never repair an ambiguous schema.
+            foreach ($migrations as $migration => $tables) {
+                $recorded = DB::table('migrations')->where('migration', $migration)->exists();
+                foreach ($tables as $table) {
+                    if ($recorded !== Schema::hasTable($table)) {
+                        $this->error('Trunkrs schema and migration history disagree; no automatic repair performed.');
 
-                return self::FAILURE;
+                        return self::FAILURE;
+                    }
+                }
             }
-            if (! $exists && $this->call('migrate', ['--path' => ['database/migrations/'.self::MIGRATION.'.php'], '--force' => true]) !== 0) {
-                return self::FAILURE;
+            foreach ($migrations as $migration => $tables) {
+                if (! Schema::hasTable($tables[0]) && $this->call('migrate', ['--path' => ['database/migrations/'.$migration.'.php'], '--force' => true]) !== 0) {
+                    return self::FAILURE;
+                }
             }
             if (! Schema::hasColumns('trunkrs_settings', ['payload', 'pending', 'scheduler_seen_at'])) {
                 return self::FAILURE;

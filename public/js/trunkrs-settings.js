@@ -13,7 +13,14 @@ const TrunkrsSettings = {
     if (generation !== this.generation || userId !== App.currentUser?.id || element !== document.getElementById('trunkrs-settings')) return;
     if (!data) { element.textContent = 'Trunkrs-instellingen konden niet worden geladen. Heropen Instellingen.'; return; }
     this.state = data;
-    if (!data.ready) { element.textContent = data.message; return; }
+    if (!data.ready) {
+      element.innerHTML = `<h3>Trunkrs — Niet bezorgd</h3><p>${escHtml(data.message)}</p>
+        <p>De beheerder kan uitsluitend de ontbrekende Trunkrs-tabellen toevoegen. Bestaande taken, projecten, kalender, notities en rapporten worden niet vervangen.</p>
+        <button type="button" class="btn btn-primary" id="trunkrs-initialize">Trunkrs-opslag voorbereiden</button>
+        <p id="trunkrs-feedback" role="status"></p>`;
+      document.getElementById('trunkrs-initialize').addEventListener('click', () => this.action('initialize'));
+      return;
+    }
     const labels = { tenant_id: 'Microsoft tenant-ID', client_id: 'Toepassings-ID (client-ID)',
       reader_user_id: 'Object-ID van de mailboxgebruiker', mailbox: 'E-mailadres van de bestaande mailbox', folder_id: 'Microsoft map-ID van Trunkrs not deliverd' };
     element.innerHTML = `<h3>Trunkrs — Niet bezorgd</h3>
@@ -55,6 +62,10 @@ const TrunkrsSettings = {
     if (kind === 'stop' && !confirm('Stop de Trunkrs-koppeling en verwijder de lokaal bewaarde toegangstokens? Bestaande rapporten blijven behouden.')) return;
     if (kind === 'save' && this.state.status.configured && !confirm('De instellingen opslaan verbreekt de huidige Microsoft-verbinding. Doorgaan?')) return;
     let body;
+    if (kind === 'initialize') {
+      if (!confirm('Uitsluitend de ontbrekende Trunkrs-tabellen toevoegen? Bestaande gegevens worden niet vervangen.')) return;
+      body = {confirm: true};
+    }
     if (kind === 'save') {
       body = {revision: this.state.revision};
       Object.keys(this.state.fields).forEach(key => { body[key] = document.getElementById(`trunkrs-${key}`).value.trim(); });
