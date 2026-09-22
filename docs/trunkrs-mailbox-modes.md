@@ -23,7 +23,9 @@ Bronnen: [Microsoft Graph-machtigingen](https://learn.microsoft.com/en-us/graph/
 
 ## Inrichting via GitHub en Pitboard (22 september 2026)
 
-De eigen-mailboxkoppeling kan nu via **Instellingen → Trunkrs — Niet bezorgd** worden ingericht door een actieve Pitboard-beheerder. Hostingtoegang is hiervoor niet nodig. De gebruikelijke feature branch → pull request → main-route levert de code en een beperkte Composer-upgradehook voor uitsluitend de nieuwe additieve instellingentabel. Een wijziging van `.env` is niet nodig. Bestaande serverinstellingen blijven als terugval gelden zolang er geen app-instellingen zijn opgeslagen.
+De eigen-mailboxkoppeling kan nu via **Instellingen → Trunkrs — Niet bezorgd** worden ingericht door een actieve Pitboard-beheerder. Hostingtoegang is hiervoor niet nodig. De gebruikelijke feature branch → pull request → main-route levert de code en een beperkte Composer-upgradehook. Een wijziging van `.env` is niet nodig. Bestaande serverinstellingen blijven als terugval gelden zolang er geen app-instellingen zijn opgeslagen.
+
+Als de uitrol geen migraties uitvoert, verschijnt **Trunkrs-opslag voorbereiden**. Na expliciete bevestiging voert deze adminactie uitsluitend de vaste migraties `2026_09_11_160000_create_trunkrs_reports_tables` en `2026_09_22_150000_create_trunkrs_settings_table` uit voor ontbrekende tabellen. Dezelfde begrensde opdracht wordt door de installatiehook gebruikt. Alle tabel- en migratiestatussen worden vooraf gecontroleerd; bij een afwijkende of gedeeltelijke structuur stopt de opdracht zonder automatische reparatie. Er worden geen gebruikerscommando's uitgevoerd, bestaande tabellen vervangen of andere migraties gestart. Taken, projecten, kalender, notities en bestaande rapporten blijven behouden.
 
 1. Vul tenant-ID, client-ID, het gebruikersobject-ID, het bestaande mailboxadres en de gecontroleerde rapportmap-ID in. Geen wachtwoord of client secret. Deze gegevens worden niet in Git gezet.
 2. Sla op. Dit zet inlezen uit, trekt eventuele lokale oude tokens in en vereist een nieuwe verbinding. Bestaande rapporten blijven behouden.
@@ -60,7 +62,7 @@ Lokaal blijven echte mailboxverzoeken geblokkeerd tenzij daar afzonderlijk expli
 - Verkeerde scopes, extra gedeelde-mailrechten, Mail.Send of Mail.ReadWrite worden geweigerd.
 - Paginering blijft exact binnen dezelfde map/resource; ook andere Microsoft-maplinks worden geweigerd.
 - Wisselen van modus maakt bestaande tokens onbruikbaar voor de nieuwe configuratie; opnieuw verbinden is verplicht. Bestaande shared-vingerafdrukken blijven compatibel.
-- Bestaande rapporten blijven behouden; er zijn geen nieuwe migraties en geen wijzigingen aan Taken, Kalender, Notities of Projecten.
+- Bestaande rapporten blijven behouden; de browserinrichting voegt alleen een instellingentabel toe en kan ontbrekende oorspronkelijke Trunkrs-tabellen aanmaken. Geen wijzigingen aan Taken, Kalender, Notities of Projecten.
 
 Regressiedekking: `TrunkrsReportTest`, `TrunkrsOwnMailboxTest` en `tests/js/trunkrs.test.cjs`. Geslaagde tests zijn geen bewijs van een werkende live Microsoft-koppeling.
 

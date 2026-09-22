@@ -46,3 +46,16 @@ test('a failed save leaves inputs and a persistent error in place', async () => 
   assert.equal(t.node('trunkrs-feedback').textContent, 'Niet opgeslagen');
   assert.equal(t.settings.busy, false);
 });
+test('missing storage offers a fixed confirmed initialization action', async () => {
+  const t = setup(); t.state.ready = false; t.state.message = 'Opslag ontbreekt';
+  await t.settings.load();
+  assert.match(t.node('trunkrs-settings').innerHTML, /Trunkrs-opslag voorbereiden/);
+  t.context.confirm = () => false;
+  await t.settings.action('initialize');
+  assert.equal(t.calls.length, 1);
+  t.context.confirm = () => true;
+  await t.settings.action('initialize');
+  assert.equal(t.calls[1][0], '/api/settings/trunkrs/initialize');
+  assert.equal(JSON.stringify(t.calls[1][1].body), '{"confirm":true}');
+  assert.equal(t.settings.busy, false);
+});
