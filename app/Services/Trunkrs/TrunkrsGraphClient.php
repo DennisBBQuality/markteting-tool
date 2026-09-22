@@ -22,10 +22,10 @@ class TrunkrsGraphClient
 
     private function folderUrl(): string
     {
-        $mailboxPath = $this->auth->usesOwnMailbox() ? 'me' : 'users/'.rawurlencode(config('trunkrs.mailbox'));
+        $mailboxPath = $this->auth->usesOwnMailbox() ? 'me' : 'users/'.rawurlencode($this->auth->configuration->get('mailbox'));
 
         return 'https://graph.microsoft.com/v1.0/'.$mailboxPath
-            .'/mailFolders/'.rawurlencode(config('trunkrs.folder_id'));
+            .'/mailFolders/'.rawurlencode($this->auth->configuration->get('folder_id'));
     }
 
     public function messages(): \Generator

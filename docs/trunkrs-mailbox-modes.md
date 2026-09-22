@@ -21,9 +21,24 @@ Voor de eigen mailbox:
 
 Bronnen: [Microsoft Graph-machtigingen](https://learn.microsoft.com/en-us/graph/permissions-reference), [device-code-flow](https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-device-code), [toestemmingen beheren](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/manage-application-permissions).
 
-## Eenmalige inrichting en controle op de hostingserver
+## Inrichting via GitHub en Pitboard (22 september 2026)
 
-De gebruikelijke GitHub-uitrol levert code, maar verleent geen Microsoft-toestemming en stelt geen mailbox of map in. Productieconfiguratie wordt niet door deze wijziging aangepast. Inrichting vraagt afzonderlijk bevoegde servertoegang.
+De eigen-mailboxkoppeling kan nu via **Instellingen → Trunkrs — Niet bezorgd** worden ingericht door een actieve Pitboard-beheerder. Hostingtoegang is hiervoor niet nodig. De gebruikelijke feature branch → pull request → main-route levert de code en een beperkte Composer-upgradehook voor uitsluitend de nieuwe additieve instellingentabel. Een wijziging van `.env` is niet nodig. Bestaande serverinstellingen blijven als terugval gelden zolang er geen app-instellingen zijn opgeslagen.
+
+1. Vul tenant-ID, client-ID, het gebruikersobject-ID, het bestaande mailboxadres en de gecontroleerde rapportmap-ID in. Geen wachtwoord of client secret. Deze gegevens worden niet in Git gezet.
+2. Sla op. Dit zet inlezen uit, trekt eventuele lokale oude tokens in en vereist een nieuwe verbinding. Bestaande rapporten blijven behouden.
+3. Bevestig de expliciete mailboxbrede Microsoft-leestoegang en kies **Verbinden met Microsoft**. Open de vaste Microsoft-aanmeldpagina en gebruik de getoonde tijdelijke gebruikerscode. Meld aan als de ingestelde mailboxgebruiker, niet als het Entra-adminaccount.
+4. Kies **Ik ben aangemeld — verbinding controleren**. De server controleert scopes, gebruikers-ID, mailboxadres én het pad van de rapportmap aan de hand van uitsluitend mapmetadata. Pas daarna bewaart hij het refresh-token en schakelt hij inlezen in.
+5. Start **Rapporten nu controleren**. De bestaande deferred-uitvoering verwerkt de controle op de webserver na het HTTP-antwoord; geen nieuwe permanente worker nodig. Het antwoord 202 bewijst nog geen import. Vernieuw de status en controleer het echte rapport in het dashboard.
+6. Controleer de afzonderlijke melding over serverplanning. Alleen een recente aanroep van `trunkrs:sync` vanuit de opdrachtregel/planning bevestigt deze heartbeat; een handmatige webcontrole doet dit niet. Deze release installeert geen hosting-cron en doet geen belofte van onbewaakte verwerking zolang die heartbeat ontbreekt.
+
+Alle setup-API's vragen een actieve adminsessie; wijzigingen zijn POST/PUT met CSRF-beveiliging en afzonderlijke snelheidslimieten. Aanmeldpogingen zijn versleuteld, aan de concrete beheerderssessie en configuratie gebonden, maximaal vijftien minuten geldig en respecteren Microsoft's wachttijd en `slow_down`. Alleen de tijdelijke gebruikerscode gaat naar die browser; device-, access- en refresh-tokens niet. Configuratie, aanmelden, stoppen en synchronisatie gebruiken dezelfde lock. Een verouderd instellingsformulier wordt geweigerd. Logs bevatten uitsluitend actiecodes en de Pitboard-beheerder-ID, geen Microsoft-antwoorden of mailboxgegevens.
+
+**Koppeling stoppen / aanmelding annuleren** schakelt inlezen uit en verwijdert lokale toegangstokens en de lopende aanmeldpoging. Dit verwijdert geen rapporten en trekt niet automatisch de toestemming bij Microsoft in. Die toestemming kan apart voor deze app in Entra worden ingetrokken. Opnieuw verbinden vereist opnieuw expliciete instemming. Gebruik lokaal alleen fictieve testgegevens: echte mailboxverzoeken blijven standaard geblokkeerd.
+
+## Alternatief: inrichting op de hostingserver
+
+Voor omgevingen die bewust serverconfiguratie gebruiken blijft de bestaande CLI-inrichting beschikbaar. GitHub bewaart nooit Microsoft-toestemming of tokens. Bij gebruik van de hierboven beschreven beheerfunctie is deze alternatieve route niet nodig.
 
 - `TRUNKRS_MAILBOX_MODE=own` expliciet kiezen.
 - Tenant-ID en app/client-ID van de juiste registratie gebruiken.

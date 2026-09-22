@@ -19,6 +19,7 @@ class TrunkrsException extends RuntimeException
             'configuration' => 'De Microsoft-koppeling moet nog door de beheerder worden ingesteld.',
             'authorization' => 'Microsoft-toegang ontbreekt of is verlopen. Laat de beheerder opnieuw verbinden.',
             'scope' => 'Het Microsoft-account of de verleende rechten komen niet overeen met de afgesproken leestoegang.',
+            'folder' => 'De gekozen map is niet Postvak IN / Klantenservice / Trunkrs not deliverd, of Microsoft geeft geen toegang tot die map.',
             'rate_limit' => 'Microsoft vraagt om even te wachten. De server probeert het later opnieuw.',
             'network', 'provider' => 'Microsoft is tijdelijk niet bereikbaar. Het laatste ingelezen rapport blijft bewaard.',
             'invalid_report' => 'Het nieuwe rapport heeft een onbekend of ongeldig formaat. Het vorige rapport blijft bewaard.',

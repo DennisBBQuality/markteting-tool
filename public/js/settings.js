@@ -12,6 +12,8 @@ async function renderSettings() {
       <h2>Instellingen</h2>
     </div>
 
+    <div class="settings-section" id="trunkrs-settings"></div>
+
     <div class="settings-section">
       <h3>AI-koppelingen</h3>
       <div class="ai-settings-card">
@@ -106,6 +108,7 @@ async function renderSettings() {
     </div>
   `;
   ImageModelPicker.load('settings');
+  TrunkrsSettings.load();
 }
 
 async function saveOpenAiKey() {

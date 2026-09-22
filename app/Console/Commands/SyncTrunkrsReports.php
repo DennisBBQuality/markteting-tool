@@ -2,9 +2,11 @@
 
 namespace App\Console\Commands;
 
+use App\Models\TrunkrsSetting;
 use App\Services\Trunkrs\TrunkrsException;
 use App\Services\Trunkrs\TrunkrsSync;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Schema;
 
 class SyncTrunkrsReports extends Command
 {
@@ -14,6 +16,9 @@ class SyncTrunkrsReports extends Command
 
     public function handle(TrunkrsSync $sync): int
     {
+        if (Schema::hasTable('trunkrs_settings')) {
+            TrunkrsSetting::where('id', 1)->update(['scheduler_seen_at' => now()]);
+        }
         $result = $sync->run();
         $this->line(match ($result) {
             'ok' => 'Trunkrs-rapportmap gecontroleerd.',

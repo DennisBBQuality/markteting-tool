@@ -9,11 +9,11 @@ use Illuminate\Support\Facades\Log;
 
 class TrunkrsSync
 {
-    public function __construct(private TrunkrsGraphClient $graph, private TrunkrsImporter $importer) {}
+    public function __construct(private TrunkrsGraphClient $graph, private TrunkrsImporter $importer, private TrunkrsConfiguration $configuration) {}
 
     public function run(): string
     {
-        if (! config('trunkrs.enabled')) {
+        if (! $this->configuration->get('enabled')) {
             return 'disabled';
         }
         $lock = Cache::lock('trunkrs-sync', 600);
@@ -21,6 +21,13 @@ class TrunkrsSync
             return 'busy';
         }
         try {
+            // Resolve a fresh configuration after acquiring the same lock used by setup.
+            $this->configuration = app(TrunkrsConfiguration::class);
+            if (! $this->configuration->get('enabled')) {
+                return 'disabled';
+            }
+            $this->graph = app(TrunkrsGraphClient::class);
+            $this->importer = app(TrunkrsImporter::class);
             $state = TrunkrsConnection::firstOrCreate(['id' => 1]);
             $state->update(['last_started_at' => now()]);
             if ($state->retry_at?->isFuture()) {

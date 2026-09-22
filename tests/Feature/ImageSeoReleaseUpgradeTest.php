@@ -45,7 +45,7 @@ class ImageSeoReleaseUpgradeTest extends TestCase
         $this->assertSame($before, $snapshot());
         $this->assertSame(1, DB::table('migrations')->where('migration', UpgradeImageSeoStorage::MIGRATION)->count());
         $scripts = json_decode(file_get_contents(base_path('composer.json')), true)['scripts'];
-        $this->assertSame(['@php artisan pitboard:upgrade-image-seo-storage --no-interaction'], $scripts['post-install-cmd']);
+        $this->assertContains('@php artisan pitboard:upgrade-image-seo-storage --no-interaction', $scripts['post-install-cmd']);
     }
 
     public function test_schema_history_mismatch_stops_without_dropping_or_rewriting_anything(): void
