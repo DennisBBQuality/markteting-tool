@@ -39,6 +39,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        foreach (['trunkrs-setup' => 6, 'trunkrs-poll' => 20, 'trunkrs-sync' => 1] as $name => $attempts) {
+            RateLimiter::for($name, fn (Request $request) => Limit::perMinute($attempts)
+                ->by($request->session()->get('userId', $request->ip())));
+        }
         // Numeric throttle middleware otherwise shares one IP bucket across all
         // routes: our custom auth does not populate Laravel's default guard.
         foreach ([

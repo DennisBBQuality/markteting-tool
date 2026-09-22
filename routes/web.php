@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\ProductImageController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\TrunkrsReportController;
+use App\Http\Controllers\Api\TrunkrsSettingController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Middleware\EnsureCustomerServiceEnabled;
 use Illuminate\Support\Facades\Route;
@@ -60,6 +61,12 @@ Route::middleware('auth.custom')->group(function () {
     // Users
     Route::get('/api/users', [UserController::class, 'index']);
     Route::middleware('admin')->group(function () {
+        Route::get('/api/settings/trunkrs', [TrunkrsSettingController::class, 'show']);
+        Route::put('/api/settings/trunkrs', [TrunkrsSettingController::class, 'update'])->middleware('throttle:trunkrs-setup');
+        Route::post('/api/settings/trunkrs/connect', [TrunkrsSettingController::class, 'start'])->middleware('throttle:trunkrs-setup');
+        Route::post('/api/settings/trunkrs/poll', [TrunkrsSettingController::class, 'poll'])->middleware('throttle:trunkrs-poll');
+        Route::post('/api/settings/trunkrs/stop', [TrunkrsSettingController::class, 'stop'])->middleware('throttle:trunkrs-setup');
+        Route::post('/api/settings/trunkrs/sync', [TrunkrsSettingController::class, 'sync'])->middleware('throttle:trunkrs-sync');
         Route::post('/api/users', [UserController::class, 'store']);
         Route::put('/api/users/{id}', [UserController::class, 'update']);
         Route::delete('/api/users/{id}', [UserController::class, 'destroy']);

@@ -27,7 +27,7 @@ class TrunkrsDashboard
         $warnings = [];
         if (! $configured) {
             $warnings[] = 'De online Microsoft-koppeling is nog niet ingesteld.';
-        } elseif (! config('trunkrs.enabled')) {
+        } elseif (! $auth->configuration->get('enabled')) {
             $warnings[] = 'Automatisch inlezen staat uit.';
         } elseif (! $state?->last_started_at || $state->last_started_at->lt(now()->subMinutes(25))) {
             $warnings[] = 'De servercontrole is niet recent uitgevoerd. Laat de beheerder de serverplanning controleren.';
@@ -39,14 +39,14 @@ class TrunkrsDashboard
             $warnings[] = 'Dit lege rapport bevat geen bezorgdatum. Er staan 0 regels in, maar de datum moet worden gecontroleerd.';
         } elseif ($report && $report->report_date->toDateString() < $expectedDate) {
             $warnings[] = 'Een nieuwer rapport ontbreekt. Hieronder blijft het laatste geldige overzicht staan.';
-        } elseif (! $report && $configured && config('trunkrs.enabled')) {
+        } elseif (! $report && $configured && $auth->configuration->get('enabled')) {
             $warnings[] = 'Nog geen geldig rapport ontvangen. Dit betekent niet dat er 0 niet-bezorgde zendingen zijn.';
         }
 
         return [
             'title' => 'Niet bezorgd Trunkrs',
             'configured' => (bool) $configured,
-            'enabled' => (bool) config('trunkrs.enabled'),
+            'enabled' => (bool) $auth->configuration->get('enabled'),
             'warnings' => $warnings,
             'last_checked_at' => $state?->last_checked_at?->toIso8601String(),
             'last_started_at' => $state?->last_started_at?->toIso8601String(),

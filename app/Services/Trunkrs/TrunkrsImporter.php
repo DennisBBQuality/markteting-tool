@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 
 class TrunkrsImporter
 {
-    public function __construct(private TrunkrsReportParser $parser) {}
+    public function __construct(private TrunkrsReportParser $parser, private TrunkrsConfiguration $configuration) {}
 
     public function accepts(array $message): bool
     {
@@ -18,7 +18,7 @@ class TrunkrsImporter
 
     public function messageHash(string $id): string
     {
-        return hash('sha256', config('trunkrs.mailbox').'|'.config('trunkrs.folder_id').'|'.$id);
+        return hash('sha256', $this->configuration->get('mailbox').'|'.$this->configuration->get('folder_id').'|'.$id);
     }
 
     public function import(array $message, string $bytes, string $filename): bool

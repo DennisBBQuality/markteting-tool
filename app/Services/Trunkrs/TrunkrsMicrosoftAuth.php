@@ -8,11 +8,13 @@ use Illuminate\Support\Facades\Http;
 
 class TrunkrsMicrosoftAuth
 {
+    public function __construct(public readonly TrunkrsConfiguration $configuration) {}
+
     public const SCOPES = 'https://graph.microsoft.com/Mail.Read.Shared https://graph.microsoft.com/User.Read offline_access';
 
     public function usesOwnMailbox(): bool
     {
-        return config('trunkrs.mailbox_mode') === 'own';
+        return $this->configuration->get('mailbox_mode') === 'own';
     }
 
     public function scopes(): string
@@ -24,22 +26,22 @@ class TrunkrsMicrosoftAuth
 
     public function configured(): bool
     {
-        if (! in_array(config('trunkrs.mailbox_mode'), ['shared', 'own'], true)) {
+        if (! in_array($this->configuration->get('mailbox_mode'), ['shared', 'own'], true)) {
             return false;
         }
         foreach (['tenant_id', 'client_id', 'reader_user_id'] as $key) {
-            if (! preg_match('/^[a-f0-9-]{36}$/iD', (string) config('trunkrs.'.$key))) {
+            if (! preg_match('/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/iD', (string) $this->configuration->get($key))) {
                 return false;
             }
         }
 
-        return filter_var(config('trunkrs.mailbox'), FILTER_VALIDATE_EMAIL)
-            && is_string(config('trunkrs.folder_id')) && strlen(config('trunkrs.folder_id')) > 10;
+        return filter_var($this->configuration->get('mailbox'), FILTER_VALIDATE_EMAIL)
+            && is_string($this->configuration->get('folder_id')) && strlen($this->configuration->get('folder_id')) > 10;
     }
 
     public function fingerprint(): string
     {
-        $configuration = array_map(fn ($key) => config('trunkrs.'.$key), [
+        $configuration = array_map(fn ($key) => $this->configuration->get($key), [
             'tenant_id', 'client_id', 'reader_user_id', 'mailbox', 'folder_id',
         ]);
         // Preserve existing shared-reader connections, but never reuse them in own mode.
@@ -62,13 +64,13 @@ class TrunkrsMicrosoftAuth
     {
         $this->assertRuntime();
 
-        return $this->post('devicecode', ['client_id' => config('trunkrs.client_id'), 'scope' => $this->scopes()]);
+        return $this->post('devicecode', ['client_id' => $this->configuration->get('client_id'), 'scope' => $this->scopes()]);
     }
 
-    public function finishDeviceLogin(string $deviceCode): string
+    public function finishDeviceLogin(string $deviceCode, bool $verifyFolder = false): string
     {
         $data = $this->post('token', [
-            'client_id' => config('trunkrs.client_id'),
+            'client_id' => $this->configuration->get('client_id'),
             'grant_type' => 'urn:ietf:params:oauth:grant-type:device_code',
             'device_code' => $deviceCode,
         ], allowPending: true);
@@ -77,6 +79,9 @@ class TrunkrsMicrosoftAuth
         }
         $this->validateTokens($data);
         $this->verifyReader($data['access_token']);
+        if ($verifyFolder) {
+            $this->verifyReportFolder($data['access_token']);
+        }
         TrunkrsConnection::updateOrCreate(['id' => 1], [
             'refresh_token' => $data['refresh_token'], 'configuration_hash' => $this->fingerprint(),
             'retry_at' => null, 'last_error' => null,
@@ -93,7 +98,7 @@ class TrunkrsMicrosoftAuth
             throw new TrunkrsException('authorization');
         }
         $data = $this->post('token', [
-            'client_id' => config('trunkrs.client_id'), 'grant_type' => 'refresh_token',
+            'client_id' => $this->configuration->get('client_id'), 'grant_type' => 'refresh_token',
             'refresh_token' => $connection->refresh_token, 'scope' => $this->scopes(),
         ]);
         $this->validateTokens($data);
@@ -125,12 +130,42 @@ class TrunkrsMicrosoftAuth
         } catch (ConnectionException) {
             throw new TrunkrsException('network');
         }
-        $isOwner = strcasecmp((string) $response->json('userPrincipalName'), (string) config('trunkrs.mailbox')) === 0
-            || strcasecmp((string) $response->json('mail'), (string) config('trunkrs.mailbox')) === 0;
+        $isOwner = strcasecmp((string) $response->json('userPrincipalName'), (string) $this->configuration->get('mailbox')) === 0
+            || strcasecmp((string) $response->json('mail'), (string) $this->configuration->get('mailbox')) === 0;
         if (! $response->successful()
-            || strcasecmp((string) $response->json('id'), (string) config('trunkrs.reader_user_id')) !== 0
+            || strcasecmp((string) $response->json('id'), (string) $this->configuration->get('reader_user_id')) !== 0
             || $isOwner !== $this->usesOwnMailbox()) {
             throw new TrunkrsException('scope');
+        }
+    }
+
+    private function verifyReportFolder(string $token): void
+    {
+        // Only folder metadata: never list other folders or read their messages.
+        $read = function (string $id) use ($token): array {
+            try {
+                $response = Http::withToken($token)->acceptJson()->connectTimeout(5)->timeout(20)
+                    ->withoutRedirecting()->get('https://graph.microsoft.com/v1.0/me/mailFolders/'.rawurlencode($id), [
+                        '$select' => 'id,displayName,parentFolderId',
+                    ]);
+            } catch (ConnectionException) {
+                throw new TrunkrsException('network');
+            }
+            if (! $response->successful() || ! is_array($response->json())) {
+                throw new TrunkrsException('folder');
+            }
+
+            return $response->json();
+        };
+        $folder = $read($this->configuration->get('folder_id'));
+        if (($folder['displayName'] ?? '') !== 'Trunkrs not deliverd' || empty($folder['parentFolderId'])) {
+            throw new TrunkrsException('folder');
+        }
+        $parent = $read($folder['parentFolderId']);
+        $inbox = $read('inbox');
+        if (($parent['displayName'] ?? '') !== 'Klantenservice' || empty($inbox['id'])
+            || ($parent['parentFolderId'] ?? '') !== $inbox['id']) {
+            throw new TrunkrsException('folder');
         }
     }
 
@@ -139,7 +174,7 @@ class TrunkrsMicrosoftAuth
         $this->assertRuntime();
         try {
             $response = Http::asForm()->acceptJson()->connectTimeout(5)->timeout(20)->withoutRedirecting()
-                ->post('https://login.microsoftonline.com/'.config('trunkrs.tenant_id').'/oauth2/v2.0/'.$endpoint, $data);
+                ->post('https://login.microsoftonline.com/'.$this->configuration->get('tenant_id').'/oauth2/v2.0/'.$endpoint, $data);
         } catch (ConnectionException) {
             throw new TrunkrsException('network');
         }
