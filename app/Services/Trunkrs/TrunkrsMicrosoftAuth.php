@@ -10,8 +10,23 @@ class TrunkrsMicrosoftAuth
 {
     public const SCOPES = 'https://graph.microsoft.com/Mail.Read.Shared https://graph.microsoft.com/User.Read offline_access';
 
+    public function usesOwnMailbox(): bool
+    {
+        return config('trunkrs.mailbox_mode') === 'own';
+    }
+
+    public function scopes(): string
+    {
+        return $this->usesOwnMailbox()
+            ? 'https://graph.microsoft.com/Mail.Read https://graph.microsoft.com/User.Read offline_access'
+            : self::SCOPES;
+    }
+
     public function configured(): bool
     {
+        if (! in_array(config('trunkrs.mailbox_mode'), ['shared', 'own'], true)) {
+            return false;
+        }
         foreach (['tenant_id', 'client_id', 'reader_user_id'] as $key) {
             if (! preg_match('/^[a-f0-9-]{36}$/iD', (string) config('trunkrs.'.$key))) {
                 return false;
@@ -24,9 +39,15 @@ class TrunkrsMicrosoftAuth
 
     public function fingerprint(): string
     {
-        return hash('sha256', json_encode(array_map(fn ($key) => config('trunkrs.'.$key), [
+        $configuration = array_map(fn ($key) => config('trunkrs.'.$key), [
             'tenant_id', 'client_id', 'reader_user_id', 'mailbox', 'folder_id',
-        ]), JSON_THROW_ON_ERROR));
+        ]);
+        // Preserve existing shared-reader connections, but never reuse them in own mode.
+        if ($this->usesOwnMailbox()) {
+            $configuration[] = 'own';
+        }
+
+        return hash('sha256', json_encode($configuration, JSON_THROW_ON_ERROR));
     }
 
     public function assertRuntime(): void
@@ -41,7 +62,7 @@ class TrunkrsMicrosoftAuth
     {
         $this->assertRuntime();
 
-        return $this->post('devicecode', ['client_id' => config('trunkrs.client_id'), 'scope' => self::SCOPES]);
+        return $this->post('devicecode', ['client_id' => config('trunkrs.client_id'), 'scope' => $this->scopes()]);
     }
 
     public function finishDeviceLogin(string $deviceCode): string
@@ -73,7 +94,7 @@ class TrunkrsMicrosoftAuth
         }
         $data = $this->post('token', [
             'client_id' => config('trunkrs.client_id'), 'grant_type' => 'refresh_token',
-            'refresh_token' => $connection->refresh_token, 'scope' => self::SCOPES,
+            'refresh_token' => $connection->refresh_token, 'scope' => $this->scopes(),
         ]);
         $this->validateTokens($data);
         // Store rotation immediately; never keep the replaced token in an .env or log.
@@ -86,8 +107,9 @@ class TrunkrsMicrosoftAuth
     private function validateTokens(array $data): void
     {
         $scopes = array_map(fn ($scope) => str_replace('https://graph.microsoft.com/', '', $scope), explode(' ', $data['scope'] ?? ''));
-        $allowed = ['Mail.Read.Shared', 'User.Read', 'offline_access', 'openid', 'profile', 'email'];
-        if (! in_array('Mail.Read.Shared', $scopes, true) || array_diff($scopes, $allowed)) {
+        $mailScope = $this->usesOwnMailbox() ? 'Mail.Read' : 'Mail.Read.Shared';
+        $allowed = [$mailScope, 'User.Read', 'offline_access', 'openid', 'profile', 'email'];
+        if (! in_array($mailScope, $scopes, true) || ! in_array('User.Read', $scopes, true) || array_diff($scopes, $allowed)) {
             throw new TrunkrsException('scope');
         }
         if (empty($data['access_token']) || empty($data['refresh_token'])) {
@@ -99,13 +121,15 @@ class TrunkrsMicrosoftAuth
     {
         try {
             $response = Http::withToken($token)->acceptJson()->connectTimeout(5)->timeout(20)
-                ->withoutRedirecting()->get('https://graph.microsoft.com/v1.0/me', ['$select' => 'id,userPrincipalName']);
+                ->withoutRedirecting()->get('https://graph.microsoft.com/v1.0/me', ['$select' => 'id,userPrincipalName,mail']);
         } catch (ConnectionException) {
             throw new TrunkrsException('network');
         }
+        $isOwner = strcasecmp((string) $response->json('userPrincipalName'), (string) config('trunkrs.mailbox')) === 0
+            || strcasecmp((string) $response->json('mail'), (string) config('trunkrs.mailbox')) === 0;
         if (! $response->successful()
             || strcasecmp((string) $response->json('id'), (string) config('trunkrs.reader_user_id')) !== 0
-            || strcasecmp((string) $response->json('userPrincipalName'), (string) config('trunkrs.mailbox')) === 0) {
+            || $isOwner !== $this->usesOwnMailbox()) {
             throw new TrunkrsException('scope');
         }
     }

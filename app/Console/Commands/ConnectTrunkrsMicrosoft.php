@@ -11,7 +11,7 @@ class ConnectTrunkrsMicrosoft extends Command
 {
     protected $signature = 'trunkrs:connect';
 
-    protected $description = 'Koppel het aparte Microsoft-leesaccount op de server; nooit de persoonlijke mailboxeigenaar.';
+    protected $description = 'Koppel het ingestelde Microsoft-account met uitsluitend leesrechten voor Trunkrs.';
 
     public function handle(TrunkrsMicrosoftAuth $auth): int
     {
@@ -23,8 +23,15 @@ class ConnectTrunkrsMicrosoft extends Command
             return self::FAILURE;
         }
         try {
-            $this->warn('Meld alleen aan met het aparte leesaccount. De beheerder moet uitsluitend de rapportmap delen, zonder Full Access.');
-            if (! $this->confirm('Zijn deze beperkte maprechten door de Microsoft-beheerder gecontroleerd?')) {
+            $auth->assertRuntime();
+            if ($auth->usesOwnMailbox()) {
+                $this->warn('Meld aan als de ingestelde mailboxeigenaar. Microsoft Mail.Read geeft technisch leestoegang tot de hele eigen mailbox. Het Pitboard leest uitsluitend de ingestelde Trunkrs-rapportmap; dit is een softwarebeperking, geen Microsoft-mapmachtiging.');
+                $question = 'Is deze mailboxbrede leestoegang expliciet goedgekeurd en is de Trunkrs-rapportmap gecontroleerd?';
+            } else {
+                $this->warn('Meld alleen aan met het aparte leesaccount. De beheerder moet uitsluitend de rapportmap delen, zonder Full Access.');
+                $question = 'Zijn deze beperkte maprechten door de Microsoft-beheerder gecontroleerd?';
+            }
+            if (! $this->confirm($question)) {
                 return self::FAILURE;
             }
             $device = $auth->startDeviceLogin();

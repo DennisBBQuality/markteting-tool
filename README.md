@@ -205,7 +205,7 @@ Zie `docs/productstudio-audit-2026-09-07.md` voor controlepunten, testbewijs en 
 
 Het dashboard bevat een afzonderlijke, read-only tegel voor de dagelijkse Trunkrs-rapporten. Alle zendingen uit het rapport blijven samen staan, ook annuleringen. De oorspronkelijke status, bezorgdatum, mailontvangst en importtijd blijven controleerbaar; een ontbrekend rapport is geen nul. Alleen actieve ingelogde gebruikers hebben toegang.
 
-Automatische verwerking gebeurt met `trunkrs:sync` via de **hostingserverplanning**, niet via de browser of een laptop. De koppeling staat standaard uit en vraagt een eigen beperkt Microsoft-leesaccount plus eenmalige inrichting. De serverkoppeling is niet de chatconnector. Zie [inrichting, tests en operationele grenzen](docs/trunkrs-not-delivered.md). De nieuwe migratie voegt alleen twee Trunkrs-tabellen toe; bestaande projecten, taken en kalendergegevens worden niet gewijzigd.
+Automatische verwerking gebeurt met `trunkrs:sync` via de **hostingserverplanning**, niet via de browser of een laptop. De koppeling staat standaard uit en ondersteunt een apart Microsoft-leesaccount (`shared`) of, na expliciete toestemming, het bestaande account van de mailboxeigenaar (`own`). Die laatste optie vereist geen extra leesaccount, maar geeft Microsoft-technisch leestoegang tot de hele eigen mailbox; uitsluitend de applicatie beperkt de verwerking tot de rapportmap. De serverkoppeling is niet de chatconnector. Zie [actuele inrichting en toegangsgrenzen](docs/trunkrs-mailbox-modes.md). De bestaande migratie voegt alleen twee Trunkrs-tabellen toe; bestaande projecten, taken en kalendergegevens worden niet gewijzigd.
 
 ## Rollen & Rechten
 

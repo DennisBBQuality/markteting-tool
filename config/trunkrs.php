@@ -1,8 +1,10 @@
 <?php
 
 return [
-    // Disabled until the server and the dedicated Microsoft reader are provisioned.
+    // Disabled until Microsoft authorization and server scheduling are configured.
     'enabled' => env('TRUNKRS_ENABLED', false),
+    // Own-mailbox access requires explicit consent; never enable it by fallback.
+    'mailbox_mode' => env('TRUNKRS_MAILBOX_MODE', 'shared'),
     'allow_local_read' => env('TRUNKRS_ALLOW_LOCAL_READ', false),
     'tenant_id' => env('TRUNKRS_TENANT_ID'),
     'client_id' => env('TRUNKRS_CLIENT_ID'),
