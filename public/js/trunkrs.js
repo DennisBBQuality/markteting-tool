@@ -3,9 +3,12 @@ const Trunkrs = {
   timer: null,
   mountVersion: 0,
   modalVersion: 0,
+  refreshVersion: 0,
+  selectedReportId: null,
   async mount() {
     const version = ++this.mountVersion;
     clearInterval(this.timer);
+    this.selectedReportId = null;
     await this.refresh();
     if (version !== this.mountVersion) return;
     this.timer = setInterval(() => {
@@ -25,7 +28,7 @@ const Trunkrs = {
   },
   status(code) {
     return code === 'EXCEPTION_SHIPMENT_CANCELLED_BY_SENDER'
-      ? 'Geannuleerd door afzender' : 'Status uit het vervoerdersrapport';
+      ? 'Geannuleerd door afzender' : code;
   },
   async request(path) {
     // Local error boundary: a report outage must not break the rest of the dashboard.
@@ -40,12 +43,16 @@ const Trunkrs = {
   async refresh() {
     const tile = document.getElementById('trunkrs-tile');
     if (!tile) return;
+    const version = ++this.refreshVersion;
     try {
-      const data = await this.request('/api/trunkrs/summary');
-      if (!tile.isConnected) return;
+      const path = this.selectedReportId
+        ? `/api/trunkrs/summary?report_id=${encodeURIComponent(this.selectedReportId)}` : '/api/trunkrs/summary';
+      const data = await this.request(path);
+      if (!tile.isConnected || version !== this.refreshVersion) return;
+      if (this.selectedReportId && data.report?.id !== this.selectedReportId) this.selectedReportId = null;
       tile.innerHTML = this.tileHtml(data);
     } catch (error) {
-      if (!tile.isConnected) return;
+      if (!tile.isConnected || version !== this.refreshVersion) return;
       if (error.status === 401) {
         tile.innerHTML = '<div class="trunkrs-body">Log opnieuw in om de rapporten te bekijken.</div>';
         clearInterval(this.timer);
@@ -62,8 +69,13 @@ const Trunkrs = {
       notice.textContent = 'Het overzicht kon niet worden vernieuwd. Eventuele eerdere gegevens hieronder zijn niet opnieuw gecontroleerd.';
     }
   },
+  selectReport(id) {
+    this.selectedReportId = id || null;
+    this.refresh();
+  },
   tileHtml(data) {
     const report = data.report;
+    const choices = data.available_reports || (report ? [report] : []);
     if (data.configured === false && !report) {
       return `<div class="trunkrs-compact"><i class="fas fa-truck" aria-hidden="true"></i>
         <div><h3>Niet bezorgd Trunkrs</h3><small>Nog geen rapport ingelezen</small></div>
@@ -75,8 +87,11 @@ const Trunkrs = {
     return `<div class="dash-section-header">
       <h3><i class="fas fa-truck"></i> Niet bezorgd Trunkrs</h3>
       <div class="dash-section-actions">
+        ${choices.length ? `<label class="trunkrs-day-picker">Bezorgdag
+          <select aria-label="Bezorgdag Trunkrs-rapport" onchange="Trunkrs.selectReport(this.value)">
+            ${choices.map(item => `<option value="${escHtml(item.id)}" ${item.id === report?.id ? 'selected' : ''}>${escHtml(this.date(item.report_date))}</option>`).join('')}
+          </select></label>` : ''}
         <button class="btn btn-sm btn-outline" onclick="Trunkrs.refresh()" aria-label="Trunkrs-overzicht vernieuwen"><i class="fas fa-rotate"></i></button>
-        <button class="btn btn-sm btn-outline" onclick="Trunkrs.openReports()">Alle rapporten</button>
       </div>
     </div>
     <div class="trunkrs-body">
@@ -86,10 +101,8 @@ const Trunkrs = {
       </div></div>
       ${this.rowsHtml(data.shipments)}
       ${report.shipment_count > 5 ? `<button class="btn btn-sm btn-outline" onclick="Trunkrs.openReport('${escHtml(report.id)}')">Alle ${report.shipment_count} zendingen bekijken</button>` : ''}
-      <p class="trunkrs-meta">Mail ontvangen ${escHtml(this.date(report.received_at, true))} · Ingelezen ${escHtml(this.date(report.imported_at, true))}</p>`
+      `
       : `<div class="trunkrs-empty"><i class="fas fa-inbox"></i><div><b>Nog geen rapport ingelezen</b><p>Zodra de online koppeling actief is, verschijnt het vervoerdersoverzicht hier automatisch. Ook wanneer alle laptops uitstaan.</p></div></div>`}
-      <p class="trunkrs-meta">Laatste geslaagde mapcontrole: ${escHtml(this.date(data.last_checked_at, true))}</p>
-      <p class="trunkrs-meta">Dit is een dagelijks rapport, geen live bezorgstatus. Er worden geen klantberichten verstuurd of orders aangepast.</p>
     </div>`;
   },
   rowsHtml(rows) {
@@ -98,7 +111,7 @@ const Trunkrs = {
       <th>Trunkrs-nummer</th><th>Barcode</th><th>Status</th><th>Redencode</th>
       </tr></thead><tbody>${rows.map(row => `<tr>
       <td>${escHtml(row.trunkrs_number)}</td><td>${escHtml(row.barcode)}</td>
-      <td>${escHtml(this.status(row.status))}<small>${escHtml(row.status)}</small></td>
+      <td>${escHtml(this.status(row.status))}</td>
       <td>${escHtml(row.reason_code || 'Niet opgegeven')}</td>
       </tr>`).join('')}</tbody></table></div>`;
   },
@@ -111,7 +124,6 @@ const Trunkrs = {
       openModal('Niet bezorgd Trunkrs — rapporten', `<p>Alle statussen staan samen in één overzicht per rapport. Een annulering door de afzender kan ook door BBQuality zijn gedaan.</p>
         <div class="trunkrs-report-list">${data.reports.length ? data.reports.map(r => `<button class="btn btn-outline" onclick="Trunkrs.openReport('${escHtml(r.id)}')">
           Bezorgdatum ${escHtml(this.date(r.report_date))} · ${r.shipment_count} zendingen
-          <small>Mail ontvangen ${escHtml(this.date(r.received_at, true))}</small>
         </button>`).join('') : '<p>Nog geen rapporten beschikbaar.</p>'}</div>`,
         `${page > 1 ? `<button class="btn btn-outline" onclick="Trunkrs.openReports(${page - 1})">Vorige</button>` : ''}
         ${page < data.last_page ? `<button class="btn btn-outline" onclick="Trunkrs.openReports(${page + 1})">Volgende</button>` : ''}
@@ -128,9 +140,8 @@ const Trunkrs = {
       const data = await this.request(`/api/trunkrs/reports/${encodeURIComponent(id)}?page=${page}`);
       if (!this.modalPending(version)) return;
       openModal('Niet bezorgd Trunkrs', `<p>Bezorgdatum: ${escHtml(this.date(data.report.report_date))} · ${data.report.shipment_count} zendingen, inclusief annuleringen.</p>
-        ${this.rowsHtml(data.shipments)}<p class="trunkrs-meta">Oorspronkelijke status uit de rapportmail. Geen live status en geen webshopordernummer.</p>`,
-        `<button class="btn btn-outline" onclick="Trunkrs.openReports()">Alle rapporten</button>
-        ${page > 1 ? `<button class="btn btn-outline" onclick="Trunkrs.openReport('${escHtml(id)}', ${page - 1})">Vorige</button>` : ''}
+        ${this.rowsHtml(data.shipments)}`,
+        `${page > 1 ? `<button class="btn btn-outline" onclick="Trunkrs.openReport('${escHtml(id)}', ${page - 1})">Vorige</button>` : ''}
         ${page < data.last_page ? `<button class="btn btn-outline" onclick="Trunkrs.openReport('${escHtml(id)}', ${page + 1})">Volgende</button>` : ''}
         <button class="btn btn-outline" onclick="closeModal()">Sluiten</button>`);
     } catch (_) {

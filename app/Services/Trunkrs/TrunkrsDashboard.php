@@ -9,37 +9,48 @@ use Illuminate\Support\Facades\Schema;
 
 class TrunkrsDashboard
 {
-    public function summary(): array
+    public function summary(?string $selectedReportId = null): array
     {
         $ready = Schema::hasTable('trunkrs_reports') && Schema::hasTable('trunkrs_connections');
         $state = $ready ? TrunkrsConnection::find(1) : null;
         $auth = app(TrunkrsMicrosoftAuth::class);
         $configured = $ready && $auth->configured() && $state?->getRawOriginal('refresh_token')
             && $state->configuration_hash === $auth->fingerprint();
-        // An older delayed report must not replace a newer dated report.
-        $report = $ready ? TrunkrsReport::whereNotNull('report_date')->orderByDesc('report_date')->orderByDesc('received_at')->first() : null;
-        $emptyReport = $ready ? TrunkrsReport::whereNull('report_date')->orderByDesc('received_at')->first() : null;
-        if ($emptyReport && (! $report || $emptyReport->received_at > $report->received_at)) {
-            $report = $emptyReport;
-        }
         $now = CarbonImmutable::now(config('trunkrs.timezone'));
+        // The opening view follows the newest imported email, not the highest date inside a CSV.
+        $latest = $ready ? TrunkrsReport::orderByDesc('created_at')->orderByDesc('received_at')->first() : null;
+        $available = $ready ? TrunkrsReport::query()
+            ->where(function ($query) use ($now) {
+                $query->whereBetween('report_date', [$now->subDays(7)->toDateString(), $now->toDateString()])
+                    ->orWhere(function ($query) use ($now) {
+                        $query->whereNull('report_date')->where('received_at', '>=', $now->subDays(7)->startOfDay()->utc());
+                    });
+            })
+            ->orderByDesc('received_at')->orderByDesc('created_at')
+            ->get(['id', 'report_date', 'received_at', 'created_at', 'shipment_count']) : collect();
+        // One choice per delivery date; keep the latest email visible even if it is older.
+        $available = $available->unique(fn ($item) => $item->report_date?->toDateString() ?? 'unknown');
+        if ($latest && ! $available->contains('id', $latest->id)) {
+            $available = $available->reject(fn ($item) => $item->report_date?->toDateString() === $latest->report_date?->toDateString());
+            $available->prepend($latest);
+        }
+        $report = $selectedReportId && $available->contains('id', $selectedReportId)
+            ? TrunkrsReport::find($selectedReportId) : $latest;
         $expectedDate = $now->subDays($now->format('H:i') < config('trunkrs.expected_by') ? 2 : 1)->toDateString();
         $warnings = [];
         if (! $configured) {
             $warnings[] = 'De online Microsoft-koppeling is nog niet ingesteld.';
         } elseif (! $auth->configuration->get('enabled')) {
             $warnings[] = 'Automatisch inlezen staat uit.';
-        } elseif (! $state?->last_started_at || $state->last_started_at->lt(now()->subMinutes(25))) {
-            $warnings[] = 'De servercontrole is niet recent uitgevoerd. Laat de beheerder de serverplanning controleren.';
         }
         if ($state?->last_error) {
             $warnings[] = TrunkrsException::description($state->last_error);
         }
-        if ($report && ! $report->report_date) {
+        if ($latest && ! $latest->report_date) {
             $warnings[] = 'Dit lege rapport bevat geen bezorgdatum. Er staan 0 regels in, maar de datum moet worden gecontroleerd.';
-        } elseif ($report && $report->report_date->toDateString() < $expectedDate) {
+        } elseif ($latest && $latest->report_date->toDateString() < $expectedDate) {
             $warnings[] = 'Een nieuwer rapport ontbreekt. Hieronder blijft het laatste geldige overzicht staan.';
-        } elseif (! $report && $configured && $auth->configuration->get('enabled')) {
+        } elseif (! $latest && $configured && $auth->configuration->get('enabled')) {
             $warnings[] = 'Nog geen geldig rapport ontvangen. Dit betekent niet dat er 0 niet-bezorgde zendingen zijn.';
         }
 
@@ -52,6 +63,7 @@ class TrunkrsDashboard
             'last_started_at' => $state?->last_started_at?->toIso8601String(),
             'retry_at' => $state?->retry_at?->toIso8601String(),
             'report' => $report ? $this->report($report) : null,
+            'available_reports' => $available->map(fn ($item) => $this->report($item))->values()->all(),
             'shipments' => $report ? array_slice($report->shipments, 0, 5) : [],
         ];
     }

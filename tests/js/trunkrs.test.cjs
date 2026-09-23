@@ -11,7 +11,7 @@ const ui = context.Trunkrs;
 test('one collection contains cancellations, without blaming the customer', () => {
   const html = ui.rowsHtml([{trunkrs_number:'TEST-1', barcode:'TEST-BAR', status:'EXCEPTION_SHIPMENT_CANCELLED_BY_SENDER', reason_code:''}]);
   assert.match(html, /Geannuleerd door afzender/);
-  assert.match(html, /EXCEPTION_SHIPMENT_CANCELLED_BY_SENDER/);
+  assert.doesNotMatch(html, /EXCEPTION_SHIPMENT_CANCELLED_BY_SENDER/);
   assert.doesNotMatch(html, /Geannuleerd door klant/);
 });
 test('unconfigured tile never shows a zero count', () => {
@@ -41,7 +41,30 @@ test('stale warning is visible alongside last good report', () => {
   const html = ui.tileHtml({warnings:['Een nieuwer rapport ontbreekt.'], report:{id:'test', report_date:'2026-09-09', shipment_count:1}, shipments:[{trunkrs_number:'TEST-OLD',barcode:'TEST',status:'UNKNOWN'}]});
   assert.match(html, /Een nieuwer rapport ontbreekt/);
   assert.match(html, /TEST-OLD/);
-  assert.match(html, /geen live bezorgstatus/);
+  assert.doesNotMatch(html, /Mail ontvangen|Laatste geslaagde mapcontrole|servercontrole/);
+});
+
+test('a seven-day selector shows available delivery days and omits technical timestamps', () => {
+  const report = {id:'new', report_date:'2026-09-22', shipment_count:1, received_at:'2026-09-23T04:00:00Z'};
+  const html = ui.tileHtml({report, available_reports:[report, {id:'old', report_date:'2026-09-21', shipment_count:2}], shipments:[], warnings:[]});
+  assert.match(html, /Bezorgdag Trunkrs-rapport/);
+  assert.match(html, /value="new" selected/);
+  assert.match(html, /value="old"/);
+  assert.doesNotMatch(html, /Mail ontvangen|Ingelezen|mapcontrole|2026-09-23T04:00:00Z/);
+});
+
+test('opening the dashboard resets the selected day to the newest imported report', async () => {
+  ui.selectedReportId = 'old';
+  context.clearInterval = () => {};
+  context.setInterval = () => 1;
+  context.document = {getElementById:() => ({isConnected:true, innerHTML:'', getClientRects:() => [1]})};
+  const request = ui.request;
+  let requestedPath;
+  ui.request = async path => { requestedPath = path; return {configured:true, report:null, warnings:[]}; };
+  await ui.mount();
+  assert.equal(ui.selectedReportId, null);
+  assert.equal(requestedPath, '/api/trunkrs/summary');
+  ui.request = request;
 });
 
 test('network failures preserve the last visible rows and add a persistent notice', async () => {

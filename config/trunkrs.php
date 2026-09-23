@@ -16,6 +16,6 @@ return [
     'folder_label' => 'Postvak IN / Klantenservice / Trunkrs not deliverd',
     'timezone' => 'Europe/Amsterdam',
     // Operational expectation, not a carrier delivery guarantee.
-    'expected_by' => '07:00',
+    'expected_by' => '06:30',
     'lookback_days' => 30,
 ];
