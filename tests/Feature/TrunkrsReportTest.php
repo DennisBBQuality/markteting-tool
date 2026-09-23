@@ -115,6 +115,7 @@ class TrunkrsReportTest extends TestCase
         $this->assertNull(TrunkrsReport::first()->report_date);
         $summary = app(TrunkrsDashboard::class)->summary();
         $this->assertSame(0, $summary['report']['shipment_count']);
+        $this->assertCount(1, $summary['available_reports']);
         $this->assertStringContainsString('geen bezorgdatum', implode(' ', $summary['warnings']));
     }
 
@@ -336,6 +337,7 @@ class TrunkrsReportTest extends TestCase
         $this->travelTo(CarbonImmutable::parse('2026-09-23T06:00:00Z'));
         $importer = app(TrunkrsImporter::class);
         $importer->import($this->message('old', '2026-09-11T04:00:00Z'), $this->csv('2026-09-10'), 'old.csv');
+        $importer->import($this->message('empty', '2026-09-21T04:00:00Z'), explode("\n", $this->csv())[0]."\n", 'empty.csv');
         $this->travelTo(CarbonImmutable::parse('2026-09-23T06:01:00Z'));
         $importer->import($this->message('yesterday', '2026-09-23T04:00:00Z'), $this->csv('2026-09-22'), 'yesterday.csv');
         $yesterdayId = TrunkrsReport::whereDate('report_date', '2026-09-22')->value('id');

@@ -20,12 +20,7 @@ class TrunkrsDashboard
         // Import scans may process older messages last; opening follows the newest received email.
         $latest = $ready ? TrunkrsReport::orderByDesc('received_at')->orderByDesc('created_at')->first() : null;
         $available = $ready ? TrunkrsReport::query()
-            ->where(function ($query) use ($now) {
-                $query->whereBetween('report_date', [$now->subDays(7)->toDateString(), $now->toDateString()])
-                    ->orWhere(function ($query) use ($now) {
-                        $query->whereNull('report_date')->where('received_at', '>=', $now->subDays(7)->startOfDay()->utc());
-                    });
-            })
+            ->whereBetween('report_date', [$now->subDays(7)->toDateString(), $now->toDateString()])
             ->orderByDesc('received_at')->orderByDesc('created_at')
             ->get(['id', 'report_date', 'received_at', 'created_at', 'shipment_count']) : collect();
         // One choice per delivery date; keep the latest email visible even if it is older.
