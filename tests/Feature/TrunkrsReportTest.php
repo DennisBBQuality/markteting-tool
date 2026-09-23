@@ -251,14 +251,14 @@ class TrunkrsReportTest extends TestCase
         }
     }
 
-    public function test_latest_imported_email_opens_by_default_even_when_its_delivery_date_is_older(): void
+    public function test_later_import_of_an_older_email_does_not_replace_the_newest_received_email(): void
     {
         $this->setupReader();
         $this->travelTo(now()->setDate(2026, 9, 11)->setTime(8, 0));
         app(TrunkrsImporter::class)->import($this->message(), $this->csv(), 'report.csv');
-        app(TrunkrsImporter::class)->import($this->message('delayed', '2026-09-11T04:00:00Z'), $this->csv('2026-09-08'), 'old.csv');
+        app(TrunkrsImporter::class)->import($this->message('delayed', '2026-09-09T04:00:00Z'), $this->csv('2026-09-08'), 'old.csv');
         $summary = app(TrunkrsDashboard::class)->summary();
-        $this->assertSame('2026-09-08', $summary['report']['report_date']);
+        $this->assertSame('2026-09-09', $summary['report']['report_date']);
         $this->assertStringContainsString('nieuwer rapport ontbreekt', implode(' ', $summary['warnings']));
         $this->assertStringNotContainsString('serverplanning', implode(' ', $summary['warnings']));
     }
@@ -340,17 +340,20 @@ class TrunkrsReportTest extends TestCase
         $importer->import($this->message('yesterday', '2026-09-23T04:00:00Z'), $this->csv('2026-09-22'), 'yesterday.csv');
         $yesterdayId = TrunkrsReport::whereDate('report_date', '2026-09-22')->value('id');
         $this->travelTo(CarbonImmutable::parse('2026-09-23T06:02:00Z'));
-        $importer->import($this->message('delayed', '2026-09-23T04:01:00Z'), $this->csv('2026-09-20'), 'delayed.csv');
+        $importer->import($this->message('delayed', '2026-09-22T04:01:00Z'), $this->csv('2026-09-20'), 'delayed.csv');
         $this->actingAsUser(['rol' => 'lid']);
 
         $default = $this->getJson('/api/trunkrs/summary')->assertOk();
-        $default->assertJsonPath('report.report_date', '2026-09-20')->assertJsonCount(2, 'available_reports');
+        $default->assertJsonPath('report.report_date', '2026-09-22')->assertJsonCount(2, 'available_reports');
         $this->assertEqualsCanonicalizing(['2026-09-20', '2026-09-22'], array_column($default->json('available_reports'), 'report_date'));
         $this->getJson('/api/trunkrs/summary?report_id='.$yesterdayId)
             ->assertOk()->assertJsonPath('report.report_date', '2026-09-22');
+        $delayedId = TrunkrsReport::whereDate('report_date', '2026-09-20')->value('id');
+        $this->getJson('/api/trunkrs/summary?report_id='.$delayedId)
+            ->assertOk()->assertJsonPath('report.report_date', '2026-09-20');
         $oldId = TrunkrsReport::whereDate('report_date', '2026-09-10')->value('id');
         $this->getJson('/api/trunkrs/summary?report_id='.$oldId)
-            ->assertOk()->assertJsonPath('report.report_date', '2026-09-20');
+            ->assertOk()->assertJsonPath('report.report_date', '2026-09-22');
         $this->getJson('/api/trunkrs/summary?report_id=not-a-uuid')->assertUnprocessable();
     }
 

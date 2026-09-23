@@ -17,8 +17,8 @@ class TrunkrsDashboard
         $configured = $ready && $auth->configured() && $state?->getRawOriginal('refresh_token')
             && $state->configuration_hash === $auth->fingerprint();
         $now = CarbonImmutable::now(config('trunkrs.timezone'));
-        // The opening view follows the newest imported email, not the highest date inside a CSV.
-        $latest = $ready ? TrunkrsReport::orderByDesc('created_at')->orderByDesc('received_at')->first() : null;
+        // Import scans may process older messages last; opening follows the newest received email.
+        $latest = $ready ? TrunkrsReport::orderByDesc('received_at')->orderByDesc('created_at')->first() : null;
         $available = $ready ? TrunkrsReport::query()
             ->where(function ($query) use ($now) {
                 $query->whereBetween('report_date', [$now->subDays(7)->toDateString(), $now->toDateString()])
