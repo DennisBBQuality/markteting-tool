@@ -26,7 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prependToPriorityList(ThrottleRequests::class, RequireAuth::class);
 
         $middleware->validateCsrfTokens(except: [
-            // 'api/*',
+            'api/trunkrs/scheduled-sync',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

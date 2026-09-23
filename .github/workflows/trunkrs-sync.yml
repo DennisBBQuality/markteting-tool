@@ -1,0 +1,33 @@
+name: Trunkrs report check
+
+on:
+  schedule:
+    - cron: '7,17,27,37,47,57 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: trunkrs-report-check
+  cancel-in-progress: false
+
+jobs:
+  request-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Request signed GitHub identity and start report check
+        env:
+          AUDIENCE: https://planning.bbquality.nl/api/trunkrs/scheduled-sync
+        run: |
+          set -euo pipefail
+          token_response=$(curl --fail --silent --show-error --max-time 15 \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${AUDIENCE}")
+          identity_token=$(jq -er '.value' <<< "$token_response")
+          curl --fail --silent --show-error --max-time 30 -X POST \
+            -H "Authorization: Bearer ${identity_token}" \
+            -H 'Accept: application/json' \
+            "$AUDIENCE"

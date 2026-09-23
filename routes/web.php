@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\ProductImageController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\TrunkrsReportController;
+use App\Http\Controllers\Api\TrunkrsScheduledSyncController;
 use App\Http\Controllers\Api\TrunkrsSettingController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Middleware\EnsureCustomerServiceEnabled;
@@ -35,6 +36,7 @@ Route::get('/api/auth/csrf', function () {
 });
 Route::post('/api/auth/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 Route::post('/api/auth/logout', [AuthController::class, 'logout']);
+Route::post('/api/trunkrs/scheduled-sync', TrunkrsScheduledSyncController::class)->middleware('throttle:trunkrs-scheduled');
 
 // ========== AUTHENTICATED ROUTES ==========
 Route::middleware('auth.custom')->group(function () {

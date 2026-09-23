@@ -28,7 +28,7 @@ const TrunkrsSettings = {
       <p>Rapportmap: <strong>Postvak IN / Klantenservice / Trunkrs not deliverd</strong>. Alleen rapporten van data@trunkrs.nl met het afgesproken onderwerp worden verwerkt.</p>
       <div class="form-group"><strong>${data.status.configured ? 'Microsoft verbonden' : 'Nog niet verbonden'} · ${data.status.enabled ? 'Inlezen ingeschakeld' : 'Inlezen uitgeschakeld'}</strong>
         <p>Laatste geslaagde controle: ${escHtml(data.status.last_checked_at || 'nog niet uitgevoerd')}</p>
-        <p>${data.scheduler_recent ? 'Serverplanning recent aangeroepen.' : 'Automatische serverplanning nog niet bevestigd. Een handmatige controle bewijst geen automatische verwerking.'}</p>
+        <p>${data.scheduler_recent ? 'Geplande rapportcontrole recent gestart.' : 'Automatische rapportcontrole nog niet bevestigd. Een handmatige controle bewijst geen automatische verwerking.'}</p>
         ${(data.status.warnings || []).map(w => `<p>${escHtml(w)}</p>`).join('')}
       </div>
       ${Object.entries(labels).map(([key, label]) => `<div class="form-group"><label for="trunkrs-${key}">${label}</label>
