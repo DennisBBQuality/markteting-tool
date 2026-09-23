@@ -4,8 +4,8 @@ use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 
-// Runs on the hosting server, without any browser/desktop session.
-Schedule::command('trunkrs:sync')->everyTenMinutes()->withoutOverlapping(10);
+// Optional hosting fallback. GitHub Actions also starts the same idempotent read-only check.
+Schedule::command('trunkrs:sync')->dailyAt('06:15')->timezone('Europe/Amsterdam')->withoutOverlapping(10);
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());

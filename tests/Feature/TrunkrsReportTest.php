@@ -251,16 +251,16 @@ class TrunkrsReportTest extends TestCase
         }
     }
 
-    public function test_stale_heartbeat_and_delayed_older_mail_are_not_presented_as_fresh(): void
+    public function test_latest_imported_email_opens_by_default_even_when_its_delivery_date_is_older(): void
     {
         $this->setupReader();
         $this->travelTo(now()->setDate(2026, 9, 11)->setTime(8, 0));
         app(TrunkrsImporter::class)->import($this->message(), $this->csv(), 'report.csv');
         app(TrunkrsImporter::class)->import($this->message('delayed', '2026-09-11T04:00:00Z'), $this->csv('2026-09-08'), 'old.csv');
         $summary = app(TrunkrsDashboard::class)->summary();
-        $this->assertSame('2026-09-09', $summary['report']['report_date']);
+        $this->assertSame('2026-09-08', $summary['report']['report_date']);
         $this->assertStringContainsString('nieuwer rapport ontbreekt', implode(' ', $summary['warnings']));
-        $this->assertStringContainsString('serverplanning', implode(' ', $summary['warnings']));
+        $this->assertStringNotContainsString('serverplanning', implode(' ', $summary['warnings']));
     }
 
     public function test_foreign_pagination_link_never_receives_a_token(): void
@@ -323,11 +323,35 @@ class TrunkrsReportTest extends TestCase
     {
         $this->setupReader();
         app(TrunkrsImporter::class)->import($this->message(), $this->csv(), 'report.csv');
-        $this->travelTo(CarbonImmutable::parse('2026-09-11T04:30:00Z'));
+        $this->travelTo(CarbonImmutable::parse('2026-09-11T04:15:00Z'));
         TrunkrsConnection::find(1)->update(['last_started_at' => now(), 'last_checked_at' => now()]);
         $this->assertSame([], app(TrunkrsDashboard::class)->summary()['warnings']);
-        $this->travelTo(CarbonImmutable::parse('2026-09-11T05:30:00Z'));
+        $this->travelTo(CarbonImmutable::parse('2026-09-11T04:35:00Z'));
         $this->assertStringContainsString('nieuwer rapport ontbreekt', implode(' ', app(TrunkrsDashboard::class)->summary()['warnings']));
+    }
+
+    public function test_recent_delivery_days_are_selectable_without_exposing_older_history_in_the_dropdown(): void
+    {
+        $this->setupReader();
+        $this->travelTo(CarbonImmutable::parse('2026-09-23T06:00:00Z'));
+        $importer = app(TrunkrsImporter::class);
+        $importer->import($this->message('old', '2026-09-11T04:00:00Z'), $this->csv('2026-09-10'), 'old.csv');
+        $this->travelTo(CarbonImmutable::parse('2026-09-23T06:01:00Z'));
+        $importer->import($this->message('yesterday', '2026-09-23T04:00:00Z'), $this->csv('2026-09-22'), 'yesterday.csv');
+        $yesterdayId = TrunkrsReport::whereDate('report_date', '2026-09-22')->value('id');
+        $this->travelTo(CarbonImmutable::parse('2026-09-23T06:02:00Z'));
+        $importer->import($this->message('delayed', '2026-09-23T04:01:00Z'), $this->csv('2026-09-20'), 'delayed.csv');
+        $this->actingAsUser(['rol' => 'lid']);
+
+        $default = $this->getJson('/api/trunkrs/summary')->assertOk();
+        $default->assertJsonPath('report.report_date', '2026-09-20')->assertJsonCount(2, 'available_reports');
+        $this->assertEqualsCanonicalizing(['2026-09-20', '2026-09-22'], array_column($default->json('available_reports'), 'report_date'));
+        $this->getJson('/api/trunkrs/summary?report_id='.$yesterdayId)
+            ->assertOk()->assertJsonPath('report.report_date', '2026-09-22');
+        $oldId = TrunkrsReport::whereDate('report_date', '2026-09-10')->value('id');
+        $this->getJson('/api/trunkrs/summary?report_id='.$oldId)
+            ->assertOk()->assertJsonPath('report.report_date', '2026-09-20');
+        $this->getJson('/api/trunkrs/summary?report_id=not-a-uuid')->assertUnprocessable();
     }
 
     public function test_the_report_migration_never_targets_existing_planning_tables(): void

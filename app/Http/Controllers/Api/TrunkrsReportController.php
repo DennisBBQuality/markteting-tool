@@ -10,9 +10,11 @@ use Illuminate\Support\Facades\Schema;
 
 class TrunkrsReportController extends Controller
 {
-    public function summary(TrunkrsDashboard $dashboard)
+    public function summary(Request $request, TrunkrsDashboard $dashboard)
     {
-        return response()->json($dashboard->summary())->header('Cache-Control', 'no-store');
+        $data = $request->validate(['report_id' => 'nullable|uuid']);
+
+        return response()->json($dashboard->summary($data['report_id'] ?? null))->header('Cache-Control', 'no-store');
     }
 
     public function index(Request $request, TrunkrsDashboard $dashboard)
