@@ -43,6 +43,7 @@ class AppServiceProvider extends ServiceProvider
             RateLimiter::for($name, fn (Request $request) => Limit::perMinute($attempts)
                 ->by($request->session()->get('userId', $request->ip())));
         }
+        RateLimiter::for('trunkrs-scheduled', fn (Request $request) => Limit::perMinute(6)->by('scheduled:'.$request->ip()));
         // Numeric throttle middleware otherwise shares one IP bucket across all
         // routes: our custom auth does not populate Laravel's default guard.
         foreach ([

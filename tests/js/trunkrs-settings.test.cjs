@@ -19,7 +19,7 @@ function setup() {
 test('setup renders explicit access warning and honest scheduler status', async () => {
   const t = setup(); await t.settings.load();
   assert.match(t.node('trunkrs-settings').innerHTML, /hele eigen mailbox/);
-  assert.match(t.node('trunkrs-settings').innerHTML, /serverplanning nog niet bevestigd/);
+  assert.match(t.node('trunkrs-settings').innerHTML, /rapportcontrole nog niet bevestigd/);
   assert.doesNotMatch(source, /localStorage|sessionStorage|refresh_token|access_token|setInterval/);
 });
 test('connecting requires consent and unchanged saved fields', async () => {
