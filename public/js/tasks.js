@@ -102,10 +102,11 @@ async function handleTaskDragEnd(evt) {
   await api('/api/tasks/reorder/batch', { method: 'PUT', body: { tasks: items } });
 }
 
-async function openEditTaskModal(id) {
+async function openEditTaskModal(id, stillCurrent = () => true) {
   const tasks = await api('/api/tasks');
+  if (!stillCurrent()) return false;
   const t = tasks?.find(t => t.id === id);
-  if (!t) return;
+  if (!t) { toast('Deze taak is niet meer beschikbaar.', 'error'); return false; }
 
   openModal('Taak bewerken', `
     <div class="form-group">

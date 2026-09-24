@@ -19,7 +19,8 @@ class AssetCacheTest extends TestCase
         $appShell = file_get_contents(public_path('index.html'));
         $this->assertIsString($appShell);
         $this->assertStringContainsString('/css/style.css?v=20260918-1', $appShell);
-        $this->assertStringContainsString('/js/app.js?v=20260918-3', $appShell);
+        $this->assertStringContainsString('/js/app.js?v=20260924-1', $appShell);
+        $this->assertStringContainsString('/js/notifications.js?v=20260924-1', $appShell);
         $this->assertStringContainsString('/js/image-models.js?v=20260911-1', $appShell);
         $this->assertStringContainsString('/js/converter.js?v=20260918-4', $appShell);
         $this->assertStringContainsString('/js/image-seo.js?v=20260918-3', $appShell);

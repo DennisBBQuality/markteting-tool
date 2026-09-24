@@ -44,6 +44,13 @@ Route::middleware('auth.custom')->group(function () {
     // Auth
     Route::get('/api/auth/me', [AuthController::class, 'me']);
 
+    Route::get('/api/notifications', [\App\Http\Controllers\Api\NotificationController::class, 'index']);
+    Route::get('/api/notifications/preferences', [\App\Http\Controllers\Api\NotificationController::class, 'preferences']);
+    Route::put('/api/notifications/preferences', [\App\Http\Controllers\Api\NotificationController::class, 'preferences']);
+    Route::post('/api/notifications/read-all', [\App\Http\Controllers\Api\NotificationController::class, 'readAll']);
+    Route::get('/api/notifications/{id}', [\App\Http\Controllers\Api\NotificationController::class, 'show']);
+    Route::post('/api/notifications/{id}/read', [\App\Http\Controllers\Api\NotificationController::class, 'read']);
+
     // Paused: retain the implementation, but also block requests from old open tabs.
     Route::middleware(EnsureCustomerServiceEnabled::class)->group(function () {
         Route::get('/api/customer-service/tickets', [TicketController::class, 'index']);
