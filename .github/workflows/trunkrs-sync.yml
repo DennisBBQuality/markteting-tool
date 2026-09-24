@@ -4,6 +4,8 @@ on:
   schedule:
     - cron: '15,25 6 * * *'
       timezone: Europe/Amsterdam
+    # Temporary UTC probe: remove after a real schedule event has been verified.
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 permissions:
