@@ -15,6 +15,8 @@ use App\Http\Controllers\Api\CustomerService\TicketStatusController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DashboardPreferenceController;
 use App\Http\Controllers\Api\NoteController;
+use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\NotificationMailController;
 use App\Http\Controllers\Api\ProductDossierController;
 use App\Http\Controllers\Api\ProductDossierOptionController;
 use App\Http\Controllers\Api\ProductImageController;
@@ -44,13 +46,24 @@ Route::middleware('auth.custom')->group(function () {
     // Auth
     Route::get('/api/auth/me', [AuthController::class, 'me']);
 
-    Route::get('/api/notifications', [\App\Http\Controllers\Api\NotificationController::class, 'index']);
-    Route::get('/api/notifications/preferences', [\App\Http\Controllers\Api\NotificationController::class, 'preferences']);
-    Route::put('/api/notifications/preferences', [\App\Http\Controllers\Api\NotificationController::class, 'preferences']);
-    Route::post('/api/notifications/read-all', [\App\Http\Controllers\Api\NotificationController::class, 'readAll']);
-    Route::post('/api/notifications/initialize', [\App\Http\Controllers\Api\NotificationController::class, 'initialize'])->middleware(['admin', 'throttle:3,1']);
-    Route::get('/api/notifications/{id}', [\App\Http\Controllers\Api\NotificationController::class, 'show']);
-    Route::post('/api/notifications/{id}/read', [\App\Http\Controllers\Api\NotificationController::class, 'read']);
+    Route::get('/api/notifications', [NotificationController::class, 'index']);
+    Route::get('/api/notifications/preferences', [NotificationController::class, 'preferences']);
+    Route::put('/api/notifications/preferences', [NotificationController::class, 'preferences']);
+    Route::post('/api/notifications/read-all', [NotificationController::class, 'readAll']);
+    Route::post('/api/notifications/initialize', [NotificationController::class, 'initialize'])->middleware(['admin', 'throttle:3,1']);
+    Route::prefix('/api/notification-mail')->middleware('admin')->group(function () {
+        $controller = NotificationMailController::class;
+        Route::get('/', [$controller, 'show']);
+        Route::put('/', [$controller, 'update']);
+        Route::post('/initialize', [$controller, 'initialize'])->middleware('throttle:3,1,notification-mail-initialize');
+        Route::post('/start', [$controller, 'start'])->middleware('throttle:6,1,notification-mail-start');
+        Route::post('/poll', [$controller, 'poll'])->middleware('throttle:20,1,notification-mail-poll');
+        Route::post('/test', [$controller, 'test'])->middleware('throttle:2,1,notification-mail-test');
+        Route::post('/enable', [$controller, 'enable']);
+        Route::post('/stop', [$controller, 'stop']);
+    });
+    Route::get('/api/notifications/{id}', [NotificationController::class, 'show']);
+    Route::post('/api/notifications/{id}/read', [NotificationController::class, 'read']);
 
     // Paused: retain the implementation, but also block requests from old open tabs.
     Route::middleware(EnsureCustomerServiceEnabled::class)->group(function () {

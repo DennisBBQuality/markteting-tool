@@ -13,6 +13,7 @@ const PitboardNotifications = {
   },
 
   stop() {
+    if (typeof PitboardNotificationMail !== 'undefined') PitboardNotificationMail.reset();
     clearInterval(this.timer);
     this.timer = null;
     this.session++;
@@ -161,7 +162,8 @@ const PitboardNotifications = {
       <p class="notification-email-status">${preferences.email_active ? `E-mails worden verstuurd vanuit ${escHtml(preferences.sender_name || 'BBQuality Pitboard')}.` : 'E-mailverzending is nog niet geactiveerd. Je voorkeuren worden alvast bewaard; meldingen in Pitboard werken wel.'}</p>
       ${preferences.email_attention_count ? `<p role="alert">Bij ${Number(preferences.email_attention_count)} e-mailmeldingen is verzending niet bevestigd. Laat dit controleren voordat opnieuw wordt verstuurd. De meldingen in Pitboard blijven beschikbaar.</p>` : ''}
       <label class="notification-preference"><input type="checkbox" id="notification-task-email" ${preferences.task_email ? 'checked' : ''}> Nieuwe taken per e-mail</label>
-      <label class="notification-preference"><input type="checkbox" id="notification-project-email" ${preferences.project_email ? 'checked' : ''}> Toegevoegd aan een project per e-mail</label>`,
+      <label class="notification-preference"><input type="checkbox" id="notification-project-email" ${preferences.project_email ? 'checked' : ''}> Toegevoegd aan een project per e-mail</label>
+      ${App.currentUser?.rol === 'admin' ? '<hr><button class="btn btn-outline" onclick="PitboardNotificationMail.open()">Afzender en Microsoft-koppeling beheren</button>' : ''}`,
       '<button class="btn btn-outline" onclick="closeModal()">Annuleren</button><button class="btn btn-primary" onclick="PitboardNotifications.savePreferences()">Opslaan</button>');
   },
 
