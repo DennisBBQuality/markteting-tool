@@ -48,6 +48,7 @@ Route::middleware('auth.custom')->group(function () {
     Route::get('/api/notifications/preferences', [\App\Http\Controllers\Api\NotificationController::class, 'preferences']);
     Route::put('/api/notifications/preferences', [\App\Http\Controllers\Api\NotificationController::class, 'preferences']);
     Route::post('/api/notifications/read-all', [\App\Http\Controllers\Api\NotificationController::class, 'readAll']);
+    Route::post('/api/notifications/initialize', [\App\Http\Controllers\Api\NotificationController::class, 'initialize'])->middleware(['admin', 'throttle:3,1']);
     Route::get('/api/notifications/{id}', [\App\Http\Controllers\Api\NotificationController::class, 'show']);
     Route::post('/api/notifications/{id}/read', [\App\Http\Controllers\Api\NotificationController::class, 'read']);
 

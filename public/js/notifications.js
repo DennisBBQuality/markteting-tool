@@ -40,7 +40,10 @@ const PitboardNotifications = {
     if (!this.owner) return;
     const result = await api('/api/notifications', { silentError: true });
     if (!this.current(session)) return;
-    if (result && Number.isInteger(result.unread_count)) this.badge(result.unread_count);
+    if (result && Number.isInteger(result.unread_count)) {
+      this.badge(result.unread_count);
+      document.getElementById('nav-notifications')?.removeAttribute('title');
+    }
     else document.getElementById('nav-notifications')?.setAttribute('title', 'Meldingen konden niet worden bijgewerkt. Open het overzicht om opnieuw te proberen.');
   },
 
@@ -54,6 +57,11 @@ const PitboardNotifications = {
     const result = await api(`/api/notifications?page=${this.page}&unread=${this.unreadOnly ? 1 : 0}`, { silentError: true });
     if (!this.current(session) || request !== this.request || App.currentView !== 'notifications') return;
     this.loading = false;
+    if (result?.ready === false) {
+      view.innerHTML = `<div class="page-header"><h2>Meldingen</h2></div><p>De meldingenopslag is nog niet voorbereid.</p>
+        ${result.can_initialize ? '<p>Deze beheeractie voegt uitsluitend de twee nieuwe meldingentabellen toe. Bestaande taken, projecten en andere gegevens blijven behouden.</p><button class="btn btn-primary" onclick="PitboardNotifications.initialize()">Meldingenopslag voorbereiden</button>' : '<p>Vraag een beheerder om Meldingen te openen en de opslag voor te bereiden.</p>'}`;
+      return;
+    }
     if (!result || !Array.isArray(result.items)) {
       view.innerHTML = '<div class="page-header"><h2>Meldingen</h2></div><p role="alert">Je meldingen konden niet worden geladen.</p><button class="btn btn-outline" onclick="PitboardNotifications.render()">Opnieuw proberen</button>';
       return;
@@ -147,6 +155,7 @@ const PitboardNotifications = {
     const session = this.session;
     const preferences = await api('/api/notifications/preferences');
     if (!preferences || !this.current(session)) return;
+    if (preferences.ready === false) { this.render(); return; }
     openModal('Mijn meldingsvoorkeuren', `
       <p>Meldingen blijven altijd bewaard in Pitboard. Kies welke nieuwe toewijzingen je ook per e-mail wilt ontvangen.</p>
       <p class="notification-email-status">${preferences.email_active ? 'E-mails worden verstuurd vanuit The Pitboard.' : 'E-mailverzending is nog niet geactiveerd. Je voorkeuren worden alvast bewaard; meldingen in Pitboard werken wel.'}</p>
@@ -163,6 +172,16 @@ const PitboardNotifications = {
       project_email: document.getElementById('notification-project-email').checked,
     } });
     if (result && this.current(session)) { closeModal(); toast('Je meldingsvoorkeuren zijn opgeslagen.', 'success'); }
+  },
+
+  async initialize() {
+    if (this.loading || !confirm('Alleen de twee nieuwe meldingentabellen toevoegen? Bestaande taken, projecten en andere gegevens blijven behouden.')) return;
+    const session = this.session;
+    this.loading = true;
+    const result = await api('/api/notifications/initialize', { method: 'POST', body: { confirm: true } });
+    if (!this.current(session)) return;
+    this.loading = false;
+    if (result) { this.refreshBadge(); this.render(); }
   },
 };
 
