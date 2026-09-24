@@ -6,10 +6,30 @@ use App\Http\Controllers\Controller;
 use App\Models\PitboardNotification;
 use App\Services\AssignmentNotifications;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 
 class NotificationController extends Controller
 {
+    public function initialize(Request $request, AssignmentNotifications $service)
+    {
+        $request->validate(['confirm' => 'accepted']);
+        try {
+            $exit = Artisan::call('pitboard:upgrade-notification-storage');
+        } catch (\Throwable) {
+            $exit = 1;
+        }
+        abort_if($exit !== 0 || ! $service->storageReady(), 503, 'De meldingenopslag kon niet veilig worden voorbereid. Er zijn geen bestaande gegevens vervangen.');
+
+        return response()->json(['ok' => true]);
+    }
+
+    private function unavailable(Request $request)
+    {
+        return response()->json(['ready' => false, 'can_initialize' => $request->session()->get('rol') === 'admin'])
+            ->header('Cache-Control', 'no-store');
+    }
+
     private function inbox(Request $request)
     {
         return PitboardNotification::where('user_id', $request->session()->get('userId'));
@@ -22,6 +42,9 @@ class NotificationController extends Controller
 
     public function index(Request $request)
     {
+        if (! app(AssignmentNotifications::class)->storageReady()) {
+            return $this->unavailable($request);
+        }
         $request->validate(['page' => 'sometimes|integer|min:1|max:10000', 'unread' => 'sometimes|boolean']);
         $query = $this->inbox($request);
         if ($request->boolean('unread')) {
@@ -64,6 +87,11 @@ class NotificationController extends Controller
 
     public function preferences(Request $request, AssignmentNotifications $service)
     {
+        if (! $service->storageReady()) {
+            abort_if($request->isMethod('put'), 503, 'De meldingenopslag is nog niet voorbereid.');
+
+            return $this->unavailable($request);
+        }
         $userId = $request->session()->get('userId');
         if ($request->isMethod('put')) {
             $data = $request->validate(['task_email' => 'required|boolean', 'project_email' => 'required|boolean']);

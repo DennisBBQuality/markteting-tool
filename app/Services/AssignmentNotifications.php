@@ -8,11 +8,18 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
 class AssignmentNotifications
 {
+    public function storageReady(): bool
+    {
+        return Schema::hasColumns('pitboard_notifications', ['user_id', 'read_at', 'email_status'])
+            && Schema::hasColumns('pitboard_notification_preferences', ['user_id', 'task_email', 'project_email']);
+    }
+
     public function emailReady(): bool
     {
         $mailer = config('pitboard_notifications.mailer');
@@ -47,6 +54,7 @@ class AssignmentNotifications
         $previous = DB::table($table)->where($key, $target->id)->pluck('user_id')->all();
         DB::table($table)->where($key, $target->id)->whereNotIn('user_id', $ids)->delete();
         $added = array_diff($ids, $previous);
+        abort_if($added && ! $this->storageReady(), 503, 'De meldingenopslag is nog niet voorbereid. Laat een beheerder Meldingen openen. Je wijziging is niet opgeslagen.');
         $actor = User::findOrFail($request->session()->get('userId'));
         foreach ($added as $userId) {
             DB::table($table)->insert(['id' => (string) Str::uuid(), $key => $target->id, 'user_id' => $userId, 'created_at' => now(), 'updated_at' => now()]);

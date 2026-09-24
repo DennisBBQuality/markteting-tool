@@ -40,4 +40,20 @@ class NotificationStorageUpgradeTest extends TestCase
         $this->artisan('pitboard:upgrade-notification-storage')->assertFailed();
         $this->assertTrue(Schema::hasTable('pitboard_notifications'));
     }
+
+    public function test_only_confirmed_admin_can_initialize_missing_tables(): void
+    {
+        $this->actingAsUser();
+        Schema::drop('pitboard_notification_preferences');
+        Schema::drop('pitboard_notifications');
+        DB::table('migrations')->where('migration', UpgradeNotificationStorage::MIGRATION)->delete();
+        $this->getJson('/api/notifications')->assertJsonPath('ready', false)->assertJsonPath('can_initialize', false);
+        $this->postJson('/api/notifications/initialize', ['confirm' => true])->assertForbidden();
+        $this->assertFalse(Schema::hasTable('pitboard_notifications'));
+        $this->actingAsUser(['rol' => 'admin']);
+        $this->getJson('/api/notifications')->assertJsonPath('ready', false)->assertJsonPath('can_initialize', true);
+        $this->postJson('/api/notifications/initialize', ['confirm' => false])->assertUnprocessable();
+        $this->postJson('/api/notifications/initialize', ['confirm' => true])->assertOk();
+        $this->getJson('/api/notifications')->assertJsonPath('unread_count', 0);
+    }
 }

@@ -6,7 +6,7 @@ const vm = require('node:vm');
 function harness() {
   const elements = new Map();
   const element = id => {
-    if (!elements.has(id)) elements.set(id, {innerHTML: '', textContent: '', hidden: false, setAttribute(name, value) {this[name] = value;}, querySelectorAll: () => []});
+    if (!elements.has(id)) elements.set(id, {innerHTML: '', textContent: '', hidden: false, setAttribute(name, value) {this[name] = value;}, removeAttribute(name) {delete this[name];}, querySelectorAll: () => []});
     return elements.get(id);
   };
   const calls = [];
@@ -101,4 +101,19 @@ test('failed refresh is an error state, not a reassuring empty inbox', async () 
   await h.ui.render();
   assert.match(h.element('view-notifications').innerHTML, /niet worden geladen/);
   assert.doesNotMatch(h.element('view-notifications').innerHTML, /Je bent bij/);
+});
+
+test('missing storage offers initialization only to admins and requires confirmation', async () => {
+  const h = harness();
+  h.context.api = async () => ({ready: false, can_initialize: false});
+  await h.ui.render();
+  assert.match(h.element('view-notifications').innerHTML, /Vraag een beheerder/);
+  assert.doesNotMatch(h.element('view-notifications').innerHTML, /onclick="PitboardNotifications.initialize/);
+  h.context.api = async () => ({ready: false, can_initialize: true});
+  await h.ui.render();
+  assert.match(h.element('view-notifications').innerHTML, /Meldingenopslag voorbereiden/);
+  h.context.confirm = () => false;
+  h.context.api = async url => {h.calls.push(url); return null;};
+  await h.ui.initialize();
+  assert.equal(h.calls.length, 0);
 });
