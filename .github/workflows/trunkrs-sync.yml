@@ -2,8 +2,9 @@ name: Trunkrs report check
 
 on:
   schedule:
-    - cron: '15,25 6 * * *'
-      timezone: Europe/Amsterdam
+    # UTC covers 06:15/06:25 in both Dutch summer and winter time.
+    # The other hour supplies two extra idempotent recovery checks.
+    - cron: '15,25 4,5 * * *'
     # Temporary UTC probe: remove after a real schedule event has been verified.
     - cron: '*/5 * * * *'
   workflow_dispatch:
