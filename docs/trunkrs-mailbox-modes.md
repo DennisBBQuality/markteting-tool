@@ -21,6 +21,13 @@ Voor de eigen mailbox:
 
 Bronnen: [Microsoft Graph-machtigingen](https://learn.microsoft.com/en-us/graph/permissions-reference), [device-code-flow](https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-device-code), [toestemmingen beheren](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/manage-application-permissions).
 
+## Controle automatische start (24 september 2026)
+
+- GitHub Actions is ingeschakeld, de workflow is actief, `main` is de default branch en de repository is niet gearchiveerd. Toch bevatte de uitvoeringshistorie geen enkel `schedule`-event, ook niet voor de gemiste ochtendcontrole van 24 september.
+- De bestaande workflow is opnieuw geactiveerd. Een tijdelijke vijfminutenproef is onderzocht en vervolgens verwijderd; tijdens de controle verscheen geen geplande uitvoering. Het ontbreken van een proefrun binnen dit venster sluit latere GitHub-vertraging niet uit.
+- De inhaalcontrole via `workflow_dispatch` ([run 35969569769](https://github.com/DennisBBQuality/markteting-tool/actions/runs/35969569769)) slaagde. De geslaagde mailboxcontrole en het nieuwere rapport zijn afzonderlijk op Live geverifieerd. Dit bewijst de importketen, niet de automatische start.
+- De vaste UTC-ochtendplanning hieronder is gepubliceerd als herstelmaatregel. **Automatische uitvoering blijft onbevestigd.** Controleer een echte `schedule`-run én de bijbehorende Live-import voordat de ochtendimport als hersteld wordt gemeld. Een heartbeat kan ook van een handmatige GitHub- of CLI-proef komen; de beheerstatus vermeldt dat expliciet.
+
 ## Inrichting via GitHub en Pitboard (22 september 2026)
 
 De eigen-mailboxkoppeling kan nu via **Instellingen → Trunkrs — Niet bezorgd** worden ingericht door een actieve Pitboard-beheerder. Hostingtoegang is hiervoor niet nodig. De gebruikelijke feature branch → pull request → main-route levert de code en een beperkte Composer-upgradehook. Een wijziging van `.env` is niet nodig. Bestaande serverinstellingen blijven als terugval gelden zolang er geen app-instellingen zijn opgeslagen.
