@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Jobs\SendAssignmentNotification;
 use App\Models\PitboardNotification;
 use App\Models\User;
+use App\Services\Notifications\MicrosoftMailSender;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +23,11 @@ class AssignmentNotifications
 
     public function emailReady(): bool
     {
+        $sender = app(MicrosoftMailSender::class);
+        if ($setting = $sender->setting()) {
+            // A stopped Graph connection must not silently fall back to another sender.
+            return $sender->ready($setting);
+        }
         $mailer = config('pitboard_notifications.mailer');
 
         return app()->environment(['production', 'testing'])

@@ -19,7 +19,7 @@ Klantenservice is op verzoek van Dennis voorlopig uit het Pitboard gehaald (11 s
 
 Nieuwe taaktoewijzingen en projectleden krijgen een persoonlijke melding via **Meldingen** in de zijbalk. De teller controleert iedere 30 seconden zolang het tabblad zichtbaar is. Het overzicht heeft alles/ongelezen, doorklikken, gelezen-status en persoonlijke e-mailvoorkeuren. Geen dubbele melding bij ongewijzigd opslaan of voor een eigen toewijzing.
 
-**E-mail is voorbereid maar standaard uitgeschakeld.** De afzender wordt BBQuality Pitboard met een apart, geverifieerd adres; de release gebruikt niet automatisch Dennis' adres en verandert de Trunkrs-koppeling niet. Inrichting van het gedeelde postvak en de verzendverbinding is een aparte gecontroleerde stap. Zie [werking, veilige uitrol en e-mailvoorwaarden](docs/assignment-notifications.md).
+**E-mail is voorbereid maar standaard uitgeschakeld.** Beheerders kunnen via **Meldingen → Voorkeuren → Afzender en Microsoft-koppeling beheren** een aparte Microsoft-verzendverbinding instellen. De afzender wordt BBQuality Pitboard met een geverifieerd gedeeld adres; de release gebruikt niet automatisch Dennis' adres en verandert de Trunkrs-koppeling niet. Pas na een expliciete proefmail en bevestiging van ontvangst en juiste afzender is activatie mogelijk. Geen extra betaald gebruikersaccount nodig voor een standaard gedeeld postvak; bestaande Microsoft-licentie en verzendrechten moeten wel worden gecontroleerd. Zie [werking, veilige uitrol en e-mailvoorwaarden](docs/assignment-notifications.md).
 
 ## Technische Stack
 

@@ -6,6 +6,7 @@ use App\Mail\AssignmentMail;
 use App\Models\PitboardNotification;
 use App\Models\User;
 use App\Services\AssignmentNotifications;
+use App\Services\Notifications\MicrosoftMailSender;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
@@ -37,8 +38,13 @@ class SendAssignmentNotification implements ShouldQueue
             return;
         }
         try {
-            Mail::mailer(config('pitboard_notifications.mailer'))->to($recipient->email)->send(new AssignmentMail($notification));
-            // SMTP acceptance is not proof of delivery to the recipient's inbox.
+            $sender = app(MicrosoftMailSender::class);
+            if ($sender->setting()) {
+                $sender->sendAssignment($notification, $recipient->email);
+            } else {
+                Mail::mailer(config('pitboard_notifications.mailer'))->to($recipient->email)->send(new AssignmentMail($notification));
+            }
+            // Provider acceptance is not proof of delivery to the recipient's inbox.
             $notification->update(['email_status' => 'accepted', 'email_accepted_at' => now()]);
         } catch (Throwable) {
             $notification->update(['email_status' => 'uncertain']);
