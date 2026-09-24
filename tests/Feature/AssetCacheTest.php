@@ -19,8 +19,11 @@ class AssetCacheTest extends TestCase
         $appShell = file_get_contents(public_path('index.html'));
         $this->assertIsString($appShell);
         $this->assertStringContainsString('/css/style.css?v=20260918-1', $appShell);
-        $this->assertStringContainsString('/js/app.js?v=20260924-1', $appShell);
-        $this->assertStringContainsString('/js/notifications.js?v=20260924-4', $appShell);
+        $this->assertStringContainsString('/js/app.js?v=20260924-2', $appShell);
+        $this->assertStringContainsString('/js/notifications.js?v=20260924-5', $appShell);
+        $this->assertStringContainsString('/css/notifications.css?v=20260924-2', $appShell);
+        $this->assertStringNotContainsString('data-view="notifications"', $appShell);
+        $this->assertStringNotContainsString('id="view-notifications"', $appShell);
         $this->assertStringContainsString('/js/notification-mail.js?v=20260924-1', $appShell);
         $this->assertStringContainsString('/js/image-models.js?v=20260911-1', $appShell);
         $this->assertStringContainsString('/js/converter.js?v=20260918-4', $appShell);
@@ -30,9 +33,9 @@ class AssetCacheTest extends TestCase
         $this->assertStringContainsString('/js/trunkrs-settings.js?v=20260923-1', $appShell);
         $this->assertStringContainsString('/js/trunkrs.js?v=20260923-1', $appShell);
         $this->assertStringContainsString('/css/trunkrs.css?v=20260923-1', $appShell);
-        $this->assertStringContainsString('/js/dashboard.js?v=20260915-1', $appShell);
+        $this->assertStringContainsString('/js/dashboard.js?v=20260924-1', $appShell);
         $this->assertStringContainsString('/css/dashboard.css?v=20260915-1', $appShell);
         $this->assertStringContainsString('/js/calendar.js?v=20260915-1', $appShell);
-        $this->assertStringContainsString('/js/dashboard-layout.js?v=20260914-2', $appShell);
+        $this->assertStringContainsString('/js/dashboard-layout.js?v=20260924-1', $appShell);
     }
 }

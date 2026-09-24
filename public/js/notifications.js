@@ -1,7 +1,9 @@
 // Persistent assignment inbox; no external push or mailbox access in the browser.
 const PitboardNotifications = {
   timer: null, session: 0, request: 0, page: 1, unreadOnly: false,
-  items: [], hasMore: false, loading: false, owner: null,
+  items: [], hasMore: false, loading: false, owner: null, unreadCount: 0,
+
+  unmount() { this.request++; this.loading = false; this.page = 1; },
 
   start() {
     this.stop();
@@ -22,7 +24,7 @@ const PitboardNotifications = {
     this.items = [];
     this.loading = false;
     this.unreadOnly = false;
-    const view = document.getElementById('view-notifications');
+    const view = document.getElementById('dashboard-notifications');
     if (view) view.innerHTML = '';
     this.badge(0);
   },
@@ -30,61 +32,68 @@ const PitboardNotifications = {
   current(session) { return session === this.session && this.owner === App.currentUser?.id; },
 
   badge(count) {
+    this.unreadCount = Number.isInteger(count) && count >= 0 ? count : 0;
     const badge = document.getElementById('notification-count');
-    const button = document.getElementById('nav-notifications');
-    if (badge) { badge.textContent = count > 99 ? '99+' : String(count); badge.hidden = !count; }
-    button?.setAttribute('aria-label', count ? `Meldingen, ${count} ongelezen` : 'Meldingen');
+    if (badge) { badge.textContent = count > 99 ? '99+' : String(this.unreadCount); badge.hidden = !this.unreadCount; badge.setAttribute('aria-label', `${this.unreadCount} ongelezen meldingen`); }
   },
 
   async refreshBadge() {
     const session = this.session;
     if (!this.owner) return;
+    if (App.currentView === 'dashboard' && document.getElementById('dashboard-notifications') && this.page === 1 && !this.loading) {
+      return this.render(false, true);
+    }
     const result = await api('/api/notifications', { silentError: true });
     if (!this.current(session)) return;
     if (result && Number.isInteger(result.unread_count)) {
       this.badge(result.unread_count);
-      document.getElementById('nav-notifications')?.removeAttribute('title');
     }
-    else document.getElementById('nav-notifications')?.setAttribute('title', 'Meldingen konden niet worden bijgewerkt. Open het overzicht om opnieuw te proberen.');
   },
 
-  async render(append = false) {
-    const view = document.getElementById('view-notifications');
+  heading() {
+    return `<header class="dashboard-tile-header"><i class="fas fa-bell dashboard-accent" aria-hidden="true"></i><div><h3>Mijn meldingen <b id="notification-count" ${this.unreadCount ? '' : 'hidden'} aria-label="${this.unreadCount} ongelezen meldingen">${this.unreadCount > 99 ? '99+' : this.unreadCount}</b></h3><p>Nieuwe taken en projecten voor jou</p></div><button class="dashboard-link" onclick="PitboardNotifications.preferences()">Voorkeuren</button></header>`;
+  },
+
+  async render(append = false, quiet = false) {
+    const view = document.getElementById('dashboard-notifications');
+    if (!view || App.currentView !== 'dashboard' || !this.owner) return;
     const session = this.session;
     const request = ++this.request;
-    if (!append) { this.page = 1; this.items = []; }
+    if (!append) this.page = 1;
     this.loading = true;
-    if (!append) view.innerHTML = '<div class="page-header"><h2>Meldingen</h2></div><p role="status">Meldingen laden…</p>';
+    if (!append && !quiet) view.innerHTML = this.heading() + '<p role="status">Meldingen laden…</p>';
     const result = await api(`/api/notifications?page=${this.page}&unread=${this.unreadOnly ? 1 : 0}`, { silentError: true });
-    if (!this.current(session) || request !== this.request || App.currentView !== 'notifications') return;
+    if (!this.current(session) || request !== this.request || App.currentView !== 'dashboard') return;
     this.loading = false;
     if (result?.ready === false) {
-      view.innerHTML = `<div class="page-header"><h2>Meldingen</h2></div><p>De meldingenopslag is nog niet voorbereid.</p>
-        ${result.can_initialize ? '<p>Deze beheeractie voegt uitsluitend de twee nieuwe meldingentabellen toe. Bestaande taken, projecten en andere gegevens blijven behouden.</p><button class="btn btn-primary" onclick="PitboardNotifications.initialize()">Meldingenopslag voorbereiden</button>' : '<p>Vraag een beheerder om Meldingen te openen en de opslag voor te bereiden.</p>'}`;
+      view.innerHTML = `<header class="dashboard-tile-header"><h3>Mijn meldingen</h3></header><div class="notification-scroll"><p>De meldingenopslag is nog niet voorbereid.</p>
+        ${result.can_initialize ? '<p>Deze beheeractie voegt uitsluitend de twee nieuwe meldingentabellen toe. Bestaande taken, projecten en andere gegevens blijven behouden.</p><button class="btn btn-primary" onclick="PitboardNotifications.initialize()">Meldingenopslag voorbereiden</button>' : '<p>Vraag een beheerder om de meldingenopslag via het dashboard voor te bereiden.</p>'}</div>`;
       return;
     }
     if (!result || !Array.isArray(result.items)) {
-      view.innerHTML = '<div class="page-header"><h2>Meldingen</h2></div><p role="alert">Je meldingen konden niet worden geladen.</p><button class="btn btn-outline" onclick="PitboardNotifications.render()">Opnieuw proberen</button>';
+      if (append) this.page--;
+      view.innerHTML = this.heading() + '<p role="alert">Je meldingen konden niet worden bijgewerkt.</p><button class="btn btn-outline" onclick="PitboardNotifications.render()">Opnieuw proberen</button>';
       return;
     }
-    this.items = append ? [...this.items, ...result.items] : result.items;
+    const unchanged = quiet && JSON.stringify(this.items) === JSON.stringify(result.items) && this.hasMore === result.has_more;
+    this.items = append ? [...new Map([...this.items, ...result.items].map(item => [item.id, item])).values()] : result.items;
     this.hasMore = result.has_more;
     this.badge(result.unread_count);
-    this.paint();
+    if (!unchanged || !view.querySelector('.notification-list')) this.paint();
   },
 
   paint() {
-    const view = document.getElementById('view-notifications');
+    const view = document.getElementById('dashboard-notifications');
+    if (!view) return;
     view.innerHTML = `
-      <div class="page-header"><div><h2>Meldingen</h2><p class="notification-intro">Nieuwe taken en projecten die aan jou zijn gekoppeld.</p></div>
-        <button class="btn btn-outline" onclick="PitboardNotifications.preferences()"><i class="fas fa-sliders"></i> Voorkeuren</button></div>
+      ${this.heading()}
       <div class="notification-toolbar">
         <div><button class="btn ${!this.unreadOnly ? 'btn-primary' : 'btn-outline'}" aria-pressed="${!this.unreadOnly}" onclick="PitboardNotifications.filter(false)">Alles</button>
         <button class="btn ${this.unreadOnly ? 'btn-primary' : 'btn-outline'}" aria-pressed="${this.unreadOnly}" onclick="PitboardNotifications.filter(true)">Ongelezen</button></div>
         <div><button class="btn btn-outline" onclick="PitboardNotifications.render()" aria-label="Meldingen vernieuwen"><i class="fas fa-rotate"></i></button>
         <button class="btn btn-outline" onclick="PitboardNotifications.readAll()">Alles als gelezen</button></div>
       </div>
-      <div class="notification-list">
+      <div class="notification-scroll"><div class="notification-list">
         ${this.items.length ? this.items.map(item => `
           <article class="notification-card ${item.read_at ? '' : 'notification-unread'}">
             <div class="notification-kind" aria-hidden="true"><i class="fas fa-${item.kind === 'task' ? 'tasks' : 'folder'}"></i></div>
@@ -96,7 +105,7 @@ const PitboardNotifications = {
             ${item.read_at ? '' : `<button class="btn btn-outline btn-sm" data-read-notification="${escHtml(item.id)}">Als gelezen</button>`}
           </article>`).join('') : '<div class="notification-empty"><i class="far fa-bell" aria-hidden="true"></i><h3>Je bent bij</h3><p>Hier verschijnen nieuwe toewijzingen aan jou.</p></div>'}
       </div>
-      ${this.hasMore ? '<button class="btn btn-outline" onclick="PitboardNotifications.more()">Meer meldingen</button>' : ''}`;
+      ${this.hasMore ? '<button class="btn btn-outline" onclick="PitboardNotifications.more()">Meer meldingen</button>' : ''}</div>`;
     view.querySelectorAll('[data-open-notification]').forEach(button => button.addEventListener('click', () => this.open(button.dataset.openNotification)));
     view.querySelectorAll('[data-read-notification]').forEach(button => button.addEventListener('click', () => this.read(button.dataset.readNotification)));
   },
@@ -112,12 +121,12 @@ const PitboardNotifications = {
   async read(id) {
     const session = this.session;
     const result = await api(`/api/notifications/${encodeURIComponent(id)}/read`, { method: 'POST' });
-    if (result && this.current(session)) { this.refreshBadge(); if (App.currentView === 'notifications') this.render(); }
+    if (result && this.current(session)) { if (App.currentView === 'dashboard') this.render(); else this.refreshBadge(); }
   },
   async readAll() {
     const session = this.session;
     const result = await api('/api/notifications/read-all', { method: 'POST' });
-    if (result && this.current(session)) { this.refreshBadge(); if (App.currentView === 'notifications') this.render(); }
+    if (result && this.current(session)) { if (App.currentView === 'dashboard') this.render(); else this.refreshBadge(); }
   },
 
   async open(id) {
@@ -145,7 +154,7 @@ const PitboardNotifications = {
     const id = url.searchParams.get('melding');
     if (!id) return false;
     // Login happens before this; only an owned server-side notification resolves a target.
-    navigateTo('notifications');
+    navigateTo('dashboard');
     await this.open(id);
     url.searchParams.delete('melding');
     history.replaceState(null, '', url);

@@ -258,7 +258,6 @@ function navigateTo(view) {
   document.querySelector(`[data-view="${view}"]`)?.classList.add('active');
 
   switch(view) {
-    case 'notifications': PitboardNotifications.render(); break;
     case 'dashboard': renderDashboard(); break;
     case 'projects': renderProjects(); break;
     case 'tasks': renderTasks(); break;
