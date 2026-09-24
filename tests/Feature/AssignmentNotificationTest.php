@@ -126,12 +126,15 @@ class AssignmentNotificationTest extends TestCase
         Mail::assertSent(AssignmentMail::class, 1);
         Mail::assertSent(AssignmentMail::class, fn ($mail) => $mail->hasTo($colleague->email)
             && $mail->envelope()->from->address === 'pitboard@example.test'
-            && $mail->envelope()->from->name === 'The Pitboard');
+            && $mail->envelope()->from->name === 'BBQuality Pitboard');
         $this->assertSame('accepted', $notification->fresh()->email_status);
         $rendered = (new AssignmentMail($notification))->render();
         $this->assertStringContainsString('/?melding='.$notification->id, $rendered);
         $this->assertStringContainsString('02-10-2026', $rendered);
         $this->assertStringContainsString('Bekijk taak', $rendered);
+        $this->assertStringContainsString('BBQuality Pitboard', $rendered);
+        $this->assertStringStartsWith('BBQuality Pitboard · ', (new AssignmentMail($notification))->envelope()->subject);
+        $this->getJson('/api/notifications/preferences')->assertJsonPath('sender_name', 'BBQuality Pitboard');
     }
 
     public function test_job_rechecks_assignment_and_local_environment_never_sends(): void

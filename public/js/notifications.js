@@ -158,7 +158,7 @@ const PitboardNotifications = {
     if (preferences.ready === false) { this.render(); return; }
     openModal('Mijn meldingsvoorkeuren', `
       <p>Meldingen blijven altijd bewaard in Pitboard. Kies welke nieuwe toewijzingen je ook per e-mail wilt ontvangen.</p>
-      <p class="notification-email-status">${preferences.email_active ? 'E-mails worden verstuurd vanuit The Pitboard.' : 'E-mailverzending is nog niet geactiveerd. Je voorkeuren worden alvast bewaard; meldingen in Pitboard werken wel.'}</p>
+      <p class="notification-email-status">${preferences.email_active ? `E-mails worden verstuurd vanuit ${escHtml(preferences.sender_name || 'BBQuality Pitboard')}.` : 'E-mailverzending is nog niet geactiveerd. Je voorkeuren worden alvast bewaard; meldingen in Pitboard werken wel.'}</p>
       ${preferences.email_attention_count ? `<p role="alert">Bij ${Number(preferences.email_attention_count)} e-mailmeldingen is verzending niet bevestigd. Laat dit controleren voordat opnieuw wordt verstuurd. De meldingen in Pitboard blijven beschikbaar.</p>` : ''}
       <label class="notification-preference"><input type="checkbox" id="notification-task-email" ${preferences.task_email ? 'checked' : ''}> Nieuwe taken per e-mail</label>
       <label class="notification-preference"><input type="checkbox" id="notification-project-email" ${preferences.project_email ? 'checked' : ''}> Toegevoegd aan een project per e-mail</label>`,

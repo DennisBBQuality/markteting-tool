@@ -15,8 +15,8 @@ class AssignmentMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            from: new Address(config('pitboard_notifications.from_address'), 'The Pitboard'),
-            subject: 'The Pitboard · '.($this->notification->kind === 'task' ? 'Nieuwe taak voor jou' : 'Toegevoegd aan een project'),
+            from: new Address(config('pitboard_notifications.from_address'), 'BBQuality Pitboard'),
+            subject: 'BBQuality Pitboard · '.($this->notification->kind === 'task' ? 'Nieuwe taak voor jou' : 'Toegevoegd aan een project'),
         );
     }
 

@@ -111,7 +111,7 @@ class NotificationController extends Controller
             'task_email' => $service->wantsEmail($userId, 'task'),
             'project_email' => $service->wantsEmail($userId, 'project'),
             'email_active' => $service->emailReady(),
-            'sender_name' => 'The Pitboard',
+            'sender_name' => 'BBQuality Pitboard',
             ...$health,
         ])->header('Cache-Control', 'no-store');
     }
