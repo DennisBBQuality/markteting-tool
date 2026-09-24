@@ -13,7 +13,7 @@
 
 De release zet **geen echte e-mailverzending aan** en wijzigt geen Microsoft-rechten of productie-instellingen. De Trunkrs-leeskoppeling blijft ongewijzigd. SMTP- en verzendrechten zijn nog niet operationeel gecontroleerd. Het scherm vermeldt dat e-mail nog uitstaat.
 
-Voorgestelde afzender: **The Pitboard**, met een nog te bevestigen eigen adres. Microsoft 365 ondersteunt een gedeeld postvak zonder afzonderlijke mailboxlicentie tot 50 GB bij normaal gebruik. De gebruiker die toegang krijgt heeft een bestaande Exchange Online-licentie nodig. Gebruik **Send As / Verzenden als**, niet **Send on behalf / Namens**. Alleen een andere weergavenaam op Dennis' adres voldoet niet.
+Door Dennis bevestigde afzendernaam: **BBQuality Pitboard**, met een nog te bevestigen eigen adres. Microsoft 365 ondersteunt een gedeeld postvak zonder afzonderlijke mailboxlicentie tot 50 GB bij normaal gebruik. De gebruiker die toegang krijgt heeft een bestaande Exchange Online-licentie nodig. Gebruik **Send As / Verzenden als**, niet **Send on behalf / Namens**. Alleen een andere weergavenaam op Dennis' adres voldoet niet.
 
 Bron: https://learn.microsoft.com/en-us/microsoft-365/admin/email/about-shared-mailboxes
 
@@ -26,7 +26,7 @@ De ingebouwde mailadapter ondersteunt een expliciet geconfigureerde Laravel SMTP
 - `PITBOARD_NOTIFICATION_MAILER`: bestaande SMTP-mailer met geschikte transportauthenticatie
 - `APP_URL`: de bevestigde HTTPS-Pitboard-URL
 
-De afzendernaam staat vast op The Pitboard; geen automatische terugval op het persoonlijke `MAIL_FROM_ADDRESS`. In de lokale omgeving blijft verzending geblokkeerd, zelfs als bovenstaande schakelaar aanstaat. Voorkeuren voor nieuwe taken en projecten staan standaard aan, maar de globale schakelaar staat standaard uit.
+De afzendernaam staat vast op BBQuality Pitboard; geen automatische terugval op het persoonlijke `MAIL_FROM_ADDRESS`. In de lokale omgeving blijft verzending geblokkeerd, zelfs als bovenstaande schakelaar aanstaat. Voorkeuren voor nieuwe taken en projecten staan standaard aan, maar de globale schakelaar staat standaard uit.
 
 Na activatie wordt ieder nieuw bericht na commit via Laravel deferred afgehandeld; geen dagelijkse timer of Mac nodig. De melding bewaart de status `pending`, `processing`, `accepted`, `uncertain`, `cancelled`, `disabled` of `opted_out`. Eén atomische claim voorkomt dubbel versturen door een herhaalde job. `accepted` betekent alleen geaccepteerd door het mailtransport, niet bewezen in de inbox. Onzekere fouten worden niet automatisch herhaald. Uitgeschakelde oude berichten worden na activatie niet alsnog verstuurd. Beheerders zien bij Voorkeuren een waarschuwing voor onzekere of langer dan tien minuten vaststaande mailpogingen. Controleer bij twijfel eerst de verzendbestemming; herhaal niet blind.
 
