@@ -19,7 +19,7 @@ if ($method !== 'GET' && ! hash_equals($_SESSION['fixture_csrf'] ?? 'missing', $
     echo json_encode(['message' => 'TEST CSRF']);
     exit;
 }
-$items = &$_SESSION['notification_fixture'];
+$items = &$_SESSION['notification_popup_fixture'];
 if (! is_array($items)) {
     $items = [
         ['id' => 'test-task', 'kind' => 'task', 'target_id' => '55555555-5555-4555-8555-555555555550', 'title' => 'Productteksten controleren', 'actor_name' => 'Testcollega', 'deadline' => '2026-10-02', 'created_at' => '2026-09-24T09:00:00Z', 'read_at' => null],

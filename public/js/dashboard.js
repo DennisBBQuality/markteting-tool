@@ -200,6 +200,7 @@ async function renderDashboard() {
       <h2>Dashboard</h2>
       <div class="page-header-actions">
         <span class="dashboard-today"><i class="far fa-calendar" aria-hidden="true"></i> ${dashboardDate(new Date().toISOString(), {weekday:'long', day:'numeric', month:'long', year:'numeric'})}</span>
+        <button id="dashboard-notification-button" class="btn btn-outline" onclick="PitboardNotifications.showPopup()" aria-haspopup="dialog"><i class="fas fa-bell" aria-hidden="true"></i> Meldingen <b id="notification-count" aria-live="polite">0</b></button>
         <button class="btn btn-primary" onclick="openQuickTaskModal()"><i class="fas fa-plus" aria-hidden="true"></i> Nieuwe taak</button>
         <button id="dashboard-customize" class="btn btn-outline" onclick="DashboardLayout.edit()"><i class="fas fa-sliders" aria-hidden="true"></i> Dashboard aanpassen</button>
       </div>
@@ -207,9 +208,6 @@ async function renderDashboard() {
     <div id="dashboard-layout-status" role="status"></div>
     <section id="dashboard-layout-editor" hidden aria-label="Dashboard aanpassen"></section>
     <div id="dashboard-widget-grid">
-    <section data-widget="notifications" class="dashboard-tile dashboard-notifications" aria-label="Mijn meldingen">
-      <div id="dashboard-notifications"><p role="status">Meldingen laden…</p></div>
-    </section>
     <section data-widget="calendar" class="dashboard-week dashboard-tile" aria-label="Weekkalender">
       <header class="dashboard-week-header">
         <div><h3>Deze week</h3><p id="dashboard-week-title" aria-live="polite"></p></div>
@@ -257,7 +255,10 @@ async function renderDashboard() {
   mountDashboardCalendar(version, userId);
   if (typeof DashboardLayout !== 'undefined') DashboardLayout.resizeCalendar();
   if (typeof Trunkrs !== 'undefined') Trunkrs.mount();
-  if (typeof PitboardNotifications !== 'undefined') PitboardNotifications.render();
+  if (typeof PitboardNotifications !== 'undefined') {
+    PitboardNotifications.badge(PitboardNotifications.unreadCount);
+    PitboardNotifications.refreshBadge();
+  }
   await Promise.all([Dashboard.loadTasks(userId), ...[
     ['notes', '/api/notes?mine=1', 'dashboard-my-notes'],
     ['projects', '/api/projects', 'dashboard-active-projects'],

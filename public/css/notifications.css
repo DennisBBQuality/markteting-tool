@@ -1,6 +1,5 @@
-.dashboard-widget > .dashboard-notifications { padding: 0 16px; overflow: hidden; }
-#dashboard-notifications { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-#dashboard-notifications .dashboard-tile-header h3 { white-space: normal; }
+#notification-popup { min-width: 0; }
+#dashboard-notification-button { white-space: nowrap; }
 #notification-count { display: inline-block; margin-left: 6px; min-width: 22px; padding: 2px 6px; border-radius: 20px; background: #ef454b; color: #fff; font-size: 12px; text-align: center; }
 #notification-count[hidden] { display: none; }
 .notification-intro { color: var(--text-light); margin-top: 6px; font-size: 14px; }

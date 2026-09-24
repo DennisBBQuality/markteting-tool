@@ -1,9 +1,21 @@
 // Persistent assignment inbox; no external push or mailbox access in the browser.
 const PitboardNotifications = {
-  timer: null, session: 0, request: 0, page: 1, unreadOnly: false,
+  timer: null, session: 0, request: 0, page: 1, unreadOnly: true, popupOpen: false,
   items: [], hasMore: false, loading: false, owner: null, unreadCount: 0,
 
-  unmount() { this.request++; this.loading = false; this.page = 1; },
+  unmount() { this.request++; this.loading = false; this.page = 1; this.popupOpen = false; },
+
+  showPopup() {
+    if (!this.owner || App.currentView !== 'dashboard') return;
+    openModal('Meldingen', '<div id="notification-popup"><p role="status">Meldingen laden…</p></div>',
+      '<button class="btn btn-outline" onclick="PitboardNotifications.preferences()">Voorkeuren</button><button class="btn btn-primary" onclick="closeModal()">Sluiten</button>');
+    this.popupOpen = true;
+    this.unreadOnly = true;
+    this.items = [];
+    document.getElementById('modal-title')?.setAttribute('tabindex', '-1');
+    document.getElementById('modal-title')?.focus();
+    return this.render();
+  },
 
   start() {
     this.stop();
@@ -23,8 +35,9 @@ const PitboardNotifications = {
     this.owner = null;
     this.items = [];
     this.loading = false;
-    this.unreadOnly = false;
-    const view = document.getElementById('dashboard-notifications');
+    this.unreadOnly = true;
+    this.popupOpen = false;
+    const view = document.getElementById('notification-popup');
     if (view) view.innerHTML = '';
     this.badge(0);
   },
@@ -34,13 +47,14 @@ const PitboardNotifications = {
   badge(count) {
     this.unreadCount = Number.isInteger(count) && count >= 0 ? count : 0;
     const badge = document.getElementById('notification-count');
-    if (badge) { badge.textContent = count > 99 ? '99+' : String(this.unreadCount); badge.hidden = !this.unreadCount; badge.setAttribute('aria-label', `${this.unreadCount} ongelezen meldingen`); }
+    if (badge) { badge.textContent = String(this.unreadCount); badge.setAttribute('aria-label', `${this.unreadCount} ongeopende meldingen`); }
+    document.getElementById('dashboard-notification-button')?.setAttribute('aria-label', `Meldingen, ${this.unreadCount} ongeopend`);
   },
 
   async refreshBadge() {
     const session = this.session;
     if (!this.owner) return;
-    if (App.currentView === 'dashboard' && document.getElementById('dashboard-notifications') && this.page === 1 && !this.loading) {
+    if (this.popupOpen && this.page === 1 && !this.loading) {
       return this.render(false, true);
     }
     const result = await api('/api/notifications', { silentError: true });
@@ -51,22 +65,22 @@ const PitboardNotifications = {
   },
 
   heading() {
-    return `<header class="dashboard-tile-header"><i class="fas fa-bell dashboard-accent" aria-hidden="true"></i><div><h3>Mijn meldingen <b id="notification-count" ${this.unreadCount ? '' : 'hidden'} aria-label="${this.unreadCount} ongelezen meldingen">${this.unreadCount > 99 ? '99+' : this.unreadCount}</b></h3><p>Nieuwe taken en projecten voor jou</p></div><button class="dashboard-link" onclick="PitboardNotifications.preferences()">Voorkeuren</button></header>`;
+    return '<p class="notification-intro">Klik op een melding om de bijbehorende taak of het project te openen. Pas daarna verdwijnt deze uit je ongeopende meldingen.</p>';
   },
 
   async render(append = false, quiet = false) {
-    const view = document.getElementById('dashboard-notifications');
-    if (!view || App.currentView !== 'dashboard' || !this.owner) return;
+    const view = document.getElementById('notification-popup');
+    if (!this.popupOpen || !view || App.currentView !== 'dashboard' || !this.owner) return;
     const session = this.session;
     const request = ++this.request;
     if (!append) this.page = 1;
     this.loading = true;
     if (!append && !quiet) view.innerHTML = this.heading() + '<p role="status">Meldingen laden…</p>';
     const result = await api(`/api/notifications?page=${this.page}&unread=${this.unreadOnly ? 1 : 0}`, { silentError: true });
-    if (!this.current(session) || request !== this.request || App.currentView !== 'dashboard') return;
+    if (!this.current(session) || request !== this.request || !this.popupOpen || view !== document.getElementById('notification-popup') || App.currentView !== 'dashboard') return;
     this.loading = false;
     if (result?.ready === false) {
-      view.innerHTML = `<header class="dashboard-tile-header"><h3>Mijn meldingen</h3></header><div class="notification-scroll"><p>De meldingenopslag is nog niet voorbereid.</p>
+      view.innerHTML = `<div class="notification-scroll"><p>De meldingenopslag is nog niet voorbereid.</p>
         ${result.can_initialize ? '<p>Deze beheeractie voegt uitsluitend de twee nieuwe meldingentabellen toe. Bestaande taken, projecten en andere gegevens blijven behouden.</p><button class="btn btn-primary" onclick="PitboardNotifications.initialize()">Meldingenopslag voorbereiden</button>' : '<p>Vraag een beheerder om de meldingenopslag via het dashboard voor te bereiden.</p>'}</div>`;
       return;
     }
@@ -83,15 +97,15 @@ const PitboardNotifications = {
   },
 
   paint() {
-    const view = document.getElementById('dashboard-notifications');
-    if (!view) return;
+    const view = document.getElementById('notification-popup');
+    if (!this.popupOpen || !view) return;
     view.innerHTML = `
       ${this.heading()}
       <div class="notification-toolbar">
         <div><button class="btn ${!this.unreadOnly ? 'btn-primary' : 'btn-outline'}" aria-pressed="${!this.unreadOnly}" onclick="PitboardNotifications.filter(false)">Alles</button>
-        <button class="btn ${this.unreadOnly ? 'btn-primary' : 'btn-outline'}" aria-pressed="${this.unreadOnly}" onclick="PitboardNotifications.filter(true)">Ongelezen</button></div>
+        <button class="btn ${this.unreadOnly ? 'btn-primary' : 'btn-outline'}" aria-pressed="${this.unreadOnly}" onclick="PitboardNotifications.filter(true)">Ongeopend</button></div>
         <div><button class="btn btn-outline" onclick="PitboardNotifications.render()" aria-label="Meldingen vernieuwen"><i class="fas fa-rotate"></i></button>
-        <button class="btn btn-outline" onclick="PitboardNotifications.readAll()">Alles als gelezen</button></div>
+        </div>
       </div>
       <div class="notification-scroll"><div class="notification-list">
         ${this.items.length ? this.items.map(item => `
@@ -102,12 +116,10 @@ const PitboardNotifications = {
               <p>${escHtml(item.actor_name)} heeft ${item.kind === 'task' ? 'deze taak aan je toegewezen' : 'je aan dit project toegevoegd'}.</p>
               <small>${escHtml(this.date(item.created_at))}${item.deadline ? ` · Deadline: ${escHtml(this.date(item.deadline, true))}` : ''}</small>
             </div>
-            ${item.read_at ? '' : `<button class="btn btn-outline btn-sm" data-read-notification="${escHtml(item.id)}">Als gelezen</button>`}
           </article>`).join('') : '<div class="notification-empty"><i class="far fa-bell" aria-hidden="true"></i><h3>Je bent bij</h3><p>Hier verschijnen nieuwe toewijzingen aan jou.</p></div>'}
       </div>
       ${this.hasMore ? '<button class="btn btn-outline" onclick="PitboardNotifications.more()">Meer meldingen</button>' : ''}</div>`;
     view.querySelectorAll('[data-open-notification]').forEach(button => button.addEventListener('click', () => this.open(button.dataset.openNotification)));
-    view.querySelectorAll('[data-read-notification]').forEach(button => button.addEventListener('click', () => this.read(button.dataset.readNotification)));
   },
 
   date(value, dayOnly = false) {
@@ -121,21 +133,24 @@ const PitboardNotifications = {
   async read(id) {
     const session = this.session;
     const result = await api(`/api/notifications/${encodeURIComponent(id)}/read`, { method: 'POST' });
-    if (result && this.current(session)) { if (App.currentView === 'dashboard') this.render(); else this.refreshBadge(); }
+    if (result && this.current(session)) { if (this.popupOpen) this.render(); else this.refreshBadge(); }
   },
   async readAll() {
     const session = this.session;
     const result = await api('/api/notifications/read-all', { method: 'POST' });
-    if (result && this.current(session)) { if (App.currentView === 'dashboard') this.render(); else this.refreshBadge(); }
+    if (result && this.current(session)) { if (this.popupOpen) this.render(); else this.refreshBadge(); }
   },
 
   async open(id) {
     const session = this.session;
+    const popupRequest = this.popupOpen ? this.request : null;
     const item = await api(`/api/notifications/${encodeURIComponent(id)}`);
     if (!item || !this.current(session)) return false;
+    if (popupRequest !== null && (!this.popupOpen || popupRequest !== this.request)) return false;
     const view = item.kind === 'task' ? 'tasks' : 'projects';
     navigateTo(view);
     if (App.currentView !== view) return false;
+    closeModal();
     if (item.kind === 'task') {
       if (await openEditTaskModal(item.target_id, () => this.current(session) && App.currentView === view) === false) return false;
     } else {
