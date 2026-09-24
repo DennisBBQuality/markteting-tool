@@ -1,8 +1,9 @@
 // Layout preferences contain only presentation choices, never business data.
 const DashboardLayout = {
-  names: {calendar:'Weekkalender', tasks:'Openstaande taken', projects:'Actieve projecten', notes:'Mijn notities', trunkrs:'Niet bezorgd Trunkrs'},
+  names: {notifications:'Mijn meldingen', calendar:'Weekkalender', tasks:'Openstaande taken', projects:'Actieve projecten', notes:'Mijn notities', trunkrs:'Niet bezorgd Trunkrs'},
   defaults() {
     return [
+      {id:'notifications', width:12, height:280, visible:true},
       {id:'calendar', width:8, height:420, visible:true},
       {id:'tasks', width:4, height:420, visible:true},
       {id:'projects', width:6, height:280, visible:true},
@@ -16,7 +17,9 @@ const DashboardLayout = {
     const seen = new Set();
     const result = tiles.filter(t => t && defaults.some(d => d.id === t.id) && !seen.has(t.id) && seen.add(t.id))
       .map(t => ({id:t.id, width:[4,6,8,12].includes(t.width)?t.width:6, height:Math.max(['calendar','tasks'].includes(t.id)?280:160,[160,280,420,560].includes(t.height)?t.height:280), visible:t.visible !== false}));
-    return result.concat(defaults.filter(d => !seen.has(d.id)));
+    // Add the new inbox without resetting an existing user's order, sizes or visibility.
+    return [...defaults.filter(d => d.id === 'notifications' && !seen.has(d.id)), ...result,
+      ...defaults.filter(d => d.id !== 'notifications' && !seen.has(d.id))];
   },
   tiles: [], revision:0, editing:false, busy:false, ready:false, sortable:null, observer:null,
   dispose() {

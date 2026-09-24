@@ -8,6 +8,7 @@ const Dashboard = {
   taskPerson: null,
   taskRequest: 0,
   dispose() {
+    if (typeof PitboardNotifications !== 'undefined') PitboardNotifications.unmount();
     this.version++;
     this.taskRequest++;
     if (typeof DashboardLayout !== 'undefined') DashboardLayout.dispose();
@@ -206,6 +207,9 @@ async function renderDashboard() {
     <div id="dashboard-layout-status" role="status"></div>
     <section id="dashboard-layout-editor" hidden aria-label="Dashboard aanpassen"></section>
     <div id="dashboard-widget-grid">
+    <section data-widget="notifications" class="dashboard-tile dashboard-notifications" aria-label="Mijn meldingen">
+      <div id="dashboard-notifications"><p role="status">Meldingen laden…</p></div>
+    </section>
     <section data-widget="calendar" class="dashboard-week dashboard-tile" aria-label="Weekkalender">
       <header class="dashboard-week-header">
         <div><h3>Deze week</h3><p id="dashboard-week-title" aria-live="polite"></p></div>
@@ -253,6 +257,7 @@ async function renderDashboard() {
   mountDashboardCalendar(version, userId);
   if (typeof DashboardLayout !== 'undefined') DashboardLayout.resizeCalendar();
   if (typeof Trunkrs !== 'undefined') Trunkrs.mount();
+  if (typeof PitboardNotifications !== 'undefined') PitboardNotifications.render();
   await Promise.all([Dashboard.loadTasks(userId), ...[
     ['notes', '/api/notes?mine=1', 'dashboard-my-notes'],
     ['projects', '/api/projects', 'dashboard-active-projects'],

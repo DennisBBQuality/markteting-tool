@@ -21,14 +21,15 @@ class DashboardPreferenceController extends Controller
     {
         $data = $request->validate([
             'revision' => 'required|integer|min:0',
-            'tiles' => 'required|array|size:5',
+            'tiles' => 'required|array|min:5|max:6',
             'tiles.*' => 'required|array:id,width,height,visible',
-            'tiles.*.id' => ['required', 'distinct', Rule::in(['calendar', 'tasks', 'projects', 'notes', 'trunkrs'])],
+            'tiles.*.id' => ['required', 'distinct', Rule::in(['calendar', 'tasks', 'projects', 'notes', 'trunkrs', 'notifications'])],
             'tiles.*.width' => ['required', 'integer', Rule::in([4, 6, 8, 12])],
             'tiles.*.height' => ['required', 'integer', Rule::in([160, 280, 420, 560])],
             'tiles.*.visible' => 'required|boolean',
         ]);
 
+        abort_if(array_diff(['calendar', 'tasks', 'projects', 'notes', 'trunkrs'], array_column($data['tiles'], 'id')), 422, 'De dashboardindeling mist een bestaande tegel.');
         foreach ($data['tiles'] as $tile) {
             abort_if(in_array($tile['id'], ['calendar', 'tasks'], true) && $tile['height'] < 280, 422, 'Kalender en taken hebben minimaal de compacte hoogte nodig.');
         }
@@ -41,6 +42,13 @@ class DashboardPreferenceController extends Controller
             ]);
             $row = DB::table('dashboard_preferences')->where('user_id', $userId)->lockForUpdate()->first();
             abort_if((int) $row->revision !== (int) $data['revision'], 409, 'Je dashboard is in een ander tabblad gewijzigd. Herlaad voordat je opnieuw aanpast.');
+            // Older open tabs submit five widgets: preserve the inbox's saved position and options.
+            if (count($data['tiles']) === 5) {
+                $previous = json_decode($row->tiles, true) ?? [];
+                $position = array_search('notifications', array_column($previous, 'id'), true);
+                $notification = $position === false ? ['id' => 'notifications', 'width' => 12, 'height' => 280, 'visible' => true] : $previous[$position];
+                array_splice($data['tiles'], $position === false ? 0 : $position, 0, [$notification]);
+            }
             $revision = $row->revision + 1;
             DB::table('dashboard_preferences')->where('user_id', $userId)->update([
                 'tiles' => json_encode($data['tiles']), 'revision' => $revision, 'updated_at' => now(),

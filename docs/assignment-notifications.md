@@ -4,7 +4,8 @@
 
 - Nieuwe toewijzing aan een taak of toevoeging aan een project maakt een blijvende melding voor ieder nieuw toegevoegd actief teamlid, behalve de uitvoerder zelf.
 - Ongewijzigd opslaan en dubbele IDs leveren geen nieuwe melding op. Verwijderen en later opnieuw toevoegen is een nieuwe toewijzing. Er is geen terugwerkende verzending voor bestaande taken.
-- Meldingen in de zijbalk: teller, alles/ongelezen, per melding lezen, alles lezen, doorklikken en eigen voorkeuren (ook voor gewone leden). Een zichtbare browser controleert iedere 30 seconden en bij terugkeer naar het tabblad. Geen toestemming voor browserpush nodig.
+- Mijn meldingen op het dashboard: teller, alles/ongelezen, per melding lezen, alles lezen, doorklikken en eigen voorkeuren (ook voor gewone leden). Geen aparte menuoptie of pagina. Een zichtbare browser controleert iedere 30 seconden en bij terugkeer naar het tabblad; de eerste pagina vernieuwt stil met behoud van het gekozen filter. Geen toestemming voor browserpush nodig.
+- Het meldingenblok is verplaatsbaar, in grootte aanpasbaar en verbergbaar via Dashboard aanpassen. Oude indelingen krijgen het blok bovenaan zonder de andere vijf blokken te wijzigen. Opslaan vanuit een oudere tab behoudt een al opgeslagen meldingenblok. Er is geen extra migratie voor deze dashboardverplaatsing.
 - Het opslaan van het item, de medewerkers en de meldingen gebeurt in één transactie; updates vergrendelen het item voor een consistente vergelijking. Ontbrekende medewerkersvelden behouden de bestaande koppelingen.
 - Alleen de ingelogde ontvanger kan een melding opvragen of lezen. De bestaande gedeelde toegang tot taken/projecten verandert niet. Bij verwijderd doel blijft de melding zichtbaar en volgt een duidelijke fout bij openen.
 - Gedeelde computer: meldingen worden bij uitloggen gewist uit het scherm en late antwoorden worden genegeerd.
@@ -19,7 +20,7 @@ Bron: https://learn.microsoft.com/en-us/microsoft-365/admin/email/about-shared-m
 
 ### Microsoft-verzendkoppeling via Pitboard
 
-Een beheerder opent **Meldingen → Voorkeuren → Afzender en Microsoft-koppeling beheren**. Deze release voegt een aparte Graph-verzendadapter en beheerpagina toe, zonder de Trunkrs-app of tokens te gebruiken. Inrichting:
+Een beheerder opent **Dashboard → Mijn meldingen → Voorkeuren → Afzender en Microsoft-koppeling beheren**. Deze release voegt een aparte Graph-verzendadapter en beheermodal toe, zonder de Trunkrs-app of tokens te gebruiken. Inrichting:
 
 1. Controleer of maak het gedeelde postvak met weergavenaam BBQuality Pitboard; direct aanmelden op dat postvak blijft geblokkeerd. Gebruik geen basiswachtwoord en schakel geen tenantbeveiliging uit.
 2. Geef een bestaand gelicentieerd account alleen de benodigde **Verzenden als**-machtiging voor de gedeelde afzender. Gebruik niet “Namens”. Microsoft Graph kan deze delegatie niet vooraf uitlezen; controleer dit in Exchange en met het proefbericht.

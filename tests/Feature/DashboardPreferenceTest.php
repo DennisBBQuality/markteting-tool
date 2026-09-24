@@ -11,7 +11,7 @@ class DashboardPreferenceTest extends TestCase
 
     private function layout(): array
     {
-        return array_map(fn ($id) => ['id' => $id, 'width' => 6, 'height' => 280, 'visible' => true], ['calendar', 'tasks', 'projects', 'notes', 'trunkrs']);
+        return array_map(fn ($id) => ['id' => $id, 'width' => 6, 'height' => 280, 'visible' => true], ['calendar', 'tasks', 'projects', 'notes', 'trunkrs', 'notifications']);
     }
 
     public function test_preferences_require_login(): void
@@ -59,5 +59,21 @@ class DashboardPreferenceTest extends TestCase
         $tiles[0]['id'] = 'tasks';
         $this->putJson('/api/dashboard/preferences', ['tiles' => $tiles, 'revision' => 0])->assertUnprocessable();
         $this->assertDatabaseCount('dashboard_preferences', 0);
+    }
+
+    public function test_old_tabs_preserve_saved_notification_tile_and_legacy_layout_gains_only_new_tile(): void
+    {
+        $this->actingAsUser();
+        $legacy = array_slice($this->layout(), 0, 5);
+        $this->putJson('/api/dashboard/preferences', ['tiles' => $legacy, 'revision' => 0])->assertOk()
+            ->assertJsonCount(6, 'tiles')->assertJsonPath('tiles.0.id', 'notifications')->assertJsonPath('tiles.0.visible', true);
+        $current = $this->layout();
+        $current[5]['visible'] = false;
+        $current[5]['width'] = 4;
+        $this->putJson('/api/dashboard/preferences', ['tiles' => $current, 'revision' => 1])->assertOk();
+        $this->putJson('/api/dashboard/preferences', ['tiles' => $legacy, 'revision' => 2])->assertOk()
+            ->assertJsonPath('tiles.5.id', 'notifications')->assertJsonPath('tiles.5.visible', false)->assertJsonPath('tiles.5.width', 4);
+        array_shift($current);
+        $this->putJson('/api/dashboard/preferences', ['tiles' => $current, 'revision' => 3])->assertUnprocessable();
     }
 }
