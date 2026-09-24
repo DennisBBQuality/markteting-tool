@@ -199,6 +199,8 @@ async function checkAuth() {
 
 function showLogin() {
   App.currentUser = null;
+  if (typeof PitboardNotifications !== 'undefined') PitboardNotifications.stop();
+  closeModal();
   if (typeof Dashboard !== 'undefined') { Dashboard.dispose(); Dashboard.date = null; }
   const dashboard = document.getElementById('view-dashboard');
   if (dashboard) dashboard.innerHTML = '';
@@ -218,7 +220,13 @@ function showApp() {
   // Show settings only for admin
   document.getElementById('nav-settings').style.display = App.currentUser.rol === 'admin' ? '' : 'none';
 
-  loadGlobalData().then(() => {
+  const signedInUserId = App.currentUser.id;
+  loadGlobalData().then(async () => {
+    if (App.currentUser?.id !== signedInUserId) return;
+    if (typeof PitboardNotifications !== 'undefined') {
+      PitboardNotifications.start();
+      if (await PitboardNotifications.openFromLink()) return;
+    }
     navigateTo(typeof productImageRecoveryId === 'function' && productImageRecoveryId() ? 'converter' : 'dashboard');
   });
 }
@@ -250,6 +258,7 @@ function navigateTo(view) {
   document.querySelector(`[data-view="${view}"]`)?.classList.add('active');
 
   switch(view) {
+    case 'notifications': PitboardNotifications.render(); break;
     case 'dashboard': renderDashboard(); break;
     case 'projects': renderProjects(); break;
     case 'tasks': renderTasks(); break;

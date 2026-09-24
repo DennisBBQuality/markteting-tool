@@ -1,0 +1,29 @@
+#nav-notifications { position: relative; }
+#notification-count { margin-left: auto; min-width: 22px; padding: 2px 6px; border-radius: 20px; background: #ef454b; color: #fff; font-size: 12px; text-align: center; }
+#notification-count[hidden] { display: none; }
+.notification-intro { color: var(--text-light); margin-top: 6px; font-size: 14px; }
+.notification-toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; margin: 20px 0; }
+.notification-toolbar > div { display: flex; gap: 8px; }
+.notification-list { display: grid; gap: 10px; margin-bottom: 20px; }
+.notification-card { background: white; border: 1px solid var(--border, #e5e1dc); border-radius: 10px; padding: 20px; display: flex; align-items: flex-start; gap: 16px; }
+.notification-unread { border-left: 4px solid #ef454b; background: #fffbfa; }
+.notification-kind { background: #fce8e8; color: #e83e45; width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; flex-shrink: 0; }
+.notification-copy { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.notification-label { font-size: 12px; font-weight: 600; color: #75675f; }
+.notification-link { background: none; border: 0; padding: 0; text-align: left; color: inherit; font: inherit; cursor: pointer; }
+.notification-link:hover { text-decoration: underline; }
+.notification-copy h3 { font-size: 17px; margin: 4px 0; }
+.notification-copy p { margin: 4px 0 8px; font-size: 14px; }
+.notification-copy small { color: #75675f; font-size: 12px; }
+.notification-empty { text-align: center; padding: 55px 20px; background: #fff; border-radius: 10px; }
+.notification-empty > i { font-size: 30px; color: #ef454b; margin-bottom: 15px; }
+.notification-empty p { color: #75675f; margin-top: 6px; }
+.notification-preference { display: flex; align-items: center; gap: 10px; margin-top: 18px; }
+.notification-preference input { width: 18px; height: 18px; accent-color: #ef454b; }
+.notification-email-status { padding: 12px; margin: 14px 0; background: #f5f3ef; border-radius: 6px; }
+@media (max-width: 768px) {
+  #notification-count { position: absolute; top: 1px; right: 1px; }
+  .notification-card { flex-wrap: wrap; padding: 14px; gap: 10px; }
+  .notification-card > .btn { margin-left: 50px; }
+  #view-notifications .page-header { align-items: flex-start; flex-wrap: wrap; gap: 12px; }
+}

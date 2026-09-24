@@ -4,10 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Project;
+use App\Services\AssignmentNotifications;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Str;
 
 class ProjectController extends Controller
 {
@@ -46,6 +46,11 @@ class ProjectController extends Controller
 
     public function store(Request $request)
     {
+        return DB::transaction(fn () => $this->storeAssignedProject($request));
+    }
+
+    private function storeAssignedProject(Request $request)
+    {
         $request->validate(['naam' => 'required|string']);
 
         $project = Project::create([
@@ -57,9 +62,7 @@ class ProjectController extends Controller
             'aangemaakt_door' => $request->session()->get('userId'),
         ]);
 
-        if (Schema::hasTable('project_gebruiker')) {
-            $this->syncMedewerkers($project->id, $request);
-        }
+        app(AssignmentNotifications::class)->sync($project, $request, 'project');
 
         $project->medewerkers = $this->getMedewerkers($project->id);
 
@@ -68,7 +71,12 @@ class ProjectController extends Controller
 
     public function update(Request $request, string $id)
     {
-        $project = Project::findOrFail($id);
+        return DB::transaction(fn () => $this->updateAssignedProject($request, $id));
+    }
+
+    private function updateAssignedProject(Request $request, string $id)
+    {
+        $project = Project::lockForUpdate()->findOrFail($id);
         $project->update([
             'naam' => $request->naam,
             'beschrijving' => $request->beschrijving,
@@ -78,9 +86,7 @@ class ProjectController extends Controller
             'deadline' => $request->deadline,
         ]);
 
-        if (Schema::hasTable('project_gebruiker')) {
-            $this->syncMedewerkers($id, $request);
-        }
+        app(AssignmentNotifications::class)->sync($project, $request, 'project');
 
         $fresh = $project->fresh();
         $fresh->medewerkers = $this->getMedewerkers($id);
@@ -109,29 +115,5 @@ class ProjectController extends Controller
             ->map(fn ($u) => ['id' => $u->id, 'naam' => $u->naam, 'kleur' => $u->kleur])
             ->values()
             ->toArray();
-    }
-
-    private function syncMedewerkers(string $projectId, Request $request): void
-    {
-        if (! Schema::hasTable('project_gebruiker')) {
-            return;
-        }
-        $value = $request->medewerkers;
-        $ids = match (true) {
-            is_array($value) => array_filter($value),
-            is_string($value) && $value !== '' => [$value],
-            default => [],
-        };
-
-        DB::table('project_gebruiker')->where('project_id', $projectId)->delete();
-        foreach ($ids as $userId) {
-            DB::table('project_gebruiker')->insert([
-                'id' => (string) Str::uuid(),
-                'project_id' => $projectId,
-                'user_id' => $userId,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        }
     }
 }

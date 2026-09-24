@@ -61,7 +61,8 @@
         ],
         "post-install-cmd": [
             "@php artisan pitboard:upgrade-image-seo-storage --no-interaction",
-            "@php artisan pitboard:upgrade-trunkrs-settings --no-interaction"
+            "@php artisan pitboard:upgrade-trunkrs-settings --no-interaction",
+            "@php artisan pitboard:upgrade-notification-storage --no-interaction"
         ],
         "post-update-cmd": [
             "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
