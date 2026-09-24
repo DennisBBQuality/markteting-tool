@@ -13,18 +13,18 @@ function harness() {
 }
 test('default is smaller calendar left, tasks right, projects and notes below',()=>{
   const {l}=harness(),tiles=l.defaults();
-  assert.deepEqual(Array.from(tiles,t=>t.id),['notifications','calendar','tasks','projects','notes','trunkrs']);
-  assert.equal(tiles[1].width,8); assert.equal(tiles[2].width,4);
+  assert.deepEqual(Array.from(tiles,t=>t.id),['calendar','tasks','projects','notes','trunkrs']);
+  assert.equal(tiles[0].width,8); assert.equal(tiles[1].width,4);
 });
 test('invalid stored layout is bounded and missing widgets are restored',()=>{
   const {l}=harness(); const tiles=l.normalize([{id:'tasks',width:999,height:160,visible:false},{id:'tasks'},{id:'unknown'}]);
-  assert.equal(tiles.length,6); assert.equal(tiles[1].height,280); assert.equal(tiles[1].width,6); assert.equal(tiles[1].visible,false);
+  assert.equal(tiles.length,5); assert.equal(tiles[0].height,280); assert.equal(tiles[0].width,6); assert.equal(tiles[0].visible,false);
 });
 test('reordering and resizing change only draft; cancel restores saved layout',()=>{
   const {l}=harness(); l.tiles=l.defaults(); l.saved=structuredClone(l.tiles);l.editing=true;
   l.move('tasks',-1); l.change('calendar','width',6); l.change('trunkrs','visible',false);
-  assert.equal(l.tiles[1].id,'tasks'); l.cancel();
-  assert.equal(l.tiles[1].id,'calendar');assert.equal(l.tiles[1].width,8);assert.equal(l.tiles[5].visible,true);
+  assert.equal(l.tiles[0].id,'tasks'); l.cancel();
+  assert.equal(l.tiles[0].id,'calendar');assert.equal(l.tiles[0].width,8);assert.equal(l.tiles[4].visible,true);
 });
 test('save sends an object to shared API, revision and no user-controlled identity',async()=>{
   const {l,c,status}=harness(); l.tiles=l.defaults();l.editing=true; let body;
@@ -43,12 +43,9 @@ test('late preference load for previous user is ignored',async()=>{
   const {l,c}=harness();c.Dashboard.isCurrent=()=>false;
   assert.equal(await l.load(1,'previous'),false);assert.equal(l.ready,false);
 });
-test('legacy preferences gain notifications without moving or resizing existing widgets',()=>{
+test('retired notification tile is ignored without moving or resizing existing widgets',()=>{
   const {l}=harness();
   const saved=[{id:'notes',width:4,height:160,visible:false},...l.defaults().filter(t=>!['notes','notifications'].includes(t.id))];
-  const normalized=l.normalize(saved);
-  assert.equal(normalized[0].id,'notifications');
-  assert.equal(JSON.stringify(normalized.slice(1)),JSON.stringify(saved));
-  normalized[0].visible=false;
-  assert.equal(l.normalize(normalized)[0].visible,false);
+  const normalized=l.normalize([{id:'notifications',width:12,height:280,visible:false},...saved]);
+  assert.equal(JSON.stringify(normalized),JSON.stringify(saved));
 });

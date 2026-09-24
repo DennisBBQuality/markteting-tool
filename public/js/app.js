@@ -271,6 +271,7 @@ function navigateTo(view) {
 
 // ========== Modal ==========
 function openModal(title, bodyHtml, footerHtml) {
+  if (typeof PitboardNotifications !== 'undefined') PitboardNotifications.unmount();
   document.getElementById('modal-title').textContent = title;
   document.getElementById('modal-body').innerHTML = bodyHtml;
   document.getElementById('modal-footer').innerHTML = footerHtml || '';
@@ -278,7 +279,10 @@ function openModal(title, bodyHtml, footerHtml) {
 }
 
 function closeModal() {
+  const notificationPopup = typeof PitboardNotifications !== 'undefined' && PitboardNotifications.popupOpen;
+  if (typeof PitboardNotifications !== 'undefined') PitboardNotifications.unmount();
   document.getElementById('modal-overlay').classList.add('hidden');
+  if (notificationPopup) document.getElementById('dashboard-notification-button')?.focus();
 }
 
 // Close modal on overlay click
