@@ -103,8 +103,9 @@ async function handleTaskDragEnd(evt) {
 }
 
 async function openEditTaskModal(id, stillCurrent = () => true) {
+  const owner = App.currentUser?.id;
   const tasks = await api('/api/tasks');
-  if (!stillCurrent()) return false;
+  if (!stillCurrent() || App.currentUser?.id !== owner) return false;
   const t = tasks?.find(t => t.id === id);
   if (!t) { toast('Deze taak is niet meer beschikbaar.', 'error'); return false; }
 
@@ -164,6 +165,8 @@ async function openEditTaskModal(id, stillCurrent = () => true) {
     <button class="btn btn-primary" onclick="saveEditTask('${t.id}')">Opslaan</button>
   `);
   loadAttachments('task_id', t.id);
+  if (typeof PitboardNotifications !== 'undefined') await PitboardNotifications.readTarget('task', t.id);
+  return true;
 }
 
 async function saveEditTask(id) {

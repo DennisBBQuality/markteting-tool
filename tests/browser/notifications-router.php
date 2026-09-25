@@ -19,7 +19,7 @@ if ($method !== 'GET' && ! hash_equals($_SESSION['fixture_csrf'] ?? 'missing', $
     echo json_encode(['message' => 'TEST CSRF']);
     exit;
 }
-$items = &$_SESSION['notification_popup_fixture'];
+$items = &$_SESSION['notification_consistency_fixture'];
 if (! is_array($items)) {
     $items = [
         ['id' => 'test-task', 'kind' => 'task', 'target_id' => '55555555-5555-4555-8555-555555555550', 'title' => 'Productteksten controleren', 'actor_name' => 'Testcollega', 'deadline' => '2026-10-02', 'created_at' => '2026-09-24T09:00:00Z', 'read_at' => null],
@@ -33,11 +33,13 @@ if ($path === '/api/notifications/preferences') {
     exit;
 }
 if ($method === 'POST') {
+    $input = json_decode(file_get_contents('php://input'), true) ?? [];
     foreach ($items as &$item) {
-        if ($path === '/api/notifications/read-all' || $path === '/api/notifications/'.$item['id'].'/read') $item['read_at'] = date('c');
+        if ($path === '/api/notifications/read-all' || $path === '/api/notifications/'.$item['id'].'/read'
+            || ($path === '/api/notifications/read-target' && ($input['kind'] ?? '') === $item['kind'] && ($input['target_id'] ?? '') === $item['target_id'])) $item['read_at'] = date('c');
     }
     unset($item);
-    echo json_encode(['ok' => true]);
+    echo json_encode(['ok' => true, 'unread_count' => count(array_filter($items, fn ($item) => ! $item['read_at']))]);
     exit;
 }
 if ($path === '/api/notifications') {

@@ -11,8 +11,10 @@ use App\Models\User;
 use App\Services\AssignmentNotifications;
 use App\Services\Notifications\MicrosoftMailException;
 use App\Services\Notifications\MicrosoftMailSender;
+use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
@@ -273,5 +275,45 @@ class NotificationMailTest extends TestCase
         DB::table('migrations')->where('migration', UpgradeNotificationMailStorage::MIGRATION)->delete();
         $this->artisan('pitboard:upgrade-notification-mail-storage')->assertFailed();
         $this->assertTrue(Schema::hasTable('pitboard_mail_settings'));
+    }
+
+    public function test_every_role_receives_task_and_project_mail_at_the_current_login_email_without_duplicates(): void
+    {
+        Bus::fake([SendAssignmentNotification::class]);
+        $this->actingAsUser();
+        $setting = $this->setupSender();
+        $setting->update(['payload' => [...$setting->payload, 'enabled' => true, 'verified_at' => now()->toIso8601String()]]);
+        $this->fakeMicrosoft();
+        $users = collect(['admin', 'manager', 'lid'])->map(fn ($role) => User::factory()->create(['rol' => $role, 'email' => 'test-'.$role.'@example.test']));
+        $this->postJson('/api/tasks', ['titel' => 'TEST team', 'toegewezen_aan' => $users->pluck('id')->all()])->assertOk();
+        $this->postJson('/api/projects', ['naam' => 'TEST team', 'medewerkers' => $users->pluck('id')->all()])->assertOk();
+        $users->last()->update(['email' => 'test-member-updated@example.test']);
+        $this->assertDatabaseCount('pitboard_notifications', 6);
+        foreach (PitboardNotification::all() as $notification) {
+            $job = new SendAssignmentNotification($notification->id);
+            $job->handle(app(AssignmentNotifications::class));
+            $job->handle(app(AssignmentNotifications::class));
+            $this->assertSame('accepted', $notification->fresh()->email_status);
+        }
+        $sent = Http::recorded(fn ($request) => str_ends_with($request->url(), '/sendMail'));
+        $this->assertCount(6, $sent);
+        foreach ($users as $user) {
+            $this->assertCount(2, $sent->filter(fn ($pair) => $pair[0]['message']['toRecipients'][0]['emailAddress']['address'] === $user->email));
+        }
+        Mail::assertNothingSent();
+    }
+
+    public function test_assignment_sender_waits_for_the_shared_lock_before_network_io(): void
+    {
+        $lock = \Mockery::mock(Lock::class);
+        $lock->shouldReceive('block')->once()->with(75)->andReturn(true);
+        $lock->shouldReceive('release')->once();
+        Cache::shouldReceive('lock')->once()->with('pitboard-microsoft-mail', 180)->andReturn($lock);
+        $ran = false;
+        app(MicrosoftMailSender::class)->locked(function () use (&$ran) {
+            $ran = true;
+        }, 75);
+        $this->assertTrue($ran);
+        Http::assertNothingSent();
     }
 }

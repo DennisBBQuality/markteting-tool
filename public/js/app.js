@@ -165,7 +165,7 @@ async function apiUpload(url, formData) {
     }
 
     if (res.status === 413) {
-      toast('De geselecteerde foto is te groot voor de server. Kies een foto kleiner dan 10 MB en probeer het opnieuw.', 'error');
+      toast('De server weigert deze upload vanwege de grootte. Maximaal 25 MB per bestand; probeer bestanden apart te uploaden. Blijft dit gebeuren, laat de serverlimiet controleren.', 'error');
       return null;
     }
 
@@ -199,6 +199,8 @@ async function checkAuth() {
 
 function showLogin() {
   App.currentUser = null;
+  const settings = document.getElementById('view-settings');
+  if (settings) settings.innerHTML = '';
   if (typeof PitboardNotifications !== 'undefined') PitboardNotifications.stop();
   closeModal();
   if (typeof Dashboard !== 'undefined') { Dashboard.dispose(); Dashboard.date = null; }
@@ -242,6 +244,7 @@ async function loadGlobalData() {
 
 // ========== Navigation ==========
 function navigateTo(view) {
+  if (view === 'settings' && App.currentUser?.rol !== 'admin') view = 'dashboard';
   // Removed views (including Klantenservice) must not leave the app blank.
   if (!document.getElementById(`view-${view}`)) view = 'dashboard';
 
@@ -362,13 +365,15 @@ async function loadAttachments(entityType, entityId) {
 }
 
 async function uploadFiles(input, entityType, entityId) {
+  let uploaded = 0;
   for (const file of input.files) {
+    if (file.size > 25 * 1024 * 1024) { toast(`${file.name} is groter dan 25 MB.`, 'error'); continue; }
     const fd = new FormData();
     fd.append('bestand', file);
     fd.append(entityType, entityId);
-    await apiUpload('/api/attachments', fd);
+    if (await apiUpload('/api/attachments', fd)) uploaded++;
   }
-  toast('Bestanden geüpload', 'success');
+  if (uploaded) toast(`${uploaded} bestand(en) geüpload`, 'success');
   loadAttachments(entityType, entityId);
   input.value = '';
 }

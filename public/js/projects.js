@@ -131,7 +131,10 @@ function openProjectModal(project) {
     <button class="btn btn-outline" onclick="closeModal()">Annuleren</button>
     <button class="btn btn-primary" onclick="saveProject('${p.id || ''}')">${isEdit ? 'Opslaan' : 'Aanmaken'}</button>
   `);
-  if (isEdit) loadAttachments('project_id', p.id);
+  if (isEdit) {
+    loadAttachments('project_id', p.id);
+    if (typeof PitboardNotifications !== 'undefined') PitboardNotifications.readTarget('project', p.id);
+  }
 }
 
 async function saveProject(id) {

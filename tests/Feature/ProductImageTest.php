@@ -56,7 +56,7 @@ class ProductImageTest extends TestCase
 
     public function test_prompt_can_be_read_and_updated(): void
     {
-        $user = $this->actingAsUser();
+        $user = $this->actingAsUser(['rol' => 'admin']);
 
         $this->getJson('/api/images/prompt')
             ->assertOk()
@@ -78,7 +78,7 @@ class ProductImageTest extends TestCase
 
     public function test_prompt_validation_rejects_an_empty_or_excessive_prompt(): void
     {
-        $this->actingAsUser();
+        $this->actingAsUser(['rol' => 'admin']);
 
         $this->putJson('/api/images/prompt', ['prompt' => 'te kort'])
             ->assertUnprocessable()

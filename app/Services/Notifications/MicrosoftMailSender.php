@@ -37,10 +37,12 @@ class MicrosoftMailSender
             && ($setting->payload['enabled'] ?? false) && ! empty($setting->payload['verified_at']);
     }
 
-    public function locked(callable $action): mixed
+    public function locked(callable $action, int $waitSeconds = 0): mixed
     {
         $lock = Cache::lock('pitboard-microsoft-mail', 180);
-        if (! $lock->get()) {
+        // Concurrent assignments share a rotating refresh token. Wait for the
+        // previous sender before doing any network I/O, never retry a sendMail.
+        if (! ($waitSeconds > 0 ? $lock->block($waitSeconds) : $lock->get())) {
             throw new MicrosoftMailException('busy');
         }
         try {
@@ -168,6 +170,6 @@ class MicrosoftMailSender
                 'BBQuality Pitboard · '.($notification->kind === 'task' ? 'Nieuwe taak voor jou' : 'Toegevoegd aan een project'),
                 view('emails.assignment', ['notification' => $notification,
                     'link' => rtrim(config('pitboard_notifications.url'), '/').'/?melding='.$notification->id])->render());
-        });
+        }, 75);
     }
 }

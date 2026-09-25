@@ -50,6 +50,7 @@ Route::middleware('auth.custom')->group(function () {
     Route::get('/api/notifications/preferences', [NotificationController::class, 'preferences']);
     Route::put('/api/notifications/preferences', [NotificationController::class, 'preferences']);
     Route::post('/api/notifications/read-all', [NotificationController::class, 'readAll']);
+    Route::post('/api/notifications/read-target', [NotificationController::class, 'readTarget']);
     Route::post('/api/notifications/initialize', [NotificationController::class, 'initialize'])->middleware(['admin', 'throttle:3,1']);
     Route::prefix('/api/notification-mail')->middleware('admin')->group(function () {
         $controller = NotificationMailController::class;
@@ -136,10 +137,10 @@ Route::middleware('auth.custom')->group(function () {
     Route::get('/api/convert/download/{filename}', [ConvertController::class, 'download']);
 
     // Product images
-    Route::get('/api/images/prompt', [ProductImageController::class, 'prompt']);
+    Route::get('/api/images/prompt', [ProductImageController::class, 'prompt'])->middleware('admin');
     Route::get('/api/images/models', [ProductImageController::class, 'models'])->middleware('throttle:image-models');
     Route::post('/api/images/models/refresh', [ProductImageController::class, 'refreshModels'])->middleware('throttle:image-model-refresh');
-    Route::put('/api/images/prompt', [ProductImageController::class, 'updatePrompt']);
+    Route::put('/api/images/prompt', [ProductImageController::class, 'updatePrompt'])->middleware('admin');
     Route::post('/api/images/generate', [ProductImageController::class, 'generate'])->middleware('throttle:image-generation');
     Route::get('/api/images/requests/{imageRequest}', [ProductImageController::class, 'status']);
     Route::get('/api/images/requests/{imageRequest}/assets/{asset}/seo', [ProductImageController::class, 'seo']);
@@ -170,8 +171,8 @@ Route::middleware('auth.custom')->group(function () {
     Route::post('/api/product-dossiers/{productDossier}/estimate-nutrition', [ProductDossierController::class, 'estimateNutrition'])->middleware('throttle:6,1');
     Route::post('/api/product-dossiers/{productDossier}/generate-page', [ProductDossierController::class, 'generatePage'])->middleware('throttle:10,1');
     Route::get('/api/product-dossier-options', [ProductDossierOptionController::class, 'index']);
-    Route::post('/api/product-dossier-options', [ProductDossierOptionController::class, 'store']);
-    Route::delete('/api/product-dossier-options/{productDossierOption}', [ProductDossierOptionController::class, 'destroy']);
+    Route::post('/api/product-dossier-options', [ProductDossierOptionController::class, 'store'])->middleware('admin');
+    Route::delete('/api/product-dossier-options/{productDossierOption}', [ProductDossierOptionController::class, 'destroy'])->middleware('admin');
 
     // Dashboard
     Route::get('/api/trunkrs/summary', [TrunkrsReportController::class, 'summary']);

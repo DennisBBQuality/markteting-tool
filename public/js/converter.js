@@ -79,9 +79,9 @@ function renderConverter() {
           <p>Maak betrouwbare productfoto's vanuit maximaal vijf echte referentiefoto's. Websiteformaat: liggend 4:3 (1536 × 1152 pixels).</p>
           <p><i class="fas fa-circle-check" style="color:var(--success);"></i> BBQuality-stijlbibliotheek actief: eigen rauwe setting voor vlees en vis, met verschillende bereide sferen.</p>
         </div>
-        <button class="btn btn-outline" type="button" onclick="openProductPromptModal()">
+        ${App.currentUser?.rol === 'admin' ? `<button class="btn btn-outline" type="button" onclick="openProductPromptModal()">
           <i class="fas fa-pen"></i> Prompt instellen
-        </button>
+        </button>` : ''}
       </div>
 
       <div class="product-image-form">
@@ -117,7 +117,7 @@ function renderConverter() {
           <i class="fas fa-camera"></i>
           <h4>Upload 1 tot 5 referentiefoto's</h4>
           <p>Sleep foto's hierheen of klik om te kiezen</p>
-          <span>JPG, PNG of WEBP · maximaal 10 MB per foto</span>
+          <span>JPG, PNG of WEBP · maximaal 25 MB per foto</span>
         </div>
         <input type="file" id="product-image-file-input" multiple accept="image/jpeg,image/png,image/webp"
           style="display:none" onchange="handleProductImageFiles(this.files)">
@@ -348,8 +348,8 @@ function handleProductImageFiles(fileList) {
       reject(`${file.name} is geen JPG-, PNG- of WEBP-afbeelding.`);
       continue;
     }
-    if (file.size === 0 || file.size > 10 * 1024 * 1024) {
-      reject(`${file.name} ${file.size === 0 ? 'is leeg' : 'is groter dan 10 MB'}.`);
+    if (file.size === 0 || file.size > 25 * 1024 * 1024) {
+      reject(`${file.name} ${file.size === 0 ? 'is leeg' : 'is groter dan 25 MB'}.`);
       continue;
     }
     if (productImageState.files.some(existing => existing.name === file.name && existing.size === file.size)) continue;
@@ -450,6 +450,8 @@ function updateProductImageForm() {
 }
 
 async function openProductPromptModal() {
+  if (App.currentUser?.rol !== 'admin') return;
+  const owner = App.currentUser.id;
   let data;
 
   try {
@@ -459,7 +461,7 @@ async function openProductPromptModal() {
     return;
   }
 
-  if (!data) return;
+  if (!data || App.currentUser?.id !== owner || App.currentUser?.rol !== 'admin') return;
 
   const modeNotice = data.voorbeeldmodus
     ? `<div class="product-image-mode-notice"><i class="fas fa-flask"></i> Lokale voorbeeldmodus is actief; er worden geen externe API-kosten gemaakt.</div>`
@@ -481,6 +483,7 @@ async function openProductPromptModal() {
 }
 
 async function saveProductImagePrompt() {
+  if (App.currentUser?.rol !== 'admin') return;
   const textarea = document.getElementById('product-image-prompt');
   const button = document.getElementById('save-product-image-prompt');
   const prompt = textarea?.value.trim() || '';

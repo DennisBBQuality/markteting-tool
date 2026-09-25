@@ -128,11 +128,11 @@ test('upload and paste share limits, preserve the main photo and never clear exi
 });
 
 test('too large or empty images show persistent validation feedback', async () => {
-  for (const size of [0, 10 * 1024 * 1024 + 1]) {
+  for (const size of [0, 25 * 1024 * 1024 + 1]) {
     const h = harness(); h.context.navigator.clipboard.read = async () => [item('image/png', size)];
     await h.run('pasteProductImageFromClipboard()');
     assert.equal(h.run('productImageState.files.length'), 0);
-    assert.match(h.field('product-image-paste-status').textContent, /is leeg|groter dan 10 MB/);
+    assert.match(h.field('product-image-paste-status').textContent, /is leeg|groter dan 25 MB/);
     assert.equal(h.field('product-image-paste-btn').disabled, false);
   }
 });

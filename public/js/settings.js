@@ -1,11 +1,13 @@
 // ========== Settings ==========
 async function renderSettings() {
   const container = document.getElementById('view-settings');
+  if (App.currentUser?.rol !== 'admin') { if (container) container.innerHTML = ''; return; }
+  const owner = App.currentUser.id;
   const [users, aiSettings] = await Promise.all([
     api('/api/users'),
     api('/api/settings/ai/openai'),
   ]);
-  if (!users || !aiSettings) return;
+  if (!users || !aiSettings || App.currentUser?.id !== owner || App.currentUser?.rol !== 'admin' || App.currentView !== 'settings') return;
 
   container.innerHTML = `
     <div class="page-header">

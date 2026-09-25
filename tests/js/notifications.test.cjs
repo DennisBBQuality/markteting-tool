@@ -76,7 +76,7 @@ test('late request does not overwrite a newer filter response', async () => {
 
 test('owned email link resolves via server and is marked read only after opening', async () => {
   const h = harness();
-  h.context.api = async url => { h.calls.push(url); return {kind: 'task', target_id: 'TEST-task', unread_count: 0}; };
+  h.context.api = async url => { h.calls.push(url); return {ok: true, kind: 'task', target_id: 'TEST-task', unread_count: 0}; };
   assert.equal(await h.ui.openFromLink(), true);
   assert.equal(h.context.App.currentView, 'tasks');
   assert.equal(h.calls[0], '/api/notifications/TEST-owned');
@@ -182,4 +182,47 @@ test('closed popup polls only count and zero remains a visible number', async ()
   assert.equal(h.calls[0], '/api/notifications');
   assert.equal(h.element('notification-count').textContent, '0');
   assert.equal(h.element('notification-count').hidden, false);
+});
+
+test('an old badge poll cannot resurrect a notification after reading it', async () => {
+  const h = harness();
+  h.ui.popupOpen = false;
+  let resolveOld;
+  h.context.api = () => new Promise(resolve => resolveOld = resolve);
+  const oldPoll = h.ui.refreshBadge();
+  h.context.api = async () => ({ok: true, unread_count: 0});
+  await h.ui.readTarget('task', 'TEST-task');
+  resolveOld({unread_count: 1});
+  await oldPoll;
+  assert.equal(h.ui.unreadCount, 0);
+});
+
+test('badge polls finishing out of order keep the newest count', async () => {
+  const h = harness();
+  h.ui.popupOpen = false;
+  let resolveOld;
+  h.context.api = () => new Promise(resolve => resolveOld = resolve);
+  const oldPoll = h.ui.refreshBadge();
+  h.context.api = async () => ({unread_count: 0});
+  await h.ui.refreshBadge();
+  resolveOld({unread_count: 1});
+  await oldPoll;
+  assert.equal(h.ui.unreadCount, 0);
+});
+
+test('a removed target still has an explicit read action and account switches cannot write', async () => {
+  const h = harness();
+  h.ui.items = [{id: 'TEST-deleted', kind: 'task', title: 'TEST removed', created_at: '2026-09-25T10:00:00Z'}];
+  h.ui.paint();
+  assert.match(h.element('notification-popup').innerHTML, /data-read-notification="TEST-deleted"/);
+  h.context.App.currentUser = {id: 'OTHER'};
+  assert.equal(await h.ui.readTarget('task', 'TEST-task'), false);
+  assert.equal(h.calls.length, 0);
+});
+
+test('failed email-link resolution preserves the link for a later login', async () => {
+  const h = harness();
+  h.context.api = async () => null;
+  assert.equal(await h.ui.openFromLink(), false);
+  assert.ok(!h.calls.some(call => Array.isArray(call) && call[0] === 'history'));
 });

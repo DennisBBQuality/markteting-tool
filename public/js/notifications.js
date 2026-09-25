@@ -1,6 +1,6 @@
 // Persistent assignment inbox; no external push or mailbox access in the browser.
 const PitboardNotifications = {
-  timer: null, session: 0, request: 0, page: 1, unreadOnly: true, popupOpen: false,
+  timer: null, session: 0, request: 0, countRequest: 0, page: 1, unreadOnly: true, popupOpen: false,
   items: [], hasMore: false, loading: false, owner: null, unreadCount: 0,
 
   unmount() { this.request++; this.loading = false; this.page = 1; this.popupOpen = false; },
@@ -53,19 +53,20 @@ const PitboardNotifications = {
 
   async refreshBadge() {
     const session = this.session;
+    const countRequest = ++this.countRequest;
     if (!this.owner) return;
     if (this.popupOpen && this.page === 1 && !this.loading) {
       return this.render(false, true);
     }
     const result = await api('/api/notifications', { silentError: true });
-    if (!this.current(session)) return;
+    if (!this.current(session) || countRequest !== this.countRequest) return;
     if (result && Number.isInteger(result.unread_count)) {
       this.badge(result.unread_count);
     }
   },
 
   heading() {
-    return '<p class="notification-intro">Klik op een melding om de bijbehorende taak of het project te openen. Pas daarna verdwijnt deze uit je ongeopende meldingen.</p>';
+    return '<p class="notification-intro">Open de bijbehorende taak of het project om de melding als gelezen te markeren, of kies Markeer als gelezen.</p>';
   },
 
   async render(append = false, quiet = false) {
@@ -73,6 +74,7 @@ const PitboardNotifications = {
     if (!this.popupOpen || !view || App.currentView !== 'dashboard' || !this.owner) return;
     const session = this.session;
     const request = ++this.request;
+    const countRequest = ++this.countRequest;
     if (!append) this.page = 1;
     this.loading = true;
     if (!append && !quiet) view.innerHTML = this.heading() + '<p role="status">Meldingen laden…</p>';
@@ -92,7 +94,7 @@ const PitboardNotifications = {
     const unchanged = quiet && JSON.stringify(this.items) === JSON.stringify(result.items) && this.hasMore === result.has_more;
     this.items = append ? [...new Map([...this.items, ...result.items].map(item => [item.id, item])).values()] : result.items;
     this.hasMore = result.has_more;
-    this.badge(result.unread_count);
+    if (countRequest === this.countRequest) this.badge(result.unread_count);
     if (!unchanged || !view.querySelector('.notification-list')) this.paint();
   },
 
@@ -115,11 +117,13 @@ const PitboardNotifications = {
               <h3><button class="notification-link" data-open-notification="${escHtml(item.id)}">${escHtml(item.title)}</button></h3>
               <p>${escHtml(item.actor_name)} heeft ${item.kind === 'task' ? 'deze taak aan je toegewezen' : 'je aan dit project toegevoegd'}.</p>
               <small>${escHtml(this.date(item.created_at))}${item.deadline ? ` · Deadline: ${escHtml(this.date(item.deadline, true))}` : ''}</small>
+              ${item.read_at ? '' : `<button class="btn btn-outline btn-sm" data-read-notification="${escHtml(item.id)}">Markeer als gelezen</button>`}
             </div>
           </article>`).join('') : '<div class="notification-empty"><i class="far fa-bell" aria-hidden="true"></i><h3>Je bent bij</h3><p>Hier verschijnen nieuwe toewijzingen aan jou.</p></div>'}
       </div>
       ${this.hasMore ? '<button class="btn btn-outline" onclick="PitboardNotifications.more()">Meer meldingen</button>' : ''}</div>`;
     view.querySelectorAll('[data-open-notification]').forEach(button => button.addEventListener('click', () => this.open(button.dataset.openNotification)));
+    view.querySelectorAll('[data-read-notification]').forEach(button => button.addEventListener('click', () => this.read(button.dataset.readNotification)));
   },
 
   date(value, dayOnly = false) {
@@ -131,14 +135,28 @@ const PitboardNotifications = {
   more() { if (!this.loading && this.hasMore) { this.page++; this.render(true); } },
 
   async read(id) {
-    const session = this.session;
-    const result = await api(`/api/notifications/${encodeURIComponent(id)}/read`, { method: 'POST' });
-    if (result && this.current(session)) { if (this.popupOpen) this.render(); else this.refreshBadge(); }
+    return this.markRead(`/api/notifications/${encodeURIComponent(id)}/read`);
   },
   async readAll() {
+    return this.markRead('/api/notifications/read-all');
+  },
+  async readTarget(kind, targetId) {
+    if (!this.owner || this.owner !== App.currentUser?.id) return false;
+    return this.markRead('/api/notifications/read-target', { kind, target_id: targetId });
+  },
+  async markRead(url, body) {
+    if (!this.owner || this.owner !== App.currentUser?.id) return false;
     const session = this.session;
-    const result = await api('/api/notifications/read-all', { method: 'POST' });
-    if (result && this.current(session)) { if (this.popupOpen) this.render(); else this.refreshBadge(); }
+    ++this.countRequest;
+    const result = await api(url, { method: 'POST', body });
+    if (!this.current(session)) return false;
+    // Invalidate polls started before or during this mutation, then fetch fresh state.
+    ++this.countRequest;
+    ++this.request;
+    this.loading = false;
+    if (result && Number.isInteger(result.unread_count)) this.badge(result.unread_count);
+    if (this.popupOpen) await this.render(); else await this.refreshBadge();
+    return !!result?.ok;
   },
 
   async open(id) {
@@ -160,8 +178,7 @@ const PitboardNotifications = {
       App.projects = projects;
       await openProjectDetail(item.target_id);
     }
-    if (this.current(session)) await this.read(id);
-    return true;
+    return this.current(session) ? this.read(id) : false;
   },
 
   async openFromLink() {
@@ -170,7 +187,7 @@ const PitboardNotifications = {
     if (!id) return false;
     // Login happens before this; only an owned server-side notification resolves a target.
     navigateTo('dashboard');
-    await this.open(id);
+    if (!await this.open(id)) return false;
     url.searchParams.delete('melding');
     history.replaceState(null, '', url);
     return true;
