@@ -6,27 +6,29 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Intervention\Image\Laravel\Facades\Image;
 
 class ConvertController extends Controller
 {
     public function toWebp(Request $request)
     {
-        if (!$request->hasFile('bestanden')) {
+        if (! $request->hasFile('bestanden')) {
             return response()->json(['error' => 'Geen bestanden geüpload'], 400);
         }
 
+        $request->validate(['bestanden' => ['required', 'array'], 'bestanden.*' => ['required', 'file', 'max:25600']]);
         $quality = min(max((int) ($request->quality ?? 80), 1), 100);
         $results = [];
 
         foreach ($request->file('bestanden') as $file) {
             try {
                 $baseName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-                $outputName = $baseName . '-' . time() . '.webp';
+                $outputName = $baseName.'-'.time().'.webp';
 
-                $image = \Intervention\Image\Laravel\Facades\Image::read($file->getPathname());
+                $image = Image::read($file->getPathname());
                 $encoded = $image->toWebp($quality);
 
-                Storage::disk('public')->put('converted/' . $outputName, (string) $encoded);
+                Storage::disk('public')->put('converted/'.$outputName, (string) $encoded);
 
                 $convertedSize = strlen((string) $encoded);
                 $results[] = [
@@ -38,12 +40,12 @@ class ConvertController extends Controller
                     'breedte' => $image->width(),
                     'hoogte' => $image->height(),
                     'besparing' => round((1 - $convertedSize / $file->getSize()) * 100),
-                    'download_url' => '/api/convert/download/' . $outputName,
+                    'download_url' => '/api/convert/download/'.$outputName,
                 ];
             } catch (\Exception $e) {
                 $results[] = [
                     'origineel' => $file->getClientOriginalName(),
-                    'error' => 'Conversie mislukt: ' . $e->getMessage(),
+                    'error' => 'Conversie mislukt: '.$e->getMessage(),
                 ];
             }
         }
@@ -54,9 +56,9 @@ class ConvertController extends Controller
     public function download(Request $request, string $filename)
     {
         $filename = basename($filename);
-        $path = 'converted/' . $filename;
+        $path = 'converted/'.$filename;
 
-        if (!Storage::disk('public')->exists($path)) {
+        if (! Storage::disk('public')->exists($path)) {
             return response()->json(['error' => 'Bestand niet gevonden'], 404);
         }
 

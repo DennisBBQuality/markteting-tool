@@ -56,7 +56,7 @@ async function renderProductDossiers() {
               <div class="form-group"><label for="dossier-product-type">Producttype <span>(optioneel)</span></label><select id="dossier-product-type"><option value="">Nog onbekend</option><option value="meat">Rauw vlees</option><option value="fish">Vis</option><option value="sauce">Saus</option><option value="rub">Rub / kruidenmix</option><option value="prepared">Samengesteld product</option><option value="bundle">Totaalpakket</option><option value="other">Anders</option></select></div>
             </div>
             <div>
-              <div class="dossier-label-dropzone" id="dossier-label-dropzone" role="button" tabindex="0" onclick="document.getElementById('dossier-label-input').click()" onkeydown="handleDossierLabelKeydown(event)"><i class="fas fa-camera"></i><strong>Etiketfoto’s toevoegen</strong><span>Voorkant, achterkant of meerdere zijden · maximaal 4 foto’s</span><small>Optioneel · JPG, PNG of WEBP · maximaal 10 MB per foto</small></div>
+              <div class="dossier-label-dropzone" id="dossier-label-dropzone" role="button" tabindex="0" onclick="document.getElementById('dossier-label-input').click()" onkeydown="handleDossierLabelKeydown(event)"><i class="fas fa-camera"></i><strong>Etiketfoto’s toevoegen</strong><span>Voorkant, achterkant of meerdere zijden · maximaal 4 foto’s</span><small>Optioneel · JPG, PNG of WEBP · maximaal 25 MB per foto</small></div>
               <input id="dossier-label-input" type="file" multiple accept="image/jpeg,image/png,image/webp" hidden onchange="handleDossierLabels(this.files)"><div id="dossier-label-preview" class="dossier-label-preview"></div>
             </div>
           </div>
@@ -65,7 +65,7 @@ async function renderProductDossiers() {
         </section>
 
         <section class="dossier-step-card" id="dossier-step-2">
-          <div class="dossier-step-heading dossier-heading-with-action"><span>2</span><div><h4>Controleer de productgegevens</h4><p>Herkomst is nodig om stap 3 te maken. De overige lege waarden blijven bewust onbekend.</p></div><button class="btn btn-outline btn-sm" type="button" onclick="openDossierOptionManager()"><i class="fas fa-list-check"></i> Keuzelijsten beheren</button></div>
+          <div class="dossier-step-heading dossier-heading-with-action"><span>2</span><div><h4>Controleer de productgegevens</h4><p>Herkomst is nodig om stap 3 te maken. De overige lege waarden blijven bewust onbekend.</p></div>${App.currentUser?.rol === 'admin' ? '<button class="btn btn-outline btn-sm" type="button" onclick="openDossierOptionManager()"><i class="fas fa-list-check"></i> Keuzelijsten beheren</button>' : ''}</div>
           <div class="dossier-fields-grid">
             <div class="form-group"><label for="dossier-category">Categorie <span>(optioneel)</span></label><select id="dossier-category"><option value="">Nog onbekend</option></select></div>
             <div class="form-group"><label for="dossier-cut">Snit <span>(optioneel)</span></label><select id="dossier-cut"><option value="">Nog onbekend</option></select></div>
@@ -153,12 +153,14 @@ function populateDossierSelect(id, options, preservedValue, emptyLabel) {
 }
 
 function openDossierOptionManager() {
+  if (App.currentUser?.rol !== 'admin') return;
   const labels = { categories: 'Categorieën', cuts: 'Snits', selections: 'Selecties' };
   const keys = ['categories','cuts','selections'];
   openModal('Keuzelijsten beheren', `<div class="dossier-option-manager">${keys.map(key => `<section><h4>${labels[key]}</h4><div class="dossier-option-add"><input id="dossier-option-new-${key}" type="text" placeholder="Nieuwe keuze"><button class="btn btn-primary btn-sm" type="button" onclick="addDossierOption('${key}')"><i class="fas fa-plus"></i> Toevoegen</button></div><div class="dossier-option-list">${productDossierState.options[key].map(option => `<span>${escHtml(option.label)}<button type="button" title="Verwijderen" onclick="deleteDossierOption(${option.id})"><i class="fas fa-xmark"></i></button></span>`).join('')}</div></section>`).join('')}</div>`, '<button class="btn btn-outline" type="button" onclick="closeModal()">Sluiten</button>');
 }
 
 async function addDossierOption(key) {
+  if (App.currentUser?.rol !== 'admin') return;
   const input = document.getElementById(`dossier-option-new-${key}`), label = input?.value.trim();
   if (!label) return;
   const type = ({categories:'category',cuts:'cut',selections:'selection'})[key];
@@ -168,6 +170,7 @@ async function addDossierOption(key) {
 }
 
 async function deleteDossierOption(id) {
+  if (App.currentUser?.rol !== 'admin') return;
   const removed = await api(`/api/product-dossier-options/${id}`, {method:'DELETE'}); if (!removed) return;
   await loadProductDossierOptions(currentChoiceValues()); openDossierOptionManager(); toast('Keuze verwijderd.', 'success');
 }
@@ -194,7 +197,7 @@ function handleDossierLabels(fileList) {
   productDossierState.pendingLabels = []; productDossierState.previewUrls = [];
   for (const file of files.slice(0, 4)) {
     if (!allowed.includes(file.type)) { toast(`${file.name} is geen ondersteunde afbeelding.`, 'error'); continue; }
-    if (file.size > 10 * 1024 * 1024) { toast(`${file.name} is groter dan 10 MB.`, 'error'); continue; }
+    if (file.size > 25 * 1024 * 1024) { toast(`${file.name} is groter dan 25 MB.`, 'error'); continue; }
     productDossierState.pendingLabels.push(file); productDossierState.previewUrls.push(URL.createObjectURL(file));
   }
   if (files.length > 4) toast('Je kunt maximaal vier etiketfoto’s tegelijk gebruiken.', 'error');
@@ -712,7 +715,7 @@ function renderDossierExpertAssets() {
 }
 async function uploadDossierExpertAsset(kind, file) {
   if (!file || dossierForegroundBusy()) return;
-  if (!['image/png','image/jpeg','image/webp'].includes(file.type) || file.size > 5*1024*1024) { showDossierOperation('Gebruik een JPG, PNG of WEBP kleiner dan 5 MB.', 'error'); return; }
+  if (!['image/png','image/jpeg','image/webp'].includes(file.type) || file.size > 25*1024*1024) { showDossierOperation('Gebruik een JPG, PNG of WEBP van maximaal 25 MB.', 'error'); return; }
   const saved = await saveProductDossier({silent:true}); if (!saved) return;
   const form = new FormData(); form.append('file', file);
   const uploaded = await apiUpload('/api/product-dossiers/' + saved.id + '/expert-assets/' + kind, form);

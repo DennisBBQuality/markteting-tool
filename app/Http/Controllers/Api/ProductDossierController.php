@@ -120,7 +120,7 @@ class ProductDossierController extends Controller
         $this->ensureOwner($request, $productDossier);
         $validated = $request->validate([
             'labels' => ['required', 'array', 'min:1', 'max:4'],
-            'labels.*' => ['file', 'max:10240', 'extensions:jpg,jpeg,png,webp', 'mimes:jpg,jpeg,png,webp'],
+            'labels.*' => ['file', 'max:25600', 'extensions:jpg,jpeg,png,webp', 'mimes:jpg,jpeg,png,webp'],
             'append' => ['nullable', 'boolean'],
         ]);
 
@@ -279,7 +279,7 @@ class ProductDossierController extends Controller
     {
         $this->ensureOwner($request, $productDossier);
         abort_unless(in_array($kind, ['photo', 'signature'], true), 404);
-        $validated = $request->validate(['file' => ['required', 'file', 'max:5120', 'mimes:jpg,jpeg,png,webp', 'extensions:jpg,jpeg,png,webp']]);
+        $validated = $request->validate(['file' => ['required', 'file', 'max:25600', 'mimes:jpg,jpeg,png,webp', 'extensions:jpg,jpeg,png,webp']]);
         $file = $validated['file'];
         // Preserve replaced originals privately; no destructive overwrite.
         $assets = (array) $productDossier->expert_assets;

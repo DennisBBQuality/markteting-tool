@@ -37,7 +37,7 @@ class AttachmentController extends Controller
             'bestand' => [
                 'required',
                 'file',
-                'max:10240',
+                'max:25600',
                 'extensions:jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,txt,csv,zip',
                 'mimes:jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,txt,csv,zip',
             ],

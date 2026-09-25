@@ -8,7 +8,7 @@ Een uitgebreide marketing team samenwerkingstool gebouwd met Laravel 12 en een v
 - **Taakbeheer** — Kanban-stijl taken (todo/bezig/review/klaar) met drag-and-drop herordening
 - **Kalender** — Evenementen voor content, deadlines, meetings, social posts, emails en blogs (FullCalendar integratie)
 - **Sticky Notes** — Kleurgecodeerde notities gekoppeld aan projecten en taken
-- **Bestandsbijlagen** — Uploads tot 10MB gekoppeld aan projecten, taken, kalenderitems en notities
+- **Bestandsbijlagen** — Uploads tot 25 MB per bestand gekoppeld aan projecten, taken, kalenderitems en notities
 - **Afbeeldingen** — AI-productfotogenerator voor vlees, vis, sauzen/rubs en totaalpakketten, plus batch WebP-conversie
 - **Productstudio** — Etiketanalyse, beheerbare productkeuzes, gestructureerde PDP-teksten, voedingswaardeschattingen en voorbereiding op WordPress-concepten
 - **Dashboard** — Statistieken over projecten, actieve taken, deadlines en kalenderitems
@@ -84,7 +84,7 @@ De applicatie gebruikt 10 modellen, allemaal met UUID primary keys:
 - **Tasks** — Titel, beschrijving, status, prioriteit, toewijzing, positie (voor drag-and-drop)
 - **Calendar Items** — Titel, type, start/einddatum, kleur
 - **Notes** — Titel, inhoud, kleur (standaard geel)
-- **Attachments** — Bestanden tot 10MB, gekoppeld aan projecten/taken/kalender/notities
+- **Attachments** — Bestanden tot 25 MB, gekoppeld aan projecten/taken/kalender/notities
 
 ## API Overzicht
 
@@ -128,7 +128,9 @@ Handmatige teksten zijn beschermd tegen laat binnenkomende analyses en verouderd
 
 De additieve migratie `2026_09_16_140000_create_product_image_metadata_table` voegt alleen de metadatatabel toe. Geen wijziging van Taken, Kalender, Notities of Projecten. Bij een databasequeue is de fototaak-timeout 1200 seconden en de standaard `DB_QUEUE_RETRY_AFTER` 1320 seconden; een expliciete omgevingswaarde moet hoger zijn dan de taak-timeout. Herstart bestaande workers na een release. De bestaande deferred-uitvoering blijft ondersteund: automatische SEO wordt binnen het al lopende achtergrondproces afgehandeld, niet als geneste deferred-callback. Deze wijziging maakt meer afbeeldingen en extra tekstanalyses, dus kan meer tijd en API-kosten gebruiken.
 
-Referentiefoto's kunnen worden geüpload, gesleept of toegevoegd met **Afbeelding plakken**. Kopieer de afbeelding zelf, niet alleen de link. De plakknop vraagt zo nodig browsertoestemming; bij ontbrekende ondersteuning of geweigerde toegang wordt het fotovak geselecteerd voor **Cmd+V / Ctrl+V**. Sneltoetsplakken werkt alleen in het referentiefotovak en verandert het plakken in tekstvelden niet. Er worden uitsluitend afbeeldingsbestanden verwerkt, geen klembordtekst of externe afbeeldingslinks. De bestaande limieten (vijf foto's, JPG/PNG/WEBP, 10 MB per foto), hoofdfotokeuze en normale upload blijven gelden. Plakken start geen AI-opdracht en verstuurt de foto nog niet naar de server.
+Referentiefoto's kunnen worden geüpload, gesleept of toegevoegd met **Afbeelding plakken**. Kopieer de afbeelding zelf, niet alleen de link. De plakknop vraagt zo nodig browsertoestemming; bij ontbrekende ondersteuning of geweigerde toegang wordt het fotovak geselecteerd voor **Cmd+V / Ctrl+V**. Sneltoetsplakken werkt alleen in het referentiefotovak en verandert het plakken in tekstvelden niet. Er worden uitsluitend afbeeldingsbestanden verwerkt, geen klembordtekst of externe afbeeldingslinks. De limieten zijn vijf foto's, JPG/PNG/WEBP, 25 MB per foto. Hoofdfotokeuze en normale upload blijven gelden. Plakken start geen AI-opdracht en verstuurt de foto nog niet naar de server.
+
+De grens van 25 MB geldt ook voor etiketfoto's, expertfoto's en WEBP-conversie. De bestaande PHP-/webserverlimieten moeten een upload kunnen doorlaten (inclusief multipart-overhead en meerdere foto's); de applicatie wijzigt deze productieconfiguratie niet automatisch.
 
 De module **Afbeeldingen** gebruikt lokaal standaard de kostenloze `fake`-driver. Daarmee kan de volledige upload- en resultaatflow worden getest zonder externe verzoeken of API-kosten.
 

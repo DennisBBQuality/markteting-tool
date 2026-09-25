@@ -84,7 +84,7 @@ class ProductDossierTest extends TestCase
 
     public function test_configurable_product_choices_are_seeded_and_can_be_managed(): void
     {
-        $this->actingAsUser();
+        $this->actingAsUser(['rol' => 'admin']);
 
         $this->getJson('/api/product-dossier-options')
             ->assertOk()

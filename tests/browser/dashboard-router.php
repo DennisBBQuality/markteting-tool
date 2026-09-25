@@ -40,6 +40,8 @@ if (!in_array($_SERVER['REQUEST_METHOD'], ['GET', 'HEAD', 'OPTIONS'], true)
     exit;
 }
 $me = ['id'=>'11111111-1111-4111-8111-111111111111', 'naam'=>'Dennis', 'rol'=>'admin', 'actief'=>true, 'kleur'=>'#3B82F6'];
+// Optional local-only role variant for permission/UI regression checks.
+if (in_array(getenv('PITBOARD_FIXTURE_ROLE'), ['lid', 'manager'], true)) $me['rol'] = getenv('PITBOARD_FIXTURE_ROLE');
 $other = ['id'=>'22222222-2222-4222-8222-222222222222', 'naam'=>'Testcollega', 'rol'=>'lid', 'actief'=>true, 'kleur'=>'#73566f'];
 $monday = new DateTimeImmutable('monday this week');
 $date = fn(int $days) => $monday->modify('+'.$days.' days')->format('Y-m-d');

@@ -16,7 +16,7 @@ function harness() {
   const nav = new Map(views.map(view => [view, element()]));
   const rendered = [];
   const context = {
-    App: {currentView: 'dashboard'},
+    App: {currentView: 'dashboard', currentUser: {id: 'TEST-admin', rol: 'admin'}},
     document: {
       getElementById: id => elements.get(id) || null,
       querySelectorAll: selector => [...(selector === '.view' ? elements : nav).values()],
@@ -50,6 +50,16 @@ test('all remaining sections still render and activate their own navigation', ()
     assert.equal(h.elements.get(`view-${view}`).classList.contains('hidden'), false);
     assert.equal(h.nav.get(view).classList.contains('active'), true);
     assert.equal([...h.elements.values()].filter(el => !el.classList.contains('hidden')).length, 1);
+  }
+});
+
+test('members and managers cannot navigate directly to admin settings', () => {
+  for (const rol of ['lid', 'manager']) {
+    const h = harness();
+    h.context.App.currentUser.rol = rol;
+    h.navigate('settings');
+    assert.equal(h.context.App.currentView, 'dashboard');
+    assert.deepEqual(h.rendered, ['dashboard']);
   }
 });
 

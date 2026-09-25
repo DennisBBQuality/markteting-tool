@@ -75,14 +75,33 @@ class NotificationController extends Controller
             $notification->update(['read_at' => now()]);
         }
 
-        return response()->json(['ok' => true]);
+        return $this->readResult($request);
     }
 
     public function readAll(Request $request)
     {
         $this->inbox($request)->whereNull('read_at')->update(['read_at' => now()]);
 
-        return response()->json(['ok' => true]);
+        return $this->readResult($request);
+    }
+
+    public function readTarget(Request $request, AssignmentNotifications $service)
+    {
+        if (! $service->storageReady()) {
+            return $this->unavailable($request);
+        }
+        $data = $request->validate(['kind' => 'required|in:task,project', 'target_id' => 'required|string|max:100']);
+        abort_unless(DB::table($data['kind'] === 'task' ? 'tasks' : 'projects')->where('id', $data['target_id'])->exists(), 404);
+        $this->inbox($request)->where('kind', $data['kind'])->where('target_id', $data['target_id'])
+            ->whereNull('read_at')->update(['read_at' => now()]);
+
+        return $this->readResult($request);
+    }
+
+    private function readResult(Request $request)
+    {
+        return response()->json(['ok' => true, 'unread_count' => $this->inbox($request)->whereNull('read_at')->count()])
+            ->header('Cache-Control', 'no-store');
     }
 
     public function preferences(Request $request, AssignmentNotifications $service)
