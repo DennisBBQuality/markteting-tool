@@ -2,9 +2,11 @@ name: Trunkrs report check
 
 on:
   schedule:
-    # UTC covers 06:15/06:25 in both Dutch summer and winter time.
-    # The other hour supplies two extra idempotent recovery checks.
-    - cron: '15,25 4,5 * * *'
+    # Cloud-only: no laptop or open Pitboard browser is required.
+    # Retry throughout the morning for late mail and delayed GitHub starts.
+    # Every invocation uses the existing lock and report deduplication.
+    - cron: '15,25,35,45,55 6-9 * * *'
+      timezone: Europe/Amsterdam
   workflow_dispatch:
 
 permissions:
