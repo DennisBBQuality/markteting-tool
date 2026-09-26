@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\SyncTrunkrsReportsJob;
 use App\Models\TrunkrsConnection;
 use App\Models\TrunkrsReport;
+use App\Services\Trunkrs\TrunkrsCheckStatus;
 use App\Services\Trunkrs\TrunkrsDashboard;
 use App\Services\Trunkrs\TrunkrsException;
 use App\Services\Trunkrs\TrunkrsImporter;
@@ -184,6 +186,25 @@ class TrunkrsReportTest extends TestCase
         Http::assertNotSent(fn ($r) => str_contains($r->url(), '/messages/unrelated/'));
         Http::assertNotSent(fn ($r) => str_contains($r->url(), 'graph.microsoft.com') && $r->method() !== 'GET');
         $this->artisan('trunkrs:sync')->assertSuccessful();
+        $this->assertDatabaseCount('trunkrs_reports', 1);
+    }
+
+    public function test_cloud_job_verifies_a_real_simulated_import_without_any_user_session(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-09-26T04:17:00Z'));
+        $this->setupReader();
+        $this->fakeGraph([$this->message('cloud-mail', '2026-09-26T04:02:03Z')], Http::response($this->csv('2026-09-25')));
+        $status = app(TrunkrsCheckStatus::class);
+        $id = $status->create();
+        (new SyncTrunkrsReportsJob($id))->handle(app(TrunkrsSync::class));
+        $this->assertSame('completed', $status->get($id)['state']);
+        $this->assertTrue($status->get($id)['mailbox_completed']);
+        $this->assertTrue($status->get($id)['report_current']);
+        $this->assertSame('2026-09-25', $status->get($id)['report_date']);
+        $this->assertDatabaseCount('trunkrs_reports', 1);
+        $second = $status->create();
+        (new SyncTrunkrsReportsJob($second))->handle(app(TrunkrsSync::class));
+        $this->assertTrue($status->get($second)['report_current']);
         $this->assertDatabaseCount('trunkrs_reports', 1);
     }
 

@@ -39,6 +39,7 @@ Route::get('/api/auth/csrf', function () {
 Route::post('/api/auth/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 Route::post('/api/auth/logout', [AuthController::class, 'logout']);
 Route::post('/api/trunkrs/scheduled-sync', TrunkrsScheduledSyncController::class)->middleware('throttle:trunkrs-scheduled');
+Route::get('/api/trunkrs/scheduled-sync/{checkId}', [TrunkrsScheduledSyncController::class, 'status'])->whereUuid('checkId')->middleware('throttle:trunkrs-scheduled');
 
 // ========== AUTHENTICATED ROUTES ==========
 Route::middleware('auth.custom')->group(function () {
