@@ -3,10 +3,11 @@ name: Trunkrs report check
 on:
   schedule:
     # Cloud-only: no laptop or open Pitboard browser is required.
-    # Retry throughout the morning for late mail and delayed GitHub starts.
-    # Every invocation uses the existing lock and report deduplication.
-    - cron: '15,25,35,45,55 6-9 * * *'
-      timezone: Europe/Amsterdam
+    # Plain UTC covers summer AND winter; the client skips starts before 06:00 NL.
+    # Retry through the morning and catch up later if GitHub delays/drops starts.
+    # This mitigates delays; GitHub cron is not an on-time delivery guarantee.
+    - cron: '17,27,37,47,57 4-9 * * *'
+    - cron: '17 10-20 * * *'
   workflow_dispatch:
 
 permissions:
@@ -20,18 +21,10 @@ concurrency:
 jobs:
   request-sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
-      - name: Request signed GitHub identity and start report check
-        env:
-          AUDIENCE: https://planning.bbquality.nl/api/trunkrs/scheduled-sync
-        run: |
-          set -euo pipefail
-          token_response=$(curl --fail --silent --show-error --max-time 15 \
-            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
-            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${AUDIENCE}")
-          identity_token=$(jq -er '.value' <<< "$token_response")
-          curl --fail --silent --show-error --max-time 30 -X POST \
-            -H "Authorization: Bearer ${identity_token}" \
-            -H 'Accept: application/json' \
-            "$AUDIENCE"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Start check and verify completed mailbox scan and daily report
+        run: python3 scripts/trunkrs-cloud-check.py

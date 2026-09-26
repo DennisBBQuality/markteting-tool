@@ -11,21 +11,22 @@ class TrunkrsMorningScheduleTest extends TestCase
     public function test_cloud_schedule_covers_dutch_mornings_in_summer_and_winter(): void
     {
         $workflow = Yaml::parseFile(__DIR__.'/../../.github/workflows/trunkrs-sync.yml');
-        $schedule = $workflow['on']['schedule'][0];
-        $this->assertSame('Europe/Amsterdam', $schedule['timezone']);
-        $cron = new CronExpression($schedule['cron']);
-
-        foreach (['2026-09-25', '2026-12-25'] as $day) {
-            $start = new \DateTimeImmutable($day.' 00:00:00', new \DateTimeZone($schedule['timezone']));
-            $runs = $cron->getMultipleRunDates(20, $start, false, false, $schedule['timezone']);
-            $this->assertSame($day.' 06:15', $runs[0]->format('Y-m-d H:i'));
-            $this->assertSame($day.' 09:55', $runs[19]->format('Y-m-d H:i'));
-            $this->assertSame($day.' 06:25', $runs[1]->format('Y-m-d H:i'));
+        foreach (['2026-09-26', '2026-12-26'] as $day) {
+            foreach (['06:17', '06:27', '09:57', '12:17', '21:17'] as $time) {
+                $instant = new \DateTimeImmutable($day.' '.$time, new \DateTimeZone('Europe/Amsterdam'));
+                $covered = false;
+                foreach ($workflow['on']['schedule'] as $schedule) {
+                    $this->assertArrayNotHasKey('timezone', $schedule);
+                    $covered = $covered || (new CronExpression($schedule['cron']))->isDue($instant, 'UTC');
+                }
+                $this->assertTrue($covered, 'Missing cloud retry at '.$day.' '.$time);
+            }
         }
 
         $this->assertFalse($workflow['concurrency']['cancel-in-progress']);
         $this->assertSame('read', $workflow['permissions']['contents']);
         $this->assertSame('write', $workflow['permissions']['id-token']);
         $this->assertSame('ubuntu-latest', $workflow['jobs']['request-sync']['runs-on']);
+        $this->assertSame('python3 scripts/trunkrs-cloud-check.py', $workflow['jobs']['request-sync']['steps'][1]['run']);
     }
 }

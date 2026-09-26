@@ -3,7 +3,11 @@
 namespace Tests\Feature;
 
 use App\Jobs\SyncTrunkrsReportsJob;
+use App\Models\TrunkrsConnection;
+use App\Models\TrunkrsReport;
 use App\Models\TrunkrsSetting;
+use App\Services\Trunkrs\TrunkrsCheckStatus;
+use App\Services\Trunkrs\TrunkrsSync;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -105,5 +109,89 @@ class TrunkrsGithubScheduleTest extends TestCase
             ->postJson(self::URL)->assertConflict();
         Queue::assertNotPushed(SyncTrunkrsReportsJob::class);
         $this->assertNull($setting->fresh()->scheduler_seen_at);
+    }
+
+    public function test_accepted_check_is_not_completion_and_polling_requires_signed_identity(): void
+    {
+        $response = $this->withHeader('Authorization', 'Bearer '.$this->token())->postJson(self::URL)->assertStatus(202);
+        $id = $response->json('check_id');
+        Queue::assertPushed(SyncTrunkrsReportsJob::class, fn ($job) => $job->checkId === $id);
+        $this->getJson(self::URL.'/'.$id)->assertOk()->assertJsonPath('state', 'queued')->assertJsonMissingPath('mailbox_completed');
+        $this->withHeader('Authorization', '')->getJson(self::URL.'/'.$id)->assertUnauthorized();
+        $this->withHeader('Authorization', 'Bearer '.$this->token(['ref' => 'refs/heads/other']))
+            ->getJson(self::URL.'/'.$id)->assertUnauthorized();
+        $this->withHeader('Authorization', 'Bearer '.$this->token())
+            ->getJson(self::URL.'/11111111-1111-4111-8111-111111111111')->assertNotFound();
+    }
+
+    private function report(?string $day, string $received): void
+    {
+        TrunkrsReport::create([
+            'message_hash' => hash('sha256', $received), 'content_hash' => hash('sha256', (string) $day),
+            'report_date' => $day, 'received_at' => $received, 'shipment_count' => 0,
+            'shipments' => [], 'parser_version' => 'test',
+        ]);
+    }
+
+    public function test_job_records_its_own_completion_and_only_safe_report_evidence(): void
+    {
+        $this->travelTo(now()->setDate(2026, 9, 26)->setTime(8, 0));
+        $this->report('2026-09-25', '2026-09-26T04:10:00Z');
+        TrunkrsConnection::create(['id' => 1, 'refresh_token' => 'private-token', 'last_checked_at' => now()]);
+        $status = app(TrunkrsCheckStatus::class);
+        $id = $status->create();
+        $other = $status->create();
+        $sync = $this->mock(TrunkrsSync::class, fn ($mock) => $mock->shouldReceive('run')->once()->andReturn('ok'));
+        (new SyncTrunkrsReportsJob($id))->handle($sync);
+        $result = $status->get($id);
+        $this->assertSame('completed', $result['state']);
+        $this->assertTrue($result['mailbox_completed']);
+        $this->assertTrue($result['report_current']);
+        $this->assertSame('2026-09-25', $result['report_date']);
+        $this->assertSame('queued', $status->get($other)['state']);
+        $this->assertArrayNotHasKey('shipments', $result);
+        $this->assertArrayNotHasKey('shipment_count', $result);
+        $this->assertStringNotContainsString('private-token', json_encode($result));
+    }
+
+    public function test_successful_scan_without_todays_report_never_claims_a_current_report(): void
+    {
+        $this->travelTo(now()->setDate(2026, 9, 26)->setTime(8, 0));
+        $status = app(TrunkrsCheckStatus::class);
+        $id = $status->create();
+        $status->started($id);
+        $status->finished($id, 'ok');
+        $this->assertFalse($status->get($id)['report_current']);
+        $this->report('2026-09-24', '2026-09-25T04:10:00Z');
+        $status->finished($id, 'ok');
+        $this->assertFalse($status->get($id)['report_current']);
+        // Even today's empty mail has no proven delivery date.
+        $this->report(null, '2026-09-26T04:10:00Z');
+        $status->finished($id, 'ok');
+        $this->assertFalse($status->get($id)['report_current']);
+    }
+
+    public function test_failures_and_overlapping_checks_never_reuse_old_success(): void
+    {
+        TrunkrsConnection::create(['id' => 1, 'last_checked_at' => now()->subDay(), 'retry_at' => now()->addMinutes(10)]);
+        foreach (['busy', 'waiting', 'authorization', 'network', 'invalid_report'] as $reason) {
+            $status = app(TrunkrsCheckStatus::class);
+            $id = $status->create();
+            $status->started($id);
+            $status->finished($id, $reason);
+            $this->assertSame('failed', $status->get($id)['state']);
+            $this->assertFalse($status->get($id)['mailbox_completed']);
+        }
+    }
+
+    public function test_unexpected_exception_is_recorded_without_leaking_provider_details(): void
+    {
+        $status = app(TrunkrsCheckStatus::class);
+        $id = $status->create();
+        $sync = $this->mock(TrunkrsSync::class, fn ($mock) => $mock->shouldReceive('run')->once()->andThrow(new \RuntimeException('private-secret')));
+        (new SyncTrunkrsReportsJob($id))->handle($sync);
+        $this->assertSame('internal', $status->get($id)['result']);
+        $this->assertSame('failed', $status->get($id)['state']);
+        $this->assertStringNotContainsString('private-secret', json_encode($status->get($id)));
     }
 }
