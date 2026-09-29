@@ -801,7 +801,8 @@ function finishProductImageRequest(hideStatus = true, keepRecovery = false) {
 
 function productImagesSeoReady(results = productImageState.results) {
   return Array.isArray(results) && results.length > 0 && results.every(result => result.seo?.ready === true &&
-    ['filename', 'alt', 'title', 'caption', 'description'].every(key => typeof result.metadata?.[key] === 'string' && result.metadata[key].trim() !== ''));
+    ['filename', 'alt', 'title', 'caption', 'description'].every(key => typeof result.metadata?.[key] === 'string' &&
+      (result.metadata[key].trim() !== '' || (key === 'caption' && result.seo?.optional_fields?.includes('caption')))));
 }
 
 function renderProductImageResults() {

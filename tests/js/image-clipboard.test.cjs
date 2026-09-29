@@ -322,6 +322,18 @@ test('ready flag alone cannot bypass incomplete fields', () => {
   assert.equal(h.run('productImagesSeoReady()'), false);
 });
 
+test('only an explicitly optional caption can be empty in a ready photoset', () => {
+  const h = harness();
+  h.run('productImageState.results = [{seo: {ready: true, optional_fields: ["caption"]}, metadata: {filename: "test.webp", alt: "Foto", title: "Test", caption: "", description: "Productfoto."}}]');
+  assert.equal(h.run('productImagesSeoReady()'), true);
+  h.run('productImageState.results[0].seo.optional_fields = []');
+  assert.equal(h.run('productImagesSeoReady()'), false);
+  h.run('productImageState.results[0].seo.optional_fields = ["caption", "alt"]; productImageState.results[0].metadata.alt = ""');
+  assert.equal(h.run('productImagesSeoReady()'), false);
+  h.run('productImageState.results[0].metadata.alt = "Foto"; delete productImageState.results[0].metadata.caption');
+  assert.equal(h.run('productImagesSeoReady()'), false);
+});
+
 test('request submits only selected groups; a failed start unlocks controls and preserves choices', async () => {
   const h = harness(); h.context.uploads = [file()]; h.context.FormData = FormData;
   h.context.getCookie = () => 'test-token';

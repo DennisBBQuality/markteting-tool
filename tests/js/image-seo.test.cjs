@@ -8,7 +8,7 @@ function harness() {
   const get = id => { if (!fields.has(id)) fields.set(id, { value: '', textContent: '', disabled: false }); return fields.get(id); };
   const calls = [], timers = [];
   const metadata = { filename: 'test.webp', alt: 'Testfoto', title: 'Test', caption: 'Serveersuggestie.', description: 'Testbeschrijving.' };
-  const context = { document: { getElementById: get }, escHtml: x => String(x), openModal: () => {}, closeModal: () => {},
+  const context = { document: { getElementById: get }, escHtml: x => String(x), openModal: (title, html) => { context.modal = html; }, closeModal: () => {},
     productImageState: { completedRequestId: 'request', results: [{asset_id: 1, version: 1, metadata, seo: {revision: 0}}] },
     setTimeout: f => timers.push(f), confirm: () => true, navigator: {clipboard: {writeText: async text => { context.copied = text; }}},
     api: async (url, options = {}) => { calls.push([url, options]); return context.response; },
@@ -75,4 +75,34 @@ test('save error is persistent, keeps input and dirty state; closing prevents la
   h.run('closeImageSeo()');
   h.context.resolve(h.context.response); await pending;
   assert.equal(h.get('image-seo-alt').value, 'Niet verliezen');
+});
+
+test('product-focused editor explains optional caption and saves an empty string without filler', async () => {
+  const h = harness();
+  h.context.response = {...h.context.response, metadata: {...h.context.response.metadata, caption: ''},
+    seo: {revision: 1, ready: true, source: 'ai', status: 'completed', optional_fields: ['caption']}};
+  h.context.productImageState.results[0].seo.optional_fields = ['caption'];
+  await h.run('openImageSeoEditor(1)');
+  assert.match(h.context.modal, /Bijschrift \(optioneel\)/);
+  assert.match(h.context.modal, /geen decor of sfeer/);
+  assert.doesNotMatch(h.context.modal, /gekozen bereidingswijze in alle vijf/);
+  assert.equal(h.get('image-seo-caption').value, '');
+  assert.match(h.get('image-seo-status').textContent, /opgeslagen/);
+  assert.doesNotMatch(h.get('image-seo-status').textContent, /alle vijf/i);
+  await h.run('saveImageSeo()');
+  assert.equal(h.calls[1][1].body.fields.caption, '');
+  await h.run('copyImageSeo("all")');
+  assert.match(h.context.copied, /Bijschrift: \n/);
+});
+
+test('fresh server policy updates guidance without replacing dirty caption', async () => {
+  const h = harness(); await h.run('openImageSeoEditor(1)');
+  assert.match(h.context.modal, /gekozen bereidingswijze in alle vijf/);
+  h.get('image-seo-caption').value = 'Mijn eigen bijschrift';
+  h.run('imageSeoEditor.dirty = true');
+  h.context.response.seo.optional_fields = ['caption'];
+  await h.run('refreshImageSeo(imageSeoEditor)');
+  assert.equal(h.get('image-seo-label-caption').textContent, 'Bijschrift (optioneel)');
+  assert.match(h.get('image-seo-guidance').textContent, /Productgerichte SEO/);
+  assert.equal(h.get('image-seo-caption').value, 'Mijn eigen bijschrift');
 });

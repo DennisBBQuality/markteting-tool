@@ -39,10 +39,15 @@ class ProductImageSeo
         }
     }
 
-    public static function completeFields(?array $fields): bool
+    public static function productFocused(array $context): bool
+    {
+        return in_array($context['product_type'] ?? '', ['sauce', 'accessory'], true);
+    }
+
+    public static function completeFields(?array $fields, array $context = []): bool
     {
         try {
-            return $fields !== null && self::normalize($fields)['filename'] === ($fields['filename'] ?? null);
+            return $fields !== null && self::normalize($fields, $context)['filename'] === ($fields['filename'] ?? null);
         } catch (ValidationException) {
             return false;
         }
@@ -50,15 +55,26 @@ class ProductImageSeo
 
     public static function normalizeForImage(array $fields, array $context, array $result): array
     {
-        return self::normalize(ProductImagePreparationSeo::complete(self::normalize($fields), $context, $result));
+        return self::normalize(ProductImagePreparationSeo::complete(self::normalize($fields, $context), $context, $result), $context);
     }
 
-    public static function normalize(array $fields): array
+    public static function normalize(array $fields, array $context = []): array
     {
         $clean = [];
         foreach (self::FIELDS as $key) {
+            // Empty form strings become null in Laravel's request middleware.
+            // The key must still be present: a missing AI field is incomplete output.
+            if ($key === 'caption' && self::productFocused($context) && array_key_exists($key, $fields)
+                && ($fields[$key] === null || is_string($fields[$key]))) {
+                $clean[$key] = trim(preg_replace('/\s+/u', ' ', strip_tags($fields[$key] ?? '')));
+                if (mb_strlen($clean[$key]) > 400) {
+                    throw ValidationException::withMessages([$key => 'Dit SEO-veld is te lang.']);
+                }
+
+                continue;
+            }
             if (! is_string($fields[$key] ?? null) || trim($fields[$key]) === '') {
-                throw ValidationException::withMessages([$key => 'Vul alle vijf SEO-velden in.']);
+                throw ValidationException::withMessages([$key => 'Vul alle verplichte SEO-velden in.']);
             }
             $clean[$key] = trim(preg_replace('/\s+/u', ' ', strip_tags($fields[$key])));
             if ($clean[$key] === '' || mb_strlen($clean[$key]) > ($key === 'description' ? 1600 : 400)) {
@@ -99,9 +115,11 @@ class ProductImageSeo
         }
 
         $storageReady = Schema::hasTable('product_image_download_names');
+        $context = (array) ProductImageRequest::findOrFail($asset->product_image_request_id)->generation_context;
 
         return ['status' => $row?->status ?? 'idle', 'source' => $row?->source ?? 'none',
-            'ready' => $row?->status === 'completed' && self::completeFields($row?->fields) && $asset->refinement_status === 'idle',
+            'ready' => $row?->status === 'completed' && self::completeFields($row?->fields, $context) && $asset->refinement_status === 'idle',
+            'optional_fields' => self::productFocused($context) ? ['caption'] : [],
             'storage_ready' => $storageReady,
             'revision' => $row?->revision ?? 0, 'error' => $storageReady ? $row?->error : self::STORAGE_ERROR, 'image_version' => $asset->version];
     }
@@ -154,7 +172,8 @@ class ProductImageSeo
 
     public function save(ProductImageAsset $asset, array $fields, int $revision): void
     {
-        $fields = self::normalize($fields);
+        $context = (array) ProductImageRequest::findOrFail($asset->product_image_request_id)->generation_context;
+        $fields = self::normalize($fields, $context);
         $this->ensureStorageReady(repair: true);
         DB::transaction(function () use ($asset, $fields, $revision) {
             // Serialize filenames per photoset, and edits against image refinement.

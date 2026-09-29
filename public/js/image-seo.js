@@ -2,6 +2,12 @@
 const IMAGE_SEO_FIELDS = [['filename', 'Bestandsnaam'], ['alt', 'Alt-tekst'], ['title', 'Afbeeldingstitel'], ['caption', 'Bijschrift'], ['description', 'Beschrijving']];
 let imageSeoEditor = null;
 
+function imageSeoGuidance(seo) {
+  return seo?.optional_fields?.includes('caption')
+    ? 'Productgerichte SEO voor sauzen, rubs en accessoires: productnaam en merk staan voorop. Noem alleen nuttige zichtbare productkenmerken of relevant gebruik, geen decor of sfeer. Laat het bijschrift leeg als het niets toevoegt. Kruiden en eten in de aankleding bewijzen geen ingrediënten of meegeleverde producten.'
+    : 'Controleer wat werkelijk zichtbaar is; bijgerechten zijn serveersuggesties. Bij de bereide vlees- en visvarianten BBQ, Pan, Oven en Airfryer wordt de gekozen bereidingswijze in alle vijf velden opgenomen. Rauwe varianten krijgen geen bereidingswijze.';
+}
+
 function imageSeoActive(editor) {
   return imageSeoEditor === editor && !!document.getElementById(`image-seo-form-${editor.assetId}`);
 }
@@ -24,14 +30,13 @@ async function openImageSeoEditor(assetId) {
   openModal('SEO voor deze foto', `
     <div id="image-seo-form-${assetId}">
       <img class="image-seo-preview" src="${escHtml(result.url)}" alt="Te controleren productfoto">
-      <p>Vijf velden voor deze fotoversie. Controleer wat werkelijk zichtbaar is; bijgerechten zijn serveersuggesties.</p>
-      <p>Bij BBQ, Pan, Oven en Airfryer wordt de gekozen bereidingswijze in alle vijf velden opgenomen. Bij opslaan wordt een ontbrekende vermelding aangevuld. Rauwe varianten krijgen geen bereidingswijze.</p>
+      <p id="image-seo-guidance">${imageSeoGuidance(result.seo)}</p>
       <p id="image-seo-status" role="status" aria-live="polite">SEO ophalen…</p>
-      ${IMAGE_SEO_FIELDS.map(([key, label]) => `<div class="form-group"><label for="image-seo-${key}">${label}</label>
+      ${IMAGE_SEO_FIELDS.map(([key, label]) => `<div class="form-group"><label id="image-seo-label-${key}" for="image-seo-${key}">${label}${key === 'caption' && result.seo?.optional_fields?.includes('caption') ? ' (optioneel)' : ''}</label>
         <textarea id="image-seo-${key}" rows="${key === 'description' ? 3 : 2}" maxlength="${key === 'description' ? 1600 : 400}" oninput="imageSeoEditor.dirty = true">${escHtml(result.metadata?.[key] || '')}</textarea>
         <button type="button" class="btn btn-outline btn-sm" onclick="copyImageSeo('${key}')">Kopiëren</button></div>`).join('')}
       <p>De opgeslagen bestandsnaam wordt ook bij de WEBP-download gebruikt. Versies blijven intern bewaard.</p>
-      <p>Gebruik een unieke beschrijvende bestandsnaam zonder cijfers. Bij een dubbele naam kies je een ander zichtbaar detail. De WEBP-download is beschikbaar zodra alle vijf SEO-velden voor deze fotoversie volledig zijn opgeslagen.</p>
+      <p>Gebruik een unieke beschrijvende bestandsnaam zonder cijfers. Bij een dubbele naam kies je een ander zichtbaar detail. De WEBP-download is beschikbaar zodra de verplichte SEO-velden voor deze fotoversie zijn opgeslagen. Een optioneel bijschrift mag leeg blijven.</p>
     </div>`, `<button class="btn btn-primary" id="image-seo-save" onclick="saveImageSeo()">SEO opslaan</button>
       <button class="btn btn-outline" id="image-seo-generate" onclick="generateImageSeo()">SEO opnieuw maken</button>
       <button class="btn btn-outline" onclick="copyImageSeo('all')">Alles kopiëren</button>
@@ -56,6 +61,8 @@ function applyImageSeo(editor, data) {
   if (Number(data.seo.revision) < editor.revision) return;
   const result = productImageState.results.find(item => Number(item.asset_id) === Number(editor.assetId));
   if (result) { result.metadata = data.metadata; result.seo = data.seo; }
+  document.getElementById('image-seo-guidance').textContent = imageSeoGuidance(data.seo);
+  document.getElementById('image-seo-label-caption').textContent = data.seo.optional_fields?.includes('caption') ? 'Bijschrift (optioneel)' : 'Bijschrift';
   if (typeof renderProductImageResults === 'function') renderProductImageResults();
   if (typeof productImagesSeoReady === 'function' && productImagesSeoReady()) {
     if (typeof finishProductImageRequest === 'function') finishProductImageRequest();
@@ -71,8 +78,8 @@ function applyImageSeo(editor, data) {
     ? 'AI analyseert deze foto. Je kunt de velden ook handmatig invullen en opslaan.'
     : editor.dirty && Number(data.seo.revision) !== editor.revision
       ? 'Er is nieuwe SEO beschikbaar. Je invoer blijft staan; kopieer eventuele correcties en open dit venster opnieuw.'
-      : data.seo.ready && data.seo.source === 'ai' ? 'Alle vijf SEO-velden voor deze foto zijn ingevuld en opgeslagen. Controleer de teksten vóór publicatie.'
-        : data.seo.ready && data.seo.source === 'manual' ? 'Handmatig opgeslagen SEO.' : 'De SEO is nog niet afgerond. Maak SEO of vul alle vijf velden in.'));
+      : data.seo.ready && data.seo.source === 'ai' ? 'De SEO voor deze foto is opgeslagen. Controleer de teksten vóór publicatie.'
+        : data.seo.ready && data.seo.source === 'manual' ? 'Handmatig opgeslagen SEO.' : 'De SEO is nog niet afgerond. Maak SEO of vul de verplichte velden in.'));
   if (pending) setTimeout(() => refreshImageSeo(editor), 2500);
 }
 
