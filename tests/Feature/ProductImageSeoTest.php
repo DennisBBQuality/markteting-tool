@@ -21,24 +21,25 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class ProductImageSeoTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function photos(): array
+    private function photos(string $type = 'meat', string $name = 'Varkens wangen ontvliesd'): array
     {
         Storage::fake('local');
         Queue::fake();
         Http::preventStrayRequests();
         $this->actingAsUser(['rol' => 'lid']);
         $id = $this->post('/api/images/generate', ['foto' => UploadedFile::fake()->image('test.png', 30, 30),
-            'product_type' => 'meat', 'product_name' => 'Varkens wangen ontvliesd'], ['Accept' => 'application/json'])
+            'product_type' => $type, 'product_name' => $name], ['Accept' => 'application/json'])
             ->assertAccepted()->json('request_id');
         (new GenerateProductImages($id))->handle(new FakeProductImageGenerator);
         $request = ProductImageRequest::findOrFail($id);
-        $raw = collect($request->results)->firstWhere('status', 'rauw');
+        $raw = collect($request->results)->firstWhere('status', 'rauw') ?? $request->results[0];
         $asset = ProductImageAsset::where('product_image_request_id', $id)->where('filename', $raw['filename'])->firstOrFail();
 
         return [$request, $asset, '/api/images/requests/'.$id.'/assets/'.$asset->id.'/seo'];
@@ -57,6 +58,94 @@ class ProductImageSeoTest extends TestCase
     {
         $row = app(ProductImageSeo::class)->record($asset);
         (new GenerateProductImageSeo($asset->id, $asset->version, $row->job_token))->handle($analyzer ?? app(ProductImageSeoAnalyzer::class));
+    }
+
+    public static function productFocusedCases(): array
+    {
+        return [
+            'sauce' => ['sauce', 'Voorbeeldsaus Proefmerk', 'voorbeeldsaus-proefmerk', 'in glazen pot', 2],
+            'rub' => ['sauce', 'Voorbeeldrub Proefmerk', 'voorbeeldrub-proefmerk', 'in strooibus', 2],
+            'accessory' => ['accessory', 'Voorbeeldtang Proefmerk', 'voorbeeldtang-proefmerk', 'met gesloten bek', 3],
+        ];
+    }
+
+    #[DataProvider('productFocusedCases')]
+    public function test_product_focused_ai_caption_can_be_empty_without_blocking_photoset_or_download(string $type, string $name, string $slug, string $detail, int $count): void
+    {
+        [$request, $asset, $url] = $this->photos($type, $name);
+        $fields = ['filename' => $slug.'.webp', 'alt' => $name.' '.$detail, 'title' => $name,
+            'caption' => '', 'description' => $name.' '.$detail.'.'];
+        config(['services.product_images.driver' => 'openai', 'services.product_images.openai.api_key' => 'test-key']);
+        Http::fake(['*' => Http::response(['output_text' => json_encode([...$fields,
+            'filename_alternatives' => [$slug.'-vooraanzicht.webp', $slug.'-detail.webp']])])]);
+        $this->runSeo($asset);
+        Http::assertSent(function ($r) use ($type, $name, $asset) {
+            $prompt = $r['input'][0]['content'];
+            $context = json_decode($r['input'][1]['content'][0]['text'], true);
+
+            return $context['producttype'] === $type && $context['productnaam'] === $name && $context['bereidingswijze'] === null
+                && $r['input'][1]['content'][1]['image_url'] === 'data:image/png;base64,'.$asset->contents_base64
+                && str_contains($prompt, 'PRODUCT EERST') && str_contains($prompt, 'caption: laat leeg')
+                && str_contains($prompt, 'Geen opsomming van het decor') && str_contains($prompt, 'geen bewijs van samenstelling')
+                && str_contains($prompt, 'voorwerp is zelf het verkochte product')
+                && ! str_contains($prompt, 'Vul alle vijf velden volledig') && ! str_contains($prompt, 'vermelding verplicht in ALLE vijf velden');
+        });
+        $this->getJson($url)->assertOk()->assertJsonPath('seo.ready', true)->assertJsonPath('seo.optional_fields', ['caption'])
+            ->assertJsonPath('metadata.caption', '')->assertJsonPath('metadata.title', $name);
+        $originalPixels = $asset->contents_base64;
+        // Same product is allowed in multiple photos; only filenames must be unique.
+        foreach (ProductImageAsset::where('product_image_request_id', $request->id)->where('id', '!=', $asset->id)->get() as $index => $other) {
+            $otherUrl = '/api/images/requests/'.$request->id.'/assets/'.$other->id.'/seo';
+            $filename = $slug.(['-vooraanzicht', '-detail'][$index]).'.webp';
+            $this->putJson($otherUrl, ['image_version' => 1, 'revision' => 0, 'fields' => [...$fields, 'filename' => $filename]])
+                ->assertOk()->assertJsonPath('metadata.caption', '')->assertJsonPath('seo.ready', true);
+        }
+        $payload = $this->getJson('/api/images/requests/'.$request->id)->assertJsonPath('status', 'completed')->assertJsonPath('seo_summary.ready', $count);
+        $this->get($payload->json('results.0.download_url'))->assertDownload($fields['filename']);
+        $this->assertSame($originalPixels, $asset->fresh()->contents_base64);
+        Http::assertSentCount(1);
+    }
+
+    public function test_optional_caption_does_not_relax_other_fields_or_categories(): void
+    {
+        foreach (['sauce', 'accessory'] as $type) {
+            foreach (['', '   ', null] as $empty) {
+                $fields = ProductImageSeo::normalize([...$this->fields(), 'caption' => $empty], ['product_type' => $type]);
+                $this->assertSame('', $fields['caption']);
+                $this->assertTrue(ProductImageSeo::completeFields($fields, ['product_type' => $type]));
+            }
+            foreach (['filename', 'alt', 'title', 'description'] as $key) {
+                $this->assertFalse(ProductImageSeo::completeFields([...$fields, $key => ''], ['product_type' => $type]));
+            }
+            foreach ([['unexpected'], 42, false, str_repeat('a', 401)] as $invalid) {
+                $this->assertFalse(ProductImageSeo::completeFields([...$fields, 'caption' => $invalid], ['product_type' => $type]));
+            }
+            unset($fields['caption']);
+            $this->assertFalse(ProductImageSeo::completeFields($fields, ['product_type' => $type]));
+        }
+        foreach (['meat', 'fish', 'dough', 'bundle', 'unknown'] as $type) {
+            $this->assertFalse(ProductImageSeo::completeFields([...$this->fields(), 'caption' => ''], ['product_type' => $type]));
+            $this->assertStringNotContainsString('PRODUCT EERST', app(ProductImageSeoAnalyzer::class)->instructions(['product_type' => $type]));
+        }
+    }
+
+    public function test_existing_sauce_seo_is_not_rewritten_and_manual_empty_caption_remains_protected(): void
+    {
+        [$request, $asset, $url] = $this->photos('sauce', 'Voorbeeldsaus Proefmerk');
+        $fields = ['filename' => 'voorbeeldsaus-proefmerk-op-hout.webp', 'title' => 'Voorbeeldsaus Proefmerk op hout',
+            'alt' => 'Voorbeeldsaus op een houten plank', 'caption' => 'Een pot saus naast een pepermolen.', 'description' => 'Saus op een houten plank.'];
+        $row = app(ProductImageSeo::class)->record($asset);
+        $row->update(['fields' => $fields, 'source' => 'manual', 'status' => 'completed', 'job_token' => null]);
+        $this->getJson($url)->assertJsonPath('metadata.caption', $fields['caption'])->assertJsonPath('seo.ready', true);
+        $this->assertSame($fields, $row->fresh()->fields);
+        $this->putJson($url, ['image_version' => 1, 'revision' => 0, 'fields' => [...$fields, 'caption' => '']])
+            ->assertOk()->assertJsonPath('metadata.caption', '')->assertJsonPath('seo.source', 'manual')->assertJsonPath('seo.ready', true);
+        $this->postJson($url.'/generate', ['image_version' => 1, 'revision' => 1])->assertConflict();
+        $this->putJson($url, ['image_version' => 1, 'revision' => 0, 'fields' => $fields])->assertConflict();
+        $this->getJson($url)->assertJsonPath('metadata.caption', '');
+        $this->actingAsUser();
+        $this->putJson($url, ['image_version' => 1, 'revision' => 1, 'fields' => [...$fields, 'caption' => '']])->assertNotFound();
+        Http::assertNothingSent();
     }
 
     public function test_photoset_is_only_ready_after_all_five_fields_of_every_current_photo_are_saved(): void

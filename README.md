@@ -108,6 +108,12 @@ Alle API routes zijn beschermd met custom session-based authenticatie.
 
 ## Productfoto-generator
 
+### Productgerichte SEO voor sauzen, rubs en accessoires (29 september 2026)
+
+Nieuwe SEO en **SEO opnieuw maken** gebruiken voor Saus/rub en Accessoires een apart productgericht profiel: productnaam en merk voorop, aangevuld met uitsluitend relevante zichtbare productkenmerken of afgebeeld gebruik. Decor, belichting en sfeer worden niet standaard beschreven; een pepermolen als verkocht product blijft uiteraard wel relevant. Kruiden en eten in de aankleding zijn geen bewijs van ingrediënten, inbegrepen producten of geschiktheid. Titel mag alleen productnaam/merk zijn, alt blijft een beeldbeschrijving en beschrijving is maximaal één korte zin. Het bijschrift mag leeg blijven als het niets toevoegt; de overige vier velden blijven verplicht. Dit geldt zowel voor AI als handmatig opslaan, voortgang, downloaden en export.
+
+Unieke bestandsnamen zonder cijfers blijven vereist. Gebruik eerst productdetails of aanzicht; alleen voor naamonderscheid mag een kort zichtbaar achtergronddetail nodig zijn. Verschillende achtergronden dwingen geen kunstmatig verschillende alt-teksten af. Opgeslagen teksten worden niet automatisch herschreven; bestaande foto's kunnen apart nieuwe SEO krijgen zonder betaalde nieuwe beeldgeneratie. Elke expliciete SEO-analyse gebruikt wel de bestaande tekst-API. Handmatige tekstbescherming, beeldgeneratie en de bestaande bereidingsvermeldingen voor vlees/vis blijven behouden. Geen migratie of productieconfiguratiewijziging nodig. Tests gebruiken synthetische data en gesimuleerde antwoorden, niet een echte AI-kwaliteitsbeoordeling.
+
 ### Deeg en Accessoires (29 september 2026)
 
 Beide categorieën leveren een vaste reeks van drie foto's: zwart achtervlak met houten planken, een normale iets minder lichte woonkeuken en de bestaande buiten-BBQ-sfeer. Bij Deeg kiest de medewerker expliciet Brood of Deegbollen/pizzabollen. Brood krijgt een huishoudelijke oven; deegbollen blijven in de keuken herkenbaar met een elektrische pizzaoven op de achtergrond en worden voor de BBQ-foto pizza's op een pizzasteen in de kamado. De productfoto op zwart/hout behoudt de aangeleverde productvorm en toestand. Accessoires blijven in alle scènes onveranderd, zonder verzonnen functies of hittebestendigheid.
