@@ -891,7 +891,7 @@ input, select, textarea { font: inherit; }
 }
 
 .product-image-form { padding: 22px 28px 0; }
-.product-type-picker { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
+.product-type-picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
 .product-type-picker button {
   display: grid; grid-template-columns: 30px 1fr; grid-template-rows: auto auto; column-gap: 9px;
   padding: 13px; border: 1px solid var(--border); border-radius: 10px; background: #FFF; color: var(--text); text-align: left; cursor: pointer;
@@ -900,6 +900,7 @@ input, select, textarea { font: inherit; }
 .product-type-picker button strong { font-size: 13px; }
 .product-type-picker button span { color: var(--text-light); font-size: 10px; }
 .product-type-picker button.active { border-color: var(--primary); background: var(--primary-light); box-shadow: 0 0 0 2px rgba(234,72,75,.08); }
+#product-image-three-scenes { margin: 0 0 18px; color: var(--text-light); font-size: 13px; line-height: 1.5; }
 .product-image-fields { display: grid; grid-template-columns: minmax(0, 2fr) minmax(150px, 1fr); gap: 14px; }
 .product-image-form .form-group { margin-bottom: 14px; }
 .product-image-form label span { color: var(--text-light); font-weight: 400; }

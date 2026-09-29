@@ -83,7 +83,8 @@ class ProductImageController extends Controller
                 'file', 'max:25600', 'extensions:jpg,jpeg,png,webp', 'mimes:jpg,jpeg,png,webp',
                 'dimensions:max_width=8000,max_height=8000',
             ],
-            'product_type' => ['nullable', 'in:meat,fish,sauce,bundle'],
+            'product_type' => ['nullable', 'in:meat,fish,sauce,bundle,dough,accessory'],
+            'dough_kind' => ['exclude_unless:product_type,dough', 'required', 'in:bread,pizza_balls'],
             'product_name' => ['nullable', 'string', 'max:160'],
             'quantity' => ['nullable', 'integer', 'min:1', 'max:100'],
             'notes' => ['nullable', 'string', 'max:2000'],
@@ -137,6 +138,9 @@ class ProductImageController extends Controller
             'notes' => trim((string) ($validated['notes'] ?? '')),
             'components' => trim((string) ($validated['components'] ?? '')),
         ];
+        if ($context['product_type'] === 'dough') {
+            $context['dough_kind'] = $validated['dough_kind'];
+        }
         if (isset($validated['variant_groups'])) {
             $context['variant_groups'] = array_values($validated['variant_groups']);
             $library = app(ProductImageStyleLibrary::class);
