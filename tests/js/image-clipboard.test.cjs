@@ -32,6 +32,38 @@ const file = (name = 'test.png', type = 'image/png', size = 8) => new File([new 
 const item = (type = 'image/png', size = 8) => ({ types: [type], getType: async () => new Blob([new Uint8Array(size)], { type }) });
 const pasteEvent = (files, editable = false) => ({ clipboardData: { files }, target: { closest: () => editable }, preventDefault() { this.prevented = true; } });
 
+test('Deeg and Accessoires select three photos and switching back preserves meat choices', () => {
+  const h = harness();
+  for (const type of ['dough', 'accessory']) {
+    h.run(`setProductImageType('${type}')`);
+    assert.equal(h.run('selectedProductImageCount()'), 3);
+    assert.match(h.field('product-image-generate-btn').innerHTML, /Maak 3/);
+  }
+  h.run("setProductImageType('meat')");
+  assert.equal(h.run('selectedProductImageCount()'), 5);
+  h.run("setProductImageType('sauce')");
+  assert.equal(h.run('selectedProductImageCount()'), 2);
+});
+
+test('Deeg sends the explicit subtype and never sends meat variant groups', async () => {
+  for (const type of ['dough', 'accessory']) {
+    const h = harness();
+    h.context.uploads = [file()];
+    h.run(`handleProductImageFiles(uploads); setProductImageType('${type}')`);
+    h.field('product-image-dough-kind').value = 'pizza_balls';
+    const calls = [];
+    Object.assign(h.context, { FormData, getCookie: () => 'test-csrf', fetch: async (url, options) => {
+      calls.push(options.body);
+      return {status: 429, headers: {get: () => '5'}};
+    }});
+    await h.run('startProductImageGeneration()');
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].get('product_type'), type);
+    assert.equal(calls[0].get('dough_kind'), type === 'dough' ? 'pizza_balls' : null);
+    assert.equal(calls[0].has('variant_groups[]'), false);
+  }
+});
+
 test('rate-limited generation preserves input and results, explains wait and never retries a paid POST', async () => {
   for (const retryAfter of ['42', null, 'invalid']) {
     const h = harness();

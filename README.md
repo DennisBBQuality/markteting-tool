@@ -108,6 +108,12 @@ Alle API routes zijn beschermd met custom session-based authenticatie.
 
 ## Productfoto-generator
 
+### Deeg en Accessoires (29 september 2026)
+
+Beide categorieën leveren een vaste reeks van drie foto's: zwart achtervlak met houten planken, een normale iets minder lichte woonkeuken en de bestaande buiten-BBQ-sfeer. Bij Deeg kiest de medewerker expliciet Brood of Deegbollen/pizzabollen. Brood krijgt een huishoudelijke oven; deegbollen blijven in de keuken herkenbaar met een elektrische pizzaoven op de achtergrond en worden voor de BBQ-foto pizza's op een pizzasteen in de kamado. De productfoto op zwart/hout behoudt de aangeleverde productvorm en toestand. Accessoires blijven in alle scènes onveranderd, zonder verzonnen functies of hittebestendigheid.
+
+De bestaande lege achtergrond-, oven- en kamado-referenties worden hergebruikt, uitsluitend voor setting. De keukenprompt vermindert de helderheid en vervangt zo nodig het apparaat. Eigen goedgekeurde voorbeelden blijven gescheiden per producttype en variant. Bestaande categorieën, beeldkwaliteit, 4:3-formaat, SEO, nabewerking en WEBP blijven behouden. Geen migratie of productieconfiguratiewijziging nodig. Technische tests gebruiken fictieve data en gesimuleerde beeldantwoorden; de eerste echte fotosets vragen nog visuele controle, inclusief merken en opschriften op accessoires.
+
 ### Websiteformaat en unieke namen (18 september 2026)
 
 De webshop toont productbeelden in 4:3 (gecontroleerd: 840 × 630). De generator maakt direct liggende beelden van 1536 × 1152, inclusief nabewerkingen, zonder achteraf bijsnijden of uitrekken. Afwijkende providerafmetingen worden geweigerd zonder betaalde automatische herhaling. WEBP behoudt de pixels en de voorbeeldkaarten tonen het hele beeld. Bestaande beelden en SEO worden niet herschreven.

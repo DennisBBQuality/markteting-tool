@@ -89,9 +89,17 @@ function renderConverter() {
         <div class="product-type-picker" role="radiogroup" aria-label="Soort opdracht">
           <button type="button" class="active" data-type="meat" onclick="setProductImageType('meat')"><i class="fas fa-drumstick-bite"></i><strong>Vlees</strong><span>Kies zelf je varianten</span></button>
           <button type="button" data-type="fish" onclick="setProductImageType('fish')"><i class="fas fa-fish"></i><strong>Vis</strong><span>Kies zelf je varianten</span></button>
+          <button type="button" data-type="dough" onclick="setProductImageType('dough')"><i class="fas fa-bread-slice"></i><strong>Deeg</strong><span>3 productfoto's</span></button>
+          <button type="button" data-type="accessory" onclick="setProductImageType('accessory')"><i class="fas fa-utensils"></i><strong>Accessoires</strong><span>3 productfoto's</span></button>
           <button type="button" data-type="sauce" onclick="setProductImageType('sauce')"><i class="fas fa-bottle-droplet"></i><strong>Saus of rub</strong><span>2 productfoto's</span></button>
           <button type="button" data-type="bundle" onclick="setProductImageType('bundle')"><i class="fas fa-box-open"></i><strong>Totaalpakket</strong><span>2 totaalbeelden</span></button>
         </div>
+        <div class="form-group hidden" id="product-image-dough-group">
+          <label for="product-image-dough-kind">Welk soort deegproduct?</label>
+          <select id="product-image-dough-kind"><option value="bread">Brood</option><option value="pizza_balls">Deegbollen / pizzabollen</option></select>
+          <small>Brood krijgt een huiselijke oven. Deegbollen krijgen een pizzaoven op de achtergrond en worden voor de BBQ-foto pizza’s op een pizzasteen in de kamado.</small>
+        </div>
+        <p class="hidden" id="product-image-three-scenes">Vaste reeks: 1. Zwart boven en houten planken onder · 2. Huiselijke keuken, iets minder licht · 3. BBQ buiten. Controleer productdetails en eventuele opschriften vóór gebruik.</p>
         <fieldset class="product-image-variants" id="product-image-variants">
           <legend>Welke varianten wil je maken?</legend>
           <div class="product-image-variant-options">
@@ -417,6 +425,7 @@ function setProductImageType(type) {
 }
 
 function selectedProductImageCount() {
+  if (['dough', 'accessory'].includes(productImageState.productType)) return 3;
   if (!['meat', 'fish'].includes(productImageState.productType)) return 2;
   return PRODUCT_IMAGE_VARIANTS.reduce((total, variant) => total + (productImageState.variantGroups.includes(variant.id) ? variant.count : 0), 0);
 }
@@ -435,6 +444,13 @@ function updateProductImageForm() {
   const quantity = Number(document.getElementById('product-image-quantity')?.value);
   const count = selectedProductImageCount();
   const variants = document.getElementById('product-image-variants');
+  document.getElementById('product-image-components-group')?.classList.toggle('hidden', productImageState.productType !== 'bundle');
+  document.getElementById('product-image-dough-group')?.classList.toggle('hidden', productImageState.productType !== 'dough');
+  document.getElementById('product-image-three-scenes')?.classList.toggle('hidden', !['dough', 'accessory'].includes(productImageState.productType));
+  const doughKind = document.getElementById('product-image-dough-kind');
+  if (doughKind) doughKind.disabled = productImageState.generating;
+  const nameInput = document.getElementById('product-image-name');
+  if (nameInput) nameInput.placeholder = ({ dough: 'Bijvoorbeeld pizzabollen of stokbrood', accessory: 'Bijvoorbeeld BBQ-tang of pizzasteen' })[productImageState.productType] || 'Bijvoorbeeld Black Angus picanha';
   if (variants) {
     variants.classList.toggle('hidden', !['meat', 'fish'].includes(productImageState.productType));
     variants.disabled = productImageState.generating;
@@ -548,6 +564,9 @@ async function startProductImageGeneration() {
   productImageState.files.forEach(file => formData.append('fotos[]', file));
   formData.append('main_index', String(productImageState.mainIndex));
   formData.append('product_type', productImageState.productType);
+  if (productImageState.productType === 'dough') {
+    formData.append('dough_kind', document.getElementById('product-image-dough-kind')?.value || 'bread');
+  }
   formData.append('product_name', productName);
   formData.append('quantity', String(quantity));
   if (['meat', 'fish'].includes(productImageState.productType)) {
@@ -710,6 +729,8 @@ async function pollProductImageRequest(requestId) {
     if (!productImageState.context && data.context) {
       productImageState.context = data.context;
       productImageState.productType = data.context.product_type || productImageState.productType;
+      const doughKind = document.getElementById('product-image-dough-kind');
+      if (doughKind && data.context.dough_kind) doughKind.value = data.context.dough_kind;
       if (Array.isArray(data.context.variant_groups)) productImageState.variantGroups = [...data.context.variant_groups];
       document.querySelectorAll('.product-type-picker button').forEach(button => button.classList.toggle('active', button.dataset.type === productImageState.productType));
       updateProductImageForm();
@@ -722,7 +743,7 @@ async function pollProductImageRequest(requestId) {
       renderProductImageResults();
     }
     if (data.status === 'completed' && productImagesSeoReady(data.results)) {
-      const expected = Number(data.expected_count ?? data.context?.photo_count ?? (['meat', 'fish'].includes(data.context?.product_type ?? 'meat') ? 4 : 2));
+      const expected = Number(data.expected_count ?? data.context?.photo_count ?? (['dough', 'accessory'].includes(data.context?.product_type) ? 3 : ['meat', 'fish'].includes(data.context?.product_type ?? 'meat') ? 4 : 2));
       if (!Array.isArray(data.results) || data.results.length !== expected) {
         throw new Error(`De beeldservice leverde niet de verwachte ${expected} productfoto's op.`);
       }

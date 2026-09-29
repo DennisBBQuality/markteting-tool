@@ -20,6 +20,7 @@ class ProductImagePromptBuilder
             'fish' => (new FishProductImageProfile)->plans(array_slice($this->meatPlans([]), 0, 2)),
             'sauce' => $this->saucePlans($context),
             'bundle' => $this->bundlePlans($context),
+            'dough', 'accessory' => (new DoughAccessoryImageProfile)->plans($context),
             default => $this->meatPlans($context),
         };
         if (isset($context['variant_groups']) && in_array($context['product_type'] ?? 'meat', ['meat', 'fish'], true)) {
@@ -86,6 +87,9 @@ class ProductImagePromptBuilder
 
     public function prompt(string $basePrompt, array $context, array $plan): string
     {
+        if (in_array($context['product_type'] ?? null, ['dough', 'accessory'], true)) {
+            return (new DoughAccessoryImageProfile)->prompt($basePrompt, $context, $plan);
+        }
         if (($context['product_type'] ?? null) === 'fish') {
             return (new FishProductImageProfile)->prompt($basePrompt, $context, $plan);
         }
