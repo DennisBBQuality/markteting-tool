@@ -20,13 +20,19 @@ class TrunkrsDashboard
         // Import scans may process older messages last; opening follows the newest received email.
         $latest = $ready ? TrunkrsReport::orderByDesc('received_at')->orderByDesc('created_at')->first() : null;
         $available = $ready ? TrunkrsReport::query()
-            ->whereBetween('report_date', [$now->subDays(7)->toDateString(), $now->toDateString()])
+            ->where(function ($query) use ($now) {
+                $query->whereBetween('report_date', [$now->subDays(7)->toDateString(), $now->toDateString()])
+                    ->orWhere(fn ($empty) => $empty->whereNull('report_date')
+                        ->whereBetween('received_at', [$now->subDays(7)->startOfDay()->utc(), $now->endOfDay()->utc()]));
+            })
             ->orderByDesc('received_at')->orderByDesc('created_at')
             ->get(['id', 'report_date', 'received_at', 'created_at', 'shipment_count']) : collect();
         // One choice per delivery date; keep the latest email visible even if it is older.
-        $available = $available->unique(fn ($item) => $item->report_date?->toDateString() ?? 'unknown');
+        $key = fn ($item) => $item->report_date?->toDateString()
+            ?? 'mail:'.$item->received_at->setTimezone(config('trunkrs.timezone'))->toDateString();
+        $available = $available->unique($key);
         if ($latest && ! $available->contains('id', $latest->id)) {
-            $available = $available->reject(fn ($item) => $item->report_date?->toDateString() === $latest->report_date?->toDateString());
+            $available = $available->reject(fn ($item) => $key($item) === $key($latest));
             $available->prepend($latest);
         }
         $report = $selectedReportId && $available->contains('id', $selectedReportId)
@@ -67,8 +73,31 @@ class TrunkrsDashboard
     {
         return [
             'id' => $report->id, 'report_date' => $report->report_date?->toDateString(),
+            'mail_date' => $report->received_at->setTimezone(config('trunkrs.timezone'))->toDateString(),
             'received_at' => $report->received_at->toIso8601String(),
             'imported_at' => $report->created_at->toIso8601String(), 'shipment_count' => $report->shipment_count,
         ];
+    }
+
+    /** Mail-day coverage is not delivery-day evidence: empty files contain no date. */
+    public function mailDays(): array
+    {
+        $today = CarbonImmutable::now(config('trunkrs.timezone'))->startOfDay();
+        $reports = Schema::hasTable('trunkrs_reports') ? TrunkrsReport::query()
+            ->whereBetween('received_at', [$today->subDays(6)->utc(), $today->endOfDay()->utc()])
+            ->orderByDesc('received_at')->orderByDesc('created_at')
+            ->get(['id', 'report_date', 'received_at', 'created_at', 'shipment_count'])
+            ->groupBy(fn ($report) => $report->received_at->setTimezone(config('trunkrs.timezone'))->toDateString()) : collect();
+
+        return collect(range(0, 6))->map(function ($offset) use ($today, $reports) {
+            $day = $today->subDays($offset)->toDateString();
+            $report = $reports->get($day)?->first();
+
+            return [
+                'mail_date' => $day,
+                'status' => ! $report ? 'not_imported' : ($report->shipment_count === 0 ? 'empty' : 'imported'),
+                'report' => $report ? $this->report($report) : null,
+            ];
+        })->all();
     }
 }

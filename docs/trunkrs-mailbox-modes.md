@@ -23,6 +23,16 @@ Bronnen: [Microsoft Graph-machtigingen](https://learn.microsoft.com/en-us/graph/
 
 ## Controle automatische start (24 september 2026)
 
+### Herstelcontrole en resterende hostingstap (30 september 2026)
+
+De controle van 30 september vond de rapportmail van 06:01 in de ingerichte rapportmap, maar geen GitHub `schedule`-run van die ochtend. De laatste geverifieerde automatische mailboxcontrole was op 29 september om 23:23 Nederlandse tijd (run `36632963411`). De oorzaak binnen GitHubs planning is niet vastgesteld. Alleen opnieuw cronregels toevoegen is daarom geen bewezen herstel.
+
+De rapporthistorie maakt lege bestanden en niet-ingelezen maildagen afzonderlijk zichtbaar. Lege bestanden behouden hun onbekende bezorgdatum; de ontvangst-dag is alleen een label, geen datum uit de CSV. Oudere rapporten blijven via de gepagineerde historie bereikbaar. Het dashboard lezen start nooit een import.
+
+Voor een onafhankelijke ochtendstart moet de beheerder van de **bestaande hosting** de Laravel-scheduler daadwerkelijk activeren: iedere minuut `php artisan schedule:run` vanuit de echte applicatiemap, met de juiste PHP-versie en applicatiegebruiker. Gebruik de native hostingplanning en bewaar uitsluitend veilige uitvoeringslogs. De bestaande `routes/console.php` plant `trunkrs:sync` op :15, :25, :35, :45 en :55 tussen 06 en 09 uur Europe/Amsterdam. Laat de bestaande GitHub-route als aanvullende inhaalroute bestaan; de gedeelde lock en ontdubbeling voorkomen dubbele imports. Geen nieuwe hosting, publieke onbeveiligde import-URL, laptoptaak of permanente lus in een webrequest.
+
+Verifieer na activatie een **werkelijke geplande uitvoering**, de geslaagde mailboxcontrole en de opgeslagen rapportgegevens afzonderlijk. Een handmatige CLI/webcontrole of heartbeat bewijst geen actieve hostingplanning. Bij deze herstelronde is geen hostingbeheertoegang beschikbaar vastgesteld en is de hostingplanning niet geactiveerd. De huidige productieconfiguratie blijft ongewijzigd.
+
 - GitHub Actions is ingeschakeld, de workflow is actief, `main` is de default branch en de repository is niet gearchiveerd. Toch bevatte de uitvoeringshistorie geen enkel `schedule`-event, ook niet voor de gemiste ochtendcontrole van 24 september.
 - De bestaande workflow is opnieuw geactiveerd. Een tijdelijke vijfminutenproef is onderzocht en vervolgens verwijderd; tijdens de controle verscheen geen geplande uitvoering. Het ontbreken van een proefrun binnen dit venster sluit latere GitHub-vertraging niet uit.
 - De inhaalcontrole via `workflow_dispatch` ([run 35969569769](https://github.com/DennisBBQuality/markteting-tool/actions/runs/35969569769)) slaagde. De geslaagde mailboxcontrole en het nieuwere rapport zijn afzonderlijk op Live geverifieerd. Dit bewijst de importketen, niet de automatische start.

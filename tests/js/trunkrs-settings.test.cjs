@@ -19,12 +19,22 @@ function setup() {
 test('setup renders explicit access warning and honest scheduler status', async () => {
   const t = setup(); await t.settings.load();
   assert.match(t.node('trunkrs-settings').innerHTML, /hele eigen mailbox/);
-  assert.match(t.node('trunkrs-settings').innerHTML, /rapportcontrole nog niet bevestigd/);
+  assert.match(t.node('trunkrs-settings').innerHTML, /afgelopen 25 minuten geen start/);
   assert.doesNotMatch(source, /localStorage|sessionStorage|refresh_token|access_token|setInterval/);
   t.state.scheduler_recent = true;
   await t.settings.load();
   assert.match(t.node('trunkrs-settings').innerHTML, /kan ook een handmatige proef zijn/);
   assert.doesNotMatch(t.node('trunkrs-settings').innerHTML, /Geplande rapportcontrole recent gestart/);
+});
+test('an older scheduler start remains visible in Dutch local time and is not a success claim', async () => {
+  const t = setup();
+  t.state.scheduler_seen_at = '2026-09-29T21:23:39Z';
+  t.state.status.last_checked_at = '2026-09-30T04:10:00Z';
+  await t.settings.load();
+  const html = t.node('trunkrs-settings').innerHTML;
+  assert.match(html, /23:23/);
+  assert.match(html, /06:10/);
+  assert.match(html, /geen bewijs van een geslaagde import/);
 });
 test('connecting requires consent and unchanged saved fields', async () => {
   const t = setup(); await t.settings.load(); await t.settings.action('connect');

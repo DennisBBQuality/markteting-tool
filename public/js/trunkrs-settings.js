@@ -3,6 +3,10 @@ const TrunkrsSettings = {
   state: null,
   busy: false,
   generation: 0,
+  timestamp(value) {
+    if (!value) return 'nog niet uitgevoerd';
+    return new Intl.DateTimeFormat('nl-NL', { timeZone: 'Europe/Amsterdam', dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
+  },
   async load() {
     const element = document.getElementById('trunkrs-settings');
     if (!element) return;
@@ -27,8 +31,9 @@ const TrunkrsSettings = {
       <p>Gebruik je bestaande Microsoft-mailbox. Er is geen extra betaald account nodig.</p>
       <p>Rapportmap: <strong>Postvak IN / Klantenservice / Trunkrs not deliverd</strong>. Alleen rapporten van data@trunkrs.nl met het afgesproken onderwerp worden verwerkt.</p>
       <div class="form-group"><strong>${data.status.configured ? 'Microsoft verbonden' : 'Nog niet verbonden'} · ${data.status.enabled ? 'Inlezen ingeschakeld' : 'Inlezen uitgeschakeld'}</strong>
-        <p>Laatste geslaagde controle: ${escHtml(data.status.last_checked_at || 'nog niet uitgevoerd')}</p>
-        <p>${data.scheduler_recent ? 'Controle via GitHub of de server recent gestart. Dit kan ook een handmatige proef zijn; controleer in GitHub of de aanleiding “schedule” was.' : 'Automatische rapportcontrole nog niet bevestigd. Een handmatige controle bewijst geen automatische verwerking.'}</p>
+        <p>Laatste geslaagde mailboxcontrole: ${escHtml(this.timestamp(data.status.last_checked_at))} (Nederlandse tijd)</p>
+        <p>Laatste start via GitHub of server: ${escHtml(this.timestamp(data.scheduler_seen_at))} (Nederlandse tijd).</p>
+        <p>${data.scheduler_recent ? 'Recent een start geregistreerd.' : 'In de afgelopen 25 minuten geen start via GitHub of server geregistreerd.'} Een start is geen bewijs van een geslaagde import en kan ook een handmatige proef zijn. Controleer de aanleiding en het resultaat in de uitvoeringslogs.</p>
         ${(data.status.warnings || []).map(w => `<p>${escHtml(w)}</p>`).join('')}
       </div>
       ${Object.entries(labels).map(([key, label]) => `<div class="form-group"><label for="trunkrs-${key}">${label}</label>

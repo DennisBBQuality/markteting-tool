@@ -67,6 +67,26 @@ test('opening the dashboard resets the selected day to the newest imported repor
   ui.request = request;
 });
 
+test('empty report choices show mail day without inventing a delivery date, and history is reachable', () => {
+  const report = {id:'empty', report_date:null, mail_date:'2026-09-28', shipment_count:0};
+  const html = ui.tileHtml({report, available_reports:[report], shipments:[], warnings:[]});
+  assert.match(html, /Leeg rapport · mail 28 sep/);
+  assert.match(html, /Bezorgdatum niet bevestigd/);
+  assert.match(html, /Trunkrs.openReports\(\)/);
+});
+
+test('mail-day coverage distinguishes empty, not imported and imported without a zero for missing reports', () => {
+  const html = ui.mailDaysHtml([
+    {mail_date:'2026-09-30', status:'not_imported', report:null},
+    {mail_date:'2026-09-29', status:'imported', report:{report_date:'2026-09-28'}},
+    {mail_date:'2026-09-28', status:'empty', report:{report_date:null, shipment_count:0}},
+  ]);
+  assert.match(html, /30 sep.*Nog geen rapport ingelezen/);
+  assert.match(html, /29 sep.*Rapport ingelezen.*Bezorgdag 28 sep/);
+  assert.match(html, /28 sep.*Leeg rapport ontvangen — bezorgdatum niet bevestigd/);
+  assert.doesNotMatch(html, /0 zendingen|Mail niet ontvangen/);
+});
+
 test('network failures preserve the last visible rows and add a persistent notice', async () => {
   const tile = {isConnected:true, innerHTML:'TEST-EXISTING-ROWS', querySelector:() => null, prepend: node => { tile.notice = node; }};
   context.document = {getElementById:() => tile, createElement:() => ({})};
