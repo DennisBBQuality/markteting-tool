@@ -100,11 +100,15 @@ Alle API routes zijn beschermd met custom session-based authenticatie.
 | `GET/POST /api/calendar`  | Kalenderitems lijst en aanmaken           |
 | `GET/POST /api/notes`     | Notities lijst en aanmaken                |
 | `GET/POST /api/attachments` | Bijlagen lijst en uploaden              |
+| `GET /api/attachments/{id}/download` | Privébijlage downloaden met originele bestandsnaam |
+| `GET /api/attachments/{id}/preview` | Privéfotopreview (JPG/PNG/GIF/WEBP) |
 | `POST /api/convert/webp`  | Batch WebP conversie                      |
 | `GET/PUT /api/images/prompt` | Productfotoprompt lezen of instellen   |
 | `POST /api/images/generate` | Productfoto-opdracht veilig in de wachtrij zetten |
 | `GET /api/images/requests/{id}` | Voortgang en resultaat van een productfoto-opdracht |
 | `GET /api/dashboard/stats`| Dashboard statistieken                    |
+
+Bijlagen in projecten, taken, kalenderitems en notities gebruiken extensieloze applicatieroutes: statische webserverregels voor `/uploads/*.jpg` kunnen zo geen Laravel-downloads onderscheppen. Klik op een foto of fotonaam voor een aparte preview; sluiten of Escape behoudt het onderliggende formulier. Niet-afbeeldingen zijn alleen te downloaden. Beide routes vereisen de bestaande teamlogin. Bestaande bestanden worden uit dezelfde privéopslag gelezen; deze wijziging herstelt geen bestanden die werkelijk van de server ontbreken en verandert geen opslag- of productieconfiguratie.
 
 ## Productfoto-generator
 
