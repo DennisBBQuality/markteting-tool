@@ -25,6 +25,7 @@ class TrunkrsReportController extends Controller
 
         return response()->json([
             'reports' => $reports?->getCollection()->map(fn ($r) => $dashboard->report($r))->all() ?? [],
+            'mail_days' => $dashboard->mailDays(),
             'page' => $reports?->currentPage() ?? 1, 'last_page' => $reports?->lastPage() ?? 1,
         ])->header('Cache-Control', 'no-store');
     }
