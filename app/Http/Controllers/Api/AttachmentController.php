@@ -46,7 +46,7 @@ class AttachmentController extends Controller
         $file = $request->file('bestand');
         $extension = strtolower($file->getClientOriginalExtension());
         $filename = Str::uuid().'.'.$extension;
-        $file->storeAs('uploads', $filename, 'local');
+        abort_unless($file->storeAs('uploads', $filename, 'local'), 500, 'Het bestand kon niet worden opgeslagen.');
 
         $attachment = Attachment::create([
             'project_id' => $request->project_id,
@@ -61,6 +61,43 @@ class AttachmentController extends Controller
         ]);
 
         return response()->json($attachment);
+    }
+
+    public function download(string $id)
+    {
+        $attachment = Attachment::findOrFail($id);
+
+        return response()->download($this->filePath($attachment), $attachment->originele_naam, [
+            'Content-Type' => 'application/octet-stream',
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, no-store',
+        ]);
+    }
+
+    public function preview(string $id)
+    {
+        $attachment = Attachment::findOrFail($id);
+        $path = $this->filePath($attachment);
+        // Inspect the stored bytes, not the client filename or database MIME label.
+        $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($path);
+        abort_unless(in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true), 415, 'Dit bestand heeft geen fotopreview.');
+
+        return response()->file($path, [
+            'Content-Type' => $mime,
+            'Content-Disposition' => 'inline',
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, no-store',
+        ]);
+    }
+
+    private function filePath(Attachment $attachment): string
+    {
+        $filename = $attachment->bestandsnaam;
+        abort_unless($filename && basename($filename) === $filename && ! str_contains($filename, '\\'), 404);
+        $path = 'uploads/'.$filename;
+        abort_unless(Storage::disk('local')->exists($path), 404, 'Het bestand is niet meer beschikbaar op de server.');
+
+        return Storage::disk('local')->path($path);
     }
 
     public function destroy(string $id)

@@ -353,15 +353,56 @@ async function loadAttachments(entityType, entityId) {
   const list = document.getElementById(`attachments-list-${entityId}`);
   if (!list) return;
   list.innerHTML = atts.map(a => {
-    const isImage = a.mimetype && a.mimetype.startsWith('image/');
-    const filename = encodeURIComponent(a.bestandsnaam || '');
+    const isImage = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(a.mimetype);
+    const baseUrl = `/api/attachments/${encodeURIComponent(a.id)}`;
+    const name = escHtml(a.originele_naam).replaceAll('"', '&quot;');
     return `<div class="attachment-item">
-      ${isImage ? `<img src="/uploads/${filename}" alt="">` : `<i class="fas fa-file"></i>`}
-      <span>${escHtml(a.originele_naam)}</span>
-      <a href="/uploads/${filename}" target="_blank" rel="noopener" class="btn-icon"><i class="fas fa-download"></i></a>
-      <button class="btn-icon" onclick="deleteAttachment('${a.id}', '${entityType}', '${entityId}')"><i class="fas fa-trash"></i></button>
+      ${isImage ? `<button type="button" class="attachment-preview-button" data-preview-url="${baseUrl}/preview" data-download-url="${baseUrl}/download" data-name="${name}" onclick="openAttachmentPreview(this)" title="Foto bekijken">
+        <img src="${baseUrl}/preview" alt="" onerror="this.hidden=true"><span>${name}</span>
+      </button>` : `<i class="fas fa-file"></i><span>${name}</span>`}
+      <a href="${baseUrl}/download" download="${name}" class="btn-icon" aria-label="Download ${name}" title="Downloaden" onclick="event.preventDefault(); downloadAttachment(this.href, this.download)"><i class="fas fa-download"></i></a>
+      <button type="button" class="btn-icon" aria-label="Verwijder ${name}" onclick="deleteAttachment('${a.id}', '${entityType}', '${entityId}')"><i class="fas fa-trash"></i></button>
     </div>`;
   }).join('');
+}
+
+async function downloadAttachment(url, name) {
+  try {
+    const response = await fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+    if (!response.ok) throw new Error(response.status === 401
+      ? 'Je sessie is verlopen. Log opnieuw in om het bestand te downloaden.'
+      : 'Dit bestand kan niet worden gedownload. Het ontbreekt mogelijk op de server.');
+    const objectUrl = URL.createObjectURL(await response.blob());
+    const link = document.createElement('a');
+    link.href = objectUrl; link.download = name;
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+  } catch (error) { toast(error.message || 'Downloaden is niet gelukt.', 'error'); }
+}
+
+function openAttachmentPreview(trigger) {
+  const dialog = document.createElement('dialog');
+  dialog.className = 'attachment-preview-dialog';
+  dialog.setAttribute('aria-label', 'Fotopreview');
+  dialog.innerHTML = `<div class="attachment-preview-header"><strong></strong><button type="button" class="btn-icon" aria-label="Preview sluiten"><i class="fas fa-times"></i></button></div>
+    <div class="attachment-preview-body"><p role="status">Foto laden…</p><img hidden></div>
+    <div class="attachment-preview-footer"><button type="button" class="btn btn-primary">Downloaden</button></div>`;
+  dialog.querySelector('strong').textContent = trigger.dataset.name;
+  const photo = dialog.querySelector('img');
+  const status = dialog.querySelector('[role="status"]');
+  photo.alt = trigger.dataset.name;
+  photo.onload = () => { status.hidden = true; photo.hidden = false; };
+  photo.onerror = () => { photo.hidden = true; status.hidden = false; status.textContent = 'De foto is niet beschikbaar. Het bestand ontbreekt mogelijk op de server of je sessie is verlopen.'; };
+  dialog.querySelector('.attachment-preview-header button').onclick = () => dialog.close();
+  dialog.querySelector('.attachment-preview-footer button').onclick = () => downloadAttachment(trigger.dataset.downloadUrl, trigger.dataset.name);
+  dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
+  // Keep Escape from closing the underlying edit form as well. Native dialog
+  // supplies focus trapping and Escape dismissal without replacing that form.
+  dialog.addEventListener('keydown', event => { if (event.key === 'Escape') event.stopPropagation(); });
+  dialog.addEventListener('close', () => { dialog.remove(); trigger.focus(); }, { once: true });
+  document.body.appendChild(dialog);
+  dialog.showModal();
+  photo.src = trigger.dataset.previewUrl;
 }
 
 async function uploadFiles(input, entityType, entityId) {

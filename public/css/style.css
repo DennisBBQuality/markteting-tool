@@ -670,6 +670,19 @@ input, select, textarea { font: inherit; }
 }
 .attachment-item img { width: 32px; height: 32px; object-fit: cover; border-radius: 4px; }
 .attachment-item .btn-icon { font-size: 10px; }
+.attachment-item { max-width: 100%; }
+.attachment-preview-button { display:flex; align-items:center; gap:8px; min-width:0; border:0; padding:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+.attachment-preview-button span, .attachment-item > span { overflow-wrap:anywhere; }
+.attachment-preview-button:hover span { text-decoration:underline; }
+.attachment-preview-button:focus-visible { outline:2px solid var(--primary); outline-offset:4px; }
+.attachment-preview-dialog { margin:auto; padding:0; border:0; border-radius:12px; width:min(960px, 94vw); max-height:92vh; overflow:auto; color:var(--text); background:white; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+.attachment-preview-dialog::backdrop { background:rgba(0,0,0,.75); }
+.attachment-preview-header { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 20px; border-bottom:1px solid var(--border); }
+.attachment-preview-header strong { overflow-wrap:anywhere; }
+.attachment-preview-body { display:flex; align-items:center; justify-content:center; min-height:160px; padding:16px; background:#24201d; color:white; }
+.attachment-preview-body img { max-width:100%; max-height:65vh; object-fit:contain; }
+.attachment-preview-body p { max-width:540px; text-align:center; }
+.attachment-preview-footer { display:flex; justify-content:flex-end; padding:12px 20px; }
 .upload-area {
   border: 2px dashed var(--border); border-radius: var(--radius); padding: 20px;
   text-align: center; cursor: pointer; transition: all var(--transition);

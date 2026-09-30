@@ -131,6 +131,8 @@ Route::middleware('auth.custom')->group(function () {
     // Attachments
     Route::get('/api/attachments', [AttachmentController::class, 'index']);
     Route::post('/api/attachments', [AttachmentController::class, 'store']);
+    Route::get('/api/attachments/{id}/download', [AttachmentController::class, 'download'])->whereUuid('id');
+    Route::get('/api/attachments/{id}/preview', [AttachmentController::class, 'preview'])->whereUuid('id');
     Route::delete('/api/attachments/{id}', [AttachmentController::class, 'destroy']);
 
     // Image Converter
