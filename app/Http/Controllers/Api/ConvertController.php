@@ -23,24 +23,27 @@ class ConvertController extends Controller
         foreach ($request->file('bestanden') as $file) {
             try {
                 $baseName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-                $outputName = $baseName.'-'.time().'.webp';
+                $id = (string) Str::uuid();
+                $outputName = $id.'.webp';
 
                 $image = Image::read($file->getPathname());
                 $encoded = $image->toWebp($quality);
 
-                Storage::disk('public')->put('converted/'.$outputName, (string) $encoded);
+                if (! Storage::disk('public')->put('converted/'.$outputName, (string) $encoded)) {
+                    throw new \RuntimeException('Het bestand kon niet worden opgeslagen. Probeer opnieuw.');
+                }
 
                 $convertedSize = strlen((string) $encoded);
                 $results[] = [
-                    'id' => (string) Str::uuid(),
+                    'id' => $id,
                     'origineel' => $file->getClientOriginalName(),
                     'origineel_grootte' => $file->getSize(),
-                    'geconverteerd' => $outputName,
+                    'geconverteerd' => $baseName.'.webp',
                     'geconverteerd_grootte' => $convertedSize,
                     'breedte' => $image->width(),
                     'hoogte' => $image->height(),
                     'besparing' => round((1 - $convertedSize / $file->getSize()) * 100),
-                    'download_url' => '/api/convert/download/'.$outputName,
+                    'download_url' => '/api/convert/download?bestand='.rawurlencode($outputName),
                 ];
             } catch (\Exception $e) {
                 $results[] = [
@@ -53,9 +56,12 @@ class ConvertController extends Controller
         return response()->json(['results' => $results]);
     }
 
-    public function download(Request $request, string $filename)
+    public function download(Request $request, ?string $filename = null)
     {
-        $filename = basename($filename);
+        $filename ??= $request->query('bestand');
+        if (! is_string($filename) || $filename === '' || str_contains($filename, '/') || str_contains($filename, '\\') || ! str_ends_with($filename, '.webp')) {
+            return response()->json(['error' => 'Bestand niet gevonden'], 404);
+        }
         $path = 'converted/'.$filename;
 
         if (! Storage::disk('public')->exists($path)) {
@@ -63,9 +69,14 @@ class ConvertController extends Controller
         }
 
         $downloadName = $request->query('naam', $filename);
+        if (! is_string($downloadName)) {
+            return response()->json(['error' => 'Ongeldige bestandsnaam'], 422);
+        }
 
         return Storage::disk('public')->download($path, basename($downloadName), [
             'Content-Type' => 'image/webp',
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, no-store',
         ]);
     }
 }

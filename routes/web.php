@@ -137,6 +137,7 @@ Route::middleware('auth.custom')->group(function () {
 
     // Image Converter
     Route::post('/api/convert/webp', [ConvertController::class, 'toWebp']);
+    Route::get('/api/convert/download', [ConvertController::class, 'download']);
     Route::get('/api/convert/download/{filename}', [ConvertController::class, 'download']);
 
     // Product images

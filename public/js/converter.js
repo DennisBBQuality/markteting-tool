@@ -1207,7 +1207,8 @@ async function startConversion() {
     converterState.results = data.results;
     converterState.seoData = {};
     renderResults();
-    toast('Conversie voltooid!', 'success');
+    const failed = data.results.filter(result => result.error).length;
+    toast(failed ? `${failed} bestand(en) konden niet worden geconverteerd. Bekijk de foutmelding.` : 'Conversie voltooid!', failed ? 'error' : 'success');
   } catch (err) {
     toast('Er ging iets mis bij de conversie', 'error');
   } finally {
@@ -1712,27 +1713,66 @@ function renderResults() {
   resultsDiv.scrollIntoView({ behavior: 'smooth' });
 }
 
-function downloadWebpFile(index) {
+async function fetchAndDownloadWebp(result, downloadName) {
+  const url = new URL(result.download_url, window.location.origin);
+  // Ook bestaande conversieresultaten via de route zonder bestandsextensie ophalen.
+  const legacyPrefix = '/api/convert/download/';
+  if (url.pathname.startsWith(legacyPrefix)) {
+    url.searchParams.set('bestand', decodeURIComponent(url.pathname.slice(legacyPrefix.length)));
+    url.pathname = '/api/convert/download';
+  }
+  if (url.origin !== window.location.origin || url.pathname !== '/api/convert/download') {
+    throw new Error('Ongeldige downloadlink. Converteer de afbeelding opnieuw.');
+  }
+  url.searchParams.set('naam', downloadName);
+  const response = await fetch(url.href, { credentials: 'same-origin', headers: { Accept: 'image/webp' } });
+  if (response.status === 401 || response.status === 403) throw new Error('Log opnieuw in om de afbeelding te downloaden.');
+  if (!response.ok) throw new Error(response.status === 404 ? 'Het bestand is niet beschikbaar. Converteer de afbeelding opnieuw.' : 'Download mislukt. Probeer opnieuw.');
+  const blob = await response.blob();
+  const header = new Uint8Array(await blob.slice(0, 12).arrayBuffer());
+  if (blob.type.split(';')[0] !== 'image/webp' || String.fromCharCode(...header.slice(0, 4)) !== 'RIFF' || String.fromCharCode(...header.slice(8, 12)) !== 'WEBP') {
+    throw new Error('Geen geldig WEBP-bestand ontvangen. Converteer de afbeelding opnieuw.');
+  }
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    const image = new Image();
+    image.src = objectUrl;
+    try { await image.decode(); } catch { throw new Error('De WEBP-afbeelding is beschadigd. Converteer deze opnieuw.'); }
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = downloadName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+  }
+}
+
+async function downloadWebpFile(index) {
   const r = converterState.results[index];
   if (!r || r.error) return;
 
   const seo = converterState.seoData[index];
   const downloadName = seo && seo.bestandsnaam ? seo.bestandsnaam : r.geconverteerd;
 
-  // Download de afbeelding
-  const link = document.createElement('a');
-  link.href = r.download_url + '?naam=' + encodeURIComponent(downloadName);
-  link.download = downloadName;
-  link.click();
+  try {
+    await fetchAndDownloadWebp(r, downloadName);
+  } catch (error) {
+    toast(error.message || 'Download mislukt. Probeer opnieuw.', 'error');
+    return;
+  }
 
   // Kopieer automatisch SEO-metadata naar klembord als die beschikbaar is
   if (seo) {
     const metadataText = formatSeoMetadataForClipboard(seo);
     navigator.clipboard.writeText(metadataText).then(() => {
-      toast('Afbeelding gedownload + SEO-metadata gekopieerd naar klembord!', 'success');
+      toast('Download gestart + SEO-metadata gekopieerd naar klembord!', 'success');
     }).catch(() => {
-      toast('Afbeelding gedownload! Metadata kon niet naar klembord worden gekopieerd.', 'success');
+      toast('Download gestart. Metadata kon niet naar klembord worden gekopieerd.', 'success');
     });
+  } else {
+    toast('Download gestart.', 'success');
   }
 }
 
@@ -1774,7 +1814,8 @@ function downloadSeoMetadataFile(index) {
 
 async function downloadAllWebp() {
   let allMetadata = '';
-  let metadataCount = 0;
+  let downloaded = 0;
+  let failed = 0;
 
   for (let i = 0; i < converterState.results.length; i++) {
     const r = converterState.results[i];
@@ -1783,15 +1824,17 @@ async function downloadAllWebp() {
     const seo = converterState.seoData[i];
     const downloadName = seo && seo.bestandsnaam ? seo.bestandsnaam : r.geconverteerd;
 
-    // Download de afbeelding
-    const link = document.createElement('a');
-    link.href = r.download_url + '?naam=' + encodeURIComponent(downloadName);
-    link.download = downloadName;
-    link.click();
+    try {
+      await fetchAndDownloadWebp(r, downloadName);
+      downloaded++;
+    } catch (error) {
+      failed++;
+      toast(`${r.origineel}: ${error.message || 'Download mislukt.'}`, 'error');
+      continue;
+    }
 
     // Verzamel metadata
     if (seo) {
-      metadataCount++;
       allMetadata += `--- ${seo.bestandsnaam} ---\n`;
       allMetadata += formatSeoMetadataForClipboard(seo);
       allMetadata += '\n\n';
@@ -1803,12 +1846,10 @@ async function downloadAllWebp() {
 
   // Kopieer alle metadata naar klembord
   if (allMetadata) {
-    navigator.clipboard.writeText(allMetadata.trim()).then(() => {
-      toast(`${metadataCount} afbeelding(en) gedownload + alle SEO-metadata gekopieerd naar klembord!`, 'success');
-    }).catch(() => {
-      toast('Alle afbeeldingen gedownload!', 'success');
-    });
+    try { await navigator.clipboard.writeText(allMetadata.trim()); }
+    catch { toast('SEO-metadata kon niet naar het klembord worden gekopieerd.', 'error'); }
   }
+  toast(`${downloaded} download(s) gestart${failed ? `; ${failed} mislukt` : ''}.`, failed ? 'error' : 'success');
 }
 
 function formatFileSize(bytes) {
