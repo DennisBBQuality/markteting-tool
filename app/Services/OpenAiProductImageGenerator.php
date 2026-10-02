@@ -329,6 +329,10 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
         $message = strtolower((string) $response->json('error.message'));
         $errorText = $code.' '.$type.' '.$message;
 
+        if ($status === 413 || in_array($code, ['context_length_exceeded', 'string_above_max_length', 'request_too_large'], true)) {
+            return 'De producttekst en referentiefoto’s passen niet binnen de technische verwerkingsruimte van de beeldservice. Er is niets stilzwijgend ingekort. Gebruik een kortere producttekst of kleinere referentiefoto’s en probeer opnieuw.';
+        }
+
         if (str_contains($errorText, 'content_policy')) {
             return 'OpenAI heeft deze afbeelding of prompt geweigerd vanwege de inhoudsregels. Probeer een andere foto of pas de prompt aan.';
         }

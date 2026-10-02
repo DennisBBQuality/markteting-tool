@@ -477,6 +477,31 @@ class OpenAiProductImageGeneratorTest extends TestCase
         );
     }
 
+    public function test_it_explains_input_capacity_without_exposing_provider_details(): void
+    {
+        config()->set('services.product_images.driver', 'openai');
+        config()->set('services.product_images.openai.api_key', 'test-key');
+        Http::fake(['*' => Http::response([
+            'error' => [
+                'code' => 'context_length_exceeded',
+                'message' => 'PRIVATE INPUT exceeded capacity.',
+            ],
+        ], 400)]);
+
+        try {
+            app(OpenAiProductImageGenerator::class)->generate(
+                UploadedFile::fake()->image('reference.jpg'),
+                'TEST producttekst',
+            );
+            $this->fail('Oversized input must fail explicitly.');
+        } catch (ProductImageGenerationException $exception) {
+            $this->assertStringContainsString('niets stilzwijgend ingekort', $exception->getMessage());
+            $this->assertStringNotContainsString('PRIVATE INPUT', $exception->getMessage());
+        }
+
+        Http::assertSentCount(1);
+    }
+
     public function test_it_reports_when_organization_verification_is_required(): void
     {
         config()->set('services.product_images.driver', 'openai');

@@ -112,6 +112,14 @@ Bijlagen in projecten, taken, kalenderitems en notities gebruiken extensieloze a
 
 ## Productfoto-generator
 
+### Producttekst als bron voor afbeeldings-SEO (2 oktober 2026)
+
+**Producttekst en belangrijke productdetails (optioneel)** accepteert volledige productteksten zonder ingestelde tekenlimiet. De invoer blijft volledig in de bestaande `generation_context.notes` bewaard en wordt bij iedere afzonderlijke SEO-analyse en expliciete heranalyse als brongegevens meegestuurd, ook na een fotobewerking. Leeg of alleen een productnaam: zelf formuleren vanuit de naam en foto, zonder onbekende productfeiten te verzinnen. Ook korte echte productdetails tellen mee; er is geen minimale tekstlengte.
+
+De producttekst is leidend voor productidentiteit en feiten, de daadwerkelijke foto voor relevante zichtbare presentatie. Alt-tekst is geen volledige verkooptekst of decorinventaris. Onverenigbare claims worden weggelaten; broninstructies worden niet gevolgd. De bestaande categorieprofielen, bereidingsvermeldingen en bescherming van handmatige SEO blijven behouden. Oude SEO wordt niet automatisch herschreven; **SEO opnieuw maken** gebruikt de bij die fotoset opgeslagen tekst, niet een later ingevuld veld bij een andere opdracht.
+
+Geen afkapping en geen vervangende kunstmatige tekenlimiet; technische server- en modelcapaciteit blijven eindig. HTTP 413 en herkenbare contextlimietfouten krijgen een duidelijke melding zonder automatische betaalde herhaling. Tests controleren volledige opslag/doorgifte met lange synthetische tekst, alle categorieën, terugvalregels en behoud bij fouten via gesimuleerde AI-antwoorden. Dit is geen garantie op inhoudelijke AI-kwaliteit of Google-posities; controleer elke echte fotoset vóór publicatie. Geen migratie, productieconfiguratie of wijziging aan de WEBP-converter.
+
 ### Productgerichte SEO voor sauzen, rubs en accessoires (29 september 2026)
 
 Nieuwe SEO en **SEO opnieuw maken** gebruiken voor Saus/rub en Accessoires een apart productgericht profiel: productnaam en merk voorop, aangevuld met uitsluitend relevante zichtbare productkenmerken of afgebeeld gebruik. Decor, belichting en sfeer worden niet standaard beschreven; een pepermolen als verkocht product blijft uiteraard wel relevant. Kruiden en eten in de aankleding zijn geen bewijs van ingrediënten, inbegrepen producten of geschiktheid. Titel mag alleen productnaam/merk zijn, alt blijft een beeldbeschrijving en beschrijving is maximaal één korte zin. Het bijschrift mag leeg blijven als het niets toevoegt; de overige vier velden blijven verplicht. Dit geldt zowel voor AI als handmatig opslaan, voortgang, downloaden en export.

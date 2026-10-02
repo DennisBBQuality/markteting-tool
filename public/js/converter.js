@@ -112,7 +112,11 @@ function renderConverter() {
           <div class="form-group"><label for="product-image-name">Productnaam *</label><input id="product-image-name" type="text" maxlength="160" placeholder="Bijvoorbeeld Black Angus picanha" oninput="updateProductImageForm()"></div>
           <div class="form-group"><label for="product-image-quantity">Exact aantal *</label><input id="product-image-quantity" type="number" min="1" max="100" value="1" oninput="updateProductImageForm()"><small>Dit aantal wordt in iedere foto aangehouden.</small></div>
         </div>
-        <div class="form-group"><label for="product-image-notes">Belangrijke productdetails <span>(optioneel)</span></label><textarea id="product-image-notes" rows="2" maxlength="2000" placeholder="Bijvoorbeeld herkomst, marmering of gewenste bereiding"></textarea></div>
+        <div class="form-group">
+          <label for="product-image-notes">Producttekst en belangrijke productdetails <span>(optioneel)</span></label>
+          <textarea id="product-image-notes" rows="8" aria-describedby="product-image-notes-help" placeholder="Plak hier de volledige producttekst. Ook korte, feitelijke productdetails zijn welkom."></textarea>
+          <small id="product-image-notes-help">Je producttekst is de belangrijkste bron voor de SEO. De alt-tekst beschrijft het relevante product op de foto, niet alle aankleding. Laat je dit leeg of vul je alleen een productnaam in, dan maken we de SEO vanuit de productnaam en de foto. Geen ingestelde tekenlimiet; tekst wordt niet stilzwijgend afgekapt.</small>
+        </div>
         <div class="form-group hidden" id="product-image-components-group"><label for="product-image-components">Onderdelen zonder eigen foto <span>(indien van toepassing)</span></label><textarea id="product-image-components" rows="3" maxlength="3000" placeholder="Beschrijf ieder ontbrekend onderdeel en het exacte aantal"></textarea></div>
       </div>
 
@@ -596,6 +600,13 @@ async function startProductImageGeneration() {
         ? `Probeer het over ${Math.ceil(seconds)} seconden opnieuw.`
         : 'Wacht even en probeer het opnieuw.';
       const message = `De fotogenerator is tijdelijk begrensd. ${wait} Deze poging heeft geen nieuwe foto-opdracht gestart. Je invoer en bestaande foto's zijn bewaard.`;
+      showProductImageError(message);
+      toast(message, 'error');
+      return;
+    }
+
+    if (response.status === 413) {
+      const message = 'De aanvraag is groter dan de server kan verwerken. Je invoer en referenties blijven staan; er wordt niets stilzwijgend ingekort. Gebruik kleinere foto’s of een kortere producttekst en probeer opnieuw.';
       showProductImageError(message);
       toast(message, 'error');
       return;
