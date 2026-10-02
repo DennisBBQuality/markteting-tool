@@ -87,7 +87,7 @@ class ProductImageController extends Controller
             'dough_kind' => ['exclude_unless:product_type,dough', 'required', 'in:bread,pizza_balls'],
             'product_name' => ['nullable', 'string', 'max:160'],
             'quantity' => ['nullable', 'integer', 'min:1', 'max:100'],
-            'notes' => ['nullable', 'string', 'max:2000'],
+            'notes' => ['nullable', 'string'],
             'components' => ['nullable', 'string', 'max:3000'],
             'main_index' => ['nullable', 'integer', 'min:0', 'max:4'],
             'reference_names' => ['nullable', 'array', 'max:5'],

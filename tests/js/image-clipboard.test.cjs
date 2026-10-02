@@ -32,6 +32,27 @@ const file = (name = 'test.png', type = 'image/png', size = 8) => new File([new 
 const item = (type = 'image/png', size = 8) => ({ types: [type], getType: async () => new Blob([new Uint8Array(size)], { type }) });
 const pasteEvent = (files, editable = false) => ({ clipboardData: { files }, target: { closest: () => editable }, preventDefault() { this.prevented = true; } });
 
+test('product text has a larger accessible field with no character limit and is sent in full', async () => {
+  const source = fs.readFileSync('public/js/converter.js', 'utf8');
+  const textarea = source.match(/<textarea id="product-image-notes"[^>]*>/)[0];
+  assert.doesNotMatch(textarea, /maxlength/);
+  assert.match(textarea, /rows="8"/);
+  assert.match(textarea, /aria-describedby="product-image-notes-help"/);
+  assert.match(source, /Producttekst en belangrijke productdetails/);
+  const h = harness(); h.context.uploads = [file()]; h.run('handleProductImageFiles(uploads)');
+  const text = 'TEST producttekst\n'.repeat(6000) + 'LAATSTE FEIT: zonder bot.';
+  h.field('product-image-notes').value = text;
+  const calls = [];
+  Object.assign(h.context, {FormData, getCookie: () => 'TEST', fetch: async (url, options) => {
+    calls.push(options.body); return {status: 413};
+  }});
+  await h.run('startProductImageGeneration()');
+  assert.equal(calls.length, 1); assert.equal(calls[0].get('notes'), text);
+  assert.equal(h.field('product-image-notes').value, text);
+  assert.match(h.messages.at(-1), /niets stilzwijgend ingekort/);
+  assert.equal(h.run('productImageState.files.length'), 1);
+});
+
 test('Deeg and Accessoires select three photos and switching back preserves meat choices', () => {
   const h = harness();
   for (const type of ['dough', 'accessory']) {
