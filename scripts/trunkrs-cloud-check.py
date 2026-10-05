@@ -61,28 +61,47 @@ def verify_report(data, check_id):
         return False
     if data.get("state") != "completed" or data.get("result") != "ok" or data.get("mailbox_completed") is not True:
         raise CheckError("Mailbox check did not complete; inspect Pitboard connection and retry status")
-    if data.get("report_current") is not True:
-        raise CheckError("Mailbox checked, but today's mail with yesterday's delivery date is missing or unconfirmed")
     try:
         requested = dt.datetime.fromisoformat(data["requested_at"])
         started = dt.datetime.fromisoformat(data["started_at"])
         checked = dt.datetime.fromisoformat(data["last_checked_at"])
-        received = dt.datetime.fromisoformat(data["report_received_at"])
-        imported = dt.datetime.fromisoformat(data["report_imported_at"])
+        if not all(stamp.tzinfo is not None for stamp in (requested, started, checked)):
+            raise ValueError()
+        if checked < started or started < requested:
+            raise ValueError()
         mail_day = requested.astimezone(ZoneInfo("Europe/Amsterdam")).date()
         expected = mail_day - dt.timedelta(days=1)
-        if not all(stamp.tzinfo is not None for stamp in (requested, started, checked, received, imported)):
-            raise ValueError()
-        if checked < started or started < requested or received.astimezone(ZoneInfo("Europe/Amsterdam")).date() != mail_day:
-            raise ValueError()
-        if data["report_date"] != expected.isoformat() or data["expected_delivery_date"] != expected.isoformat():
+        if data["expected_delivery_date"] != expected.isoformat():
             raise ValueError()
     except (KeyError, ValueError, TypeError):
         raise CheckError("Missing or inconsistent completion evidence") from None
-    # Only verified dates/times, never arbitrary response text or shipment data.
+    # A completed scan and a verified delivery date are separate evidence.
     print("Mailbox completed: " + checked.isoformat())
+    if (data.get("report_status") == "missing" and data.get("report_current") is False
+            and all(data.get(key) is None for key in ("report_date", "report_received_at", "report_imported_at"))):
+        raise CheckError("Mailbox completed; no imported report is available")
+    try:
+        received = dt.datetime.fromisoformat(data["report_received_at"])
+        imported = dt.datetime.fromisoformat(data["report_imported_at"])
+        if not all(stamp.tzinfo is not None for stamp in (received, imported)):
+            raise ValueError()
+        if imported < received or imported > checked:
+            raise ValueError()
+    except (KeyError, ValueError, TypeError):
+        raise CheckError("Mailbox completed; missing or inconsistent report evidence") from None
+    # Only verified dates/times and fixed messages, never arbitrary response text or shipment data.
     print("Report received: " + received.isoformat())
     print("Report imported: " + imported.isoformat())
+    if received.astimezone(ZoneInfo("Europe/Amsterdam")).date() != mail_day:
+        raise CheckError("Mailbox completed; latest imported report was not received on the requested Dutch day")
+    if data.get("report_current") is not True:
+        if data.get("report_status") == "empty_undated" and data.get("report_date") is None:
+            raise CheckError("Mailbox completed; today's empty report was imported, but its delivery date is unknown")
+        if data.get("report_status") == "unexpected_delivery_date":
+            raise CheckError("Mailbox completed; today's report does not confirm yesterday's delivery date")
+        raise CheckError("Mailbox completed; today's delivery date is unconfirmed")
+    if data.get("report_date") != expected.isoformat() or data.get("report_status", "current") != "current":
+        raise CheckError("Missing or inconsistent completion evidence")
     print("Delivery date: " + expected.isoformat())
     return True
 
