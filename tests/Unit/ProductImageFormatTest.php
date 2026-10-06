@@ -13,9 +13,9 @@ use Tests\TestCase;
 
 class ProductImageFormatTest extends TestCase
 {
-    public function test_all_product_types_and_webp_keep_native_landscape_pixels(): void
+    public function test_all_product_types_and_webp_keep_native_landscape_dimensions(): void
     {
-        foreach (['meat', 'fish', 'sauce', 'bundle'] as $type) {
+        foreach (['meat', 'fish', 'sauce', 'bundle', 'dough', 'accessory'] as $type) {
             $results = (new FakeProductImageGenerator)->generateForProduct([], '', ['product_type' => $type, 'product_name' => 'Testproduct']);
             foreach ($results as $result) {
                 $png = ProductImageFormat::validate($result['contents']);
@@ -23,7 +23,8 @@ class ProductImageFormatTest extends TestCase
                 $this->assertSame([1536, 1152], array_slice(getimagesizefromstring($webp), 0, 2));
                 $original = imagecreatefromstring($png);
                 $export = imagecreatefromstring($webp);
-                $this->assertSame(imagecolorat($original, 100, 100), imagecolorat($export, 100, 100));
+                // Lossy export may change RGB slightly; dimensions and source stay intact.
+                $this->assertSame([imagesx($original), imagesy($original)], [imagesx($export), imagesy($export)]);
                 imagedestroy($original);
                 imagedestroy($export);
             }

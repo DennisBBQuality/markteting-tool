@@ -202,7 +202,7 @@ class ProductStudioReliabilityTest extends TestCase
         $this->getJson('/api/product-dossiers/'.$dossier->id)->assertJsonPath('generation.status', 'failed');
     }
 
-    public function test_lossless_webp_preserves_pixels_and_has_descriptive_metadata(): void
+    public function test_webp_preserves_dimensions_and_alpha_and_has_descriptive_metadata(): void
     {
         $image = imagecreatetruecolor(3, 2);
         imagesavealpha($image, true);
@@ -216,7 +216,8 @@ class ProductStudioReliabilityTest extends TestCase
         $decoded = imagecreatefromstring($webp);
         $this->assertSame(3, imagesx($decoded));
         $this->assertSame(2, imagesy($decoded));
-        $this->assertSame(imagecolorat($image, 0, 0), imagecolorat($decoded, 0, 0));
+        $this->assertSame(imagecolorsforindex($image, imagecolorat($image, 0, 0))['alpha'],
+            imagecolorsforindex($decoded, imagecolorat($decoded, 0, 0))['alpha']);
         $metadata = $delivery->metadata(['product_name' => 'Black Angus brisket'], ['status' => 'rauw', 'variant' => 1], 2);
         $this->assertSame('', $metadata['filename']); // No invented or numbered fallback before photo-specific SEO.
         $this->assertSame('Black Angus brisket, rauw', $metadata['alt']);

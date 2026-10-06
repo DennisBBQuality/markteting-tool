@@ -835,6 +835,7 @@ function renderProductImageResults() {
       <div>
         <span class="product-image-eyebrow">Resultaat</span>
         <h3>Kies je favoriete productfoto</h3>
+        <p>WEBP voor de website: kwaliteitsstand 85, met behoud van de afmetingen. Het originele PNG blijft beschikbaar voor bewerking. Controleer fijne details en etiketten vóór publicatie.</p>
         ${productImageState.context?.image_model ? `<p>Gemaakt met ${escHtml(productImageState.context.image_model)}</p>` : ''}
       </div>
       <span class="product-image-count"><i class="fas ${productImagesSeoReady() ? 'fa-check-circle' : 'fa-clock'}"></i> ${productImageState.results.length} afbeeldingen · SEO ${productImageState.results.filter(item => item.seo?.ready).length}/${productImageState.results.length} klaar</span>
@@ -857,6 +858,7 @@ function renderProductImageResults() {
               <button class="btn btn-outline btn-sm" type="button" onclick="toggleProductImageRefinement(${Number(result.asset_id)})" ${result.refinement_status !== 'idle' ? 'disabled' : ''}><i class="fas ${result.refinement_status !== 'idle' ? 'fa-spinner fa-spin' : 'fa-pen'}"></i> ${result.refinement_status !== 'idle' ? 'Wordt aangepast…' : 'Deze foto aanpassen'}</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="openProductImageMetadata(${Number(result.asset_id)})">${result.seo?.ready ? 'SEO-gegevens ✓' : ['queued', 'processing'].includes(result.seo?.status) ? 'SEO wordt gemaakt…' : 'SEO niet afgerond'}</button>
               <a class="btn btn-primary btn-sm" href="${escHtml(result.download_url)}" onclick="return prepareProductImageDownload(event, ${Number(result.asset_id)})"><i class="fas fa-download"></i> Download WEBP</a>
+              ${result.original_download_url ? `<a class="btn btn-outline btn-sm" href="${escHtml(result.original_download_url)}" onclick="return prepareProductImageDownload(event, ${Number(result.asset_id)})">Origineel PNG</a>` : ''}
             </div>
           </div>
           ${result.needs_label_review ? `<label class="product-label-warning"><input type="checkbox" id="product-label-approved-${Number(result.asset_id)}"><span><strong>Etiketcontrole verplicht.</strong> Ik heb iedere letter, het logo en de kleuren vergeleken met de echte referentiefoto.</span></label>` : ''}
