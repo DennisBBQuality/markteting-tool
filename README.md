@@ -112,6 +112,12 @@ Bijlagen in projecten, taken, kalenderitems en notities gebruiken extensieloze a
 
 ## Productfoto-generator
 
+### Compacte WEBP-downloads (6 oktober 2026)
+
+**Download WEBP** exporteert een kopie met kwaliteitsstand 85 (lossy), zonder verkleinen, bijsnijden of uitrekken. De huidige generatieafmetingen blijven 1536 × 1152; ook oudere foto's behouden hun eigen afmetingen. Transparantie blijft behouden. **Origineel PNG** downloadt de ongewijzigde bron voor verdere bewerking. Beide knoppen behouden de bestaande SEO- en etiketcontrole in de interface; beide routes blijven privé voor de eigenaar. Preview, bronopslag, fotoversies en SEO worden niet opnieuw gemaakt of overschreven.
+
+De exportcache bevat een profielversie (`web-v2-q85`) en de bronhash: oude verliesvrije caches worden niet meer gebruikt, ook niet bij bestaande fotosets of dossierexportlinks. Oude cachebestanden worden niet automatisch verwijderd. Geen nieuwe AI-aanroepen, migratie of productieconfiguratie. De losse converter blijft standaard kwaliteitsstand 80 gebruiken. Besparing verschilt per afbeelding; kleine graphics kunnen met lossless juist kleiner zijn. Controleer fijne details en etiketten vóór publicatie. Zie [testbewijs en grenzen](docs/compact-webp-2026-10-06.md).
+
 ### Productfunctie in afbeeldings-SEO (6 oktober 2026)
 
 De veldverdeling is aangescherpt na de brikettenstarterproef van Dennis: alt beschrijft het relevante beeld; titel en bestandsnaam identificeren het product met passende toepassing; bijschrift en beschrijving gebruiken de functie, voordelen en relevante eigenschappen uit de opgeslagen producttekst, ook als die niet zichtbaar worden gedemonstreerd. De AI selecteert eerst de kernfeiten en controleert claims tegen tekst en foto. Beschrijving is doorgaans twee of drie zinnen, geen verplichte één-zinsgrens. Bij weinig broninformatie blijft de uitvoer kort; leeg/alleen naam blijft een veilige terugval zonder verzonnen feiten. De beperking tot zichtbare kenmerken voor accessoires, sauzen en rubs is verwijderd. Achtergrond, ingrediënten en geschiktheid mogen niet uit aankleding worden afgeleid.
@@ -140,7 +146,7 @@ De bestaande lege achtergrond-, oven- en kamado-referenties worden hergebruikt, 
 
 ### Websiteformaat en unieke namen (18 september 2026)
 
-De webshop toont productbeelden in 4:3 (gecontroleerd: 840 × 630). De generator maakt direct liggende beelden van 1536 × 1152, inclusief nabewerkingen, zonder achteraf bijsnijden of uitrekken. Afwijkende providerafmetingen worden geweigerd zonder betaalde automatische herhaling. WEBP behoudt de pixels en de voorbeeldkaarten tonen het hele beeld. Bestaande beelden en SEO worden niet herschreven.
+De webshop toont productbeelden in 4:3 (gecontroleerd: 840 × 630). De generator maakt direct liggende beelden van 1536 × 1152, inclusief nabewerkingen, zonder achteraf bijsnijden of uitrekken. Afwijkende providerafmetingen worden geweigerd zonder betaalde automatische herhaling. WEBP behoudt de afmetingen en de voorbeeldkaarten tonen het hele beeld; sinds 6 oktober gebruikt de download kwaliteitsstand 85. Bestaande bronbeelden en SEO worden niet herschreven.
 
 De additieve migratie `2026_09_18_100000_create_product_image_download_names_table` bewaakt unieke beschrijvende downloadnamen met een primaire sleutel. Bestaande metadata wordt daarnaast gecontroleerd. Geen wijzigingen aan Taken, Kalender, Notities of Projecten. Zie [controle en grenzen](docs/image-format-filenames-2026-09-18.md).
 
@@ -231,7 +237,7 @@ Etiketgegevens en handmatige correcties worden niet door schattingen overschreve
 
 De editor biedt blijvende foutmeldingen, browserherstel per gebruiker/concept, een revisiecontrole tegen overschrijven vanuit een oude tab, individueel kopieerbare vragen en antwoorden, tekstbewerking en de laatste tien tekstversies. Optionele foto/handtekening van de vakman blijven privé. De expertstip wordt alleen als goedgekeurde persoonlijke tip geëxporteerd na expliciete goedkeuring.
 
-Gegenereerde productfoto's zijn automatisch als **verliesvrij WEBP** te downloaden, met behoud van de originele pixels en resolutie. De PNG-bron blijft voor bewerking bewaard. De **SEO-gegevens**-knop biedt beschrijvende bestandsnaam, alt-tekst, titel, bijschrift en beschrijving. Een fotoset kan aan een productdossier worden gekoppeld en komt dan mee in de conceptexport als nog te uploaden media. Afbeeldingen en metadata moeten visueel worden gecontroleerd; de naam alleen bewijst geen details zoals gaarheid of snijwijze.
+Gegenereerde productfoto's zijn automatisch als **webgeoptimaliseerde WEBP (kwaliteitsstand 85)** te downloaden, met behoud van de afmetingen. De PNG-bron blijft ongewijzigd voor bewerking bewaard en is apart te downloaden. De **SEO-gegevens**-knop biedt beschrijvende bestandsnaam, alt-tekst, titel, bijschrift en beschrijving. Een fotoset kan aan een productdossier worden gekoppeld en komt dan mee in de conceptexport als nog te uploaden media. Afbeeldingen en metadata moeten visueel worden gecontroleerd; de naam alleen bewijst geen details zoals gaarheid of snijwijze.
 
 **Export en WordPress:** JSON en veilige HTML zijn beschikbaar. JSON bevat de korte en uitgebreide tekst, FAQ's, SEO, productfeiten, gecontroleerde samenstelling, expertinformatie en gekoppelde media. Schattingen/onbevestigde samenstelling staan apart onder `internal_review_do_not_publish`, niet in publiceerbare velden. De `Product`-structured-data-opzet verzint geen prijzen, voorraad, beoordelingen of openbare URL's. De echte WordPress/WooCommerce-koppeling is nog niet actief: daarvoor zijn de doelomgeving, toegangsgegevens en daadwerkelijke veldmapping nodig. Er wordt niets gepubliceerd of naar WordPress verstuurd.
 

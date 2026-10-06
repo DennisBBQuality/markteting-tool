@@ -7,6 +7,11 @@ use RuntimeException;
 
 class ProductImageDelivery
 {
+    public const WEBP_QUALITY = 85;
+
+    // Include the export policy in the cache key; never reuse older lossless exports.
+    public const WEBP_PROFILE = 'web-v2-q85';
+
     public function metadata(array $context, array $result, int $version, ?ProductImageAsset $asset = null): array
     {
         $name = trim((string) ($context['product_name'] ?? 'Product')) ?: 'Product';
@@ -33,7 +38,7 @@ class ProductImageDelivery
         ];
     }
 
-    /** Lossless delivery: the generated pixels, dimensions and transparency stay intact. */
+    /** Web delivery: compress a copy, keeping dimensions and transparency. */
     public function webp(string $contents): string
     {
         $image = @imagecreatefromstring($contents);
@@ -44,9 +49,9 @@ class ProductImageDelivery
             imagepalettetotruecolor($image);
             imagesavealpha($image, true);
             ob_start();
-            $ok = imagewebp($image, null, IMG_WEBP_LOSSLESS);
+            $ok = imagewebp($image, null, self::WEBP_QUALITY);
             $webp = ob_get_clean();
-            if (! $ok || ! is_string($webp) || $webp === '') {
+            if (! $ok || ! is_string($webp) || substr($webp, 0, 4) !== 'RIFF' || substr($webp, 8, 4) !== 'WEBP') {
                 throw new RuntimeException('De WebP-export is niet gelukt. Het origineel is bewaard.');
             }
 

@@ -377,9 +377,10 @@ class ProductImageController extends Controller
         abort_unless($asset && app(ProductImageSeo::class)->payload($asset)['ready'], 422, 'De SEO is nog niet volledig afgerond en opgeslagen. De foto blijft bewaard.');
         abort_if($metadata['filename'] === '' || preg_match('/[0-9]/', $metadata['filename']), 422,
             'Maak of sla eerst de SEO op met een unieke beschrijvende bestandsnaam zonder cijfers. De foto blijft bewaard.');
-        $path = 'product-images/'.$request->id.'/webp/'.hash('sha256', $contents).'.webp';
+        $path = 'product-images/'.$request->id.'/webp/'.ProductImageDelivery::WEBP_PROFILE.'-'.hash('sha256', $contents).'.webp';
         if (! Storage::disk('local')->exists($path)) {
-            Storage::disk('local')->put($path, $delivery->webp($contents));
+            abort_unless(Storage::disk('local')->put($path, $delivery->webp($contents)), 503,
+                'De WEBP-download kon niet worden opgeslagen. Het origineel is bewaard. Probeer opnieuw.');
         }
 
         return Storage::disk('local')->download($path, $metadata['filename'], [
@@ -414,6 +415,7 @@ class ProductImageController extends Controller
                 'needs_label_review' => ($imageRequest->generation_context['product_type'] ?? null) === 'sauce',
                 'url' => $url.'?v='.($storedAsset?->version ?? 1),
                 'download_url' => $url.'?download=1&format=webp&v='.($storedAsset?->version ?? 1),
+                'original_download_url' => $url.'?download=1&v='.($storedAsset?->version ?? 1),
                 'metadata' => app(ProductImageDelivery::class)->metadata((array) $imageRequest->generation_context, $result, $storedAsset?->version ?? 1, $storedAsset),
                 'seo' => $storedAsset ? app(ProductImageSeo::class)->payload($storedAsset) : null,
             ];

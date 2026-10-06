@@ -121,7 +121,11 @@ test('recovery links only accept a photoset UUID and do not start generation', (
   assert.equal(h.run('productImageState.generating'), false);
 });
 
-test('WEBP requires a descriptive SEO name and still enforces sauce label review', () => {
+test('both photo download buttons use SEO and sauce label review guards', () => {
+  const source = fs.readFileSync('public/js/converter.js', 'utf8');
+  for (const field of ['download_url', 'original_download_url']) {
+    assert.ok(source.includes('href="${escHtml(result.' + field + ')}" onclick="return prepareProductImageDownload(event, ${Number(result.asset_id)})"'));
+  }
   const h = harness();
   const opened = [];
   h.context.openImageSeoEditor = id => opened.push(id);
@@ -139,6 +143,19 @@ test('WEBP requires a descriptive SEO name and still enforces sauce label review
   assert.equal(h.run('prepareProductImageDownload(event, 1)'), false);
   h.field('product-label-approved-1').checked = true;
   assert.equal(h.run('prepareProductImageDownload(event, 1)'), true);
+});
+
+test('result cards offer web optimized WEBP and original PNG with distinct URLs', () => {
+  const h = harness();
+  h.run(`productImageState.results = [{asset_id: 1, version: 1, status: 'rauw', label: 'Testfoto', variant: 1,
+    url: '/test/preview', download_url: '/test/webp', original_download_url: '/test/original',
+    refinement_status: 'idle', seo: {ready: true}, metadata: {filename: 'test.webp'}}]; renderProductImageResults()`);
+  const html = h.field('product-image-results').innerHTML;
+  assert.match(html, /kwaliteitsstand 85/);
+  assert.match(html, /href="\/test\/webp"/);
+  assert.match(html, /href="\/test\/original"/);
+  assert.match(html, /Origineel PNG/);
+  assert.match(html, /Controleer fijne details en etiketten/);
 });
 
 test('paste button adds a local image preview and enables generation without changing product data', async () => {
