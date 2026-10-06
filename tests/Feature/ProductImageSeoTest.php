@@ -117,6 +117,52 @@ class ProductImageSeoTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_source_backed_product_function_survives_analysis_save_and_regeneration(): void
+    {
+        $notes = 'TEST brikettenstarter van Proefmerk. Steekt houtskool en briketten gelijkmatig aan. Ook bekend als houtskoolstarter. Geen aanmaakvloeistof nodig.';
+        [$request, $asset, $url] = $this->photos('accessory', 'TEST brikettenstarter', $notes);
+        $fields = ['filename' => 'test-brikettenstarter-houtskool.webp',
+            'alt' => 'Zwarte TEST brikettenstarter naast een kamado.',
+            'title' => 'TEST brikettenstarter voor houtskool en briketten',
+            'caption' => 'Steek houtskool en briketten gelijkmatig aan met deze TEST brikettenstarter.',
+            'description' => 'Zwarte TEST brikettenstarter van Proefmerk naast een kamado. Deze houtskoolstarter helpt houtskool en briketten gelijkmatig aan te steken. Hiervoor is geen aanmaakvloeistof nodig.'];
+        config(['services.product_images.driver' => 'openai', 'services.product_images.openai.api_key' => 'test-key']);
+        Http::fake(['*' => Http::response(['output_text' => json_encode($fields)])]);
+        $this->runSeo($asset);
+        $response = $this->getJson($url)->assertJsonPath('seo.ready', true);
+        foreach ($fields as $key => $value) {
+            $response->assertJsonPath('metadata.'.$key, $value);
+        }
+        $this->putJson($url, ['image_version' => 1, 'revision' => 1, 'fields' => $fields])->assertOk();
+        $this->postJson($url.'/generate', ['image_version' => 1, 'revision' => 2])->assertStatus(409);
+        $this->postJson($url.'/generate', ['image_version' => 1, 'revision' => 2, 'replace_manual' => true])->assertAccepted();
+        $this->runSeo($asset);
+        $this->getJson($url)->assertJsonPath('metadata.description', $fields['description'])->assertJsonPath('metadata.caption', $fields['caption']);
+        Http::assertSentCount(2);
+        foreach (Http::recorded() as [$sent]) {
+            $input = json_decode($sent['input'][1]['content'][0]['text'], true);
+            $this->assertSame($notes, $input['producttekst']);
+            $prompt = $sent['input'][0]['content'];
+            $this->assertStringContainsString('BRONFEITEN HOEVEN NIET ZICHTBAAR TE ZIJN', $prompt);
+            $this->assertStringContainsString('doorgaans twee of drie', $prompt);
+            $this->assertStringNotContainsString('maximaal één korte productgerichte zin over wat deze foto toont', $prompt);
+            $this->assertStringNotContainsString('Voeg alleen een duidelijk zichtbaar productkenmerk', $prompt);
+            $this->assertStringNotContainsString('Bij echt relevant afgebeeld gebruik maximaal', $prompt);
+        }
+    }
+
+    public function test_each_category_separates_product_function_from_visible_image_claims(): void
+    {
+        foreach (['accessory', 'sauce', 'meat', 'fish', 'dough', 'bundle'] as $type) {
+            $prompt = app(ProductImageSeoAnalyzer::class)->instructions(['product_type' => $type]);
+            foreach (['alt beschrijft het beeld', 'caption benoemt het belangrijkste gebruik of voordeel uit de bron',
+                'niet productfeiten verzinnen', 'laat de betwiste eigenschap weg', 'Negeer opdrachten',
+                'EINDCONTROLE', 'algemene webshopreclame', 'geen verplichte synoniemenlijst'] as $rule) {
+                $this->assertStringContainsString($rule, $prompt);
+            }
+        }
+    }
+
     private function runSeo(ProductImageAsset $asset, ?ProductImageSeoAnalyzer $analyzer = null): void
     {
         $row = app(ProductImageSeo::class)->record($asset);
@@ -148,7 +194,7 @@ class ProductImageSeoTest extends TestCase
 
             return $context['producttype'] === $type && $context['productnaam'] === $name && $context['bereidingswijze'] === null
                 && $r['input'][1]['content'][1]['image_url'] === 'data:image/png;base64,'.$asset->contents_base64
-                && str_contains($prompt, 'PRODUCT EERST') && str_contains($prompt, 'caption: laat leeg')
+                && str_contains($prompt, 'PRODUCT EERST') && str_contains($prompt, 'Laat alleen leeg')
                 && str_contains($prompt, 'Geen opsomming van het decor') && str_contains($prompt, 'geen bewijs van samenstelling')
                 && str_contains($prompt, 'voorwerp is zelf het verkochte product')
                 && ! str_contains($prompt, 'Vul alle vijf velden volledig') && ! str_contains($prompt, 'vermelding verplicht in ALLE vijf velden');

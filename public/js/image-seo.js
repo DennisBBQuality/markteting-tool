@@ -4,8 +4,8 @@ let imageSeoEditor = null;
 
 function imageSeoGuidance(seo) {
   return seo?.optional_fields?.includes('caption')
-    ? 'Productgerichte SEO voor sauzen, rubs en accessoires: productnaam en merk staan voorop. Noem alleen nuttige zichtbare productkenmerken of relevant gebruik, geen decor of sfeer. Laat het bijschrift leeg als het niets toevoegt. Kruiden en eten in de aankleding bewijzen geen ingrediënten of meegeleverde producten.'
-    : 'Controleer wat werkelijk zichtbaar is; bijgerechten zijn serveersuggesties. Bij de bereide vlees- en visvarianten BBQ, Pan, Oven en Airfryer wordt de gekozen bereidingswijze in alle vijf velden opgenomen. Rauwe varianten krijgen geen bereidingswijze.';
+    ? 'Productgerichte SEO voor sauzen, rubs en accessoires: de alt-tekst beschrijft de foto. Titel, bijschrift en beschrijving gebruiken de functie, toepassing en relevante eigenschappen uit je producttekst, ook als die niet zichtbaar zijn. Laat het bijschrift alleen leeg als bron en foto niets nuttigs toevoegen. Decor bewijst geen ingrediënten of geschiktheid. SEO opnieuw maken gebruikt de producttekst die bij deze fotoset is opgeslagen.'
+    : 'De alt-tekst beschrijft de foto; bijschrift en beschrijving gebruiken ook functie, toepassing en relevante eigenschappen uit je producttekst. Bijgerechten zijn serveersuggesties. Bij de bereide vlees- en visvarianten BBQ, Pan, Oven en Airfryer wordt de gekozen bereidingswijze in alle vijf velden opgenomen. Rauwe varianten krijgen geen bereidingswijze. SEO opnieuw maken gebruikt de producttekst die bij deze fotoset is opgeslagen.';
 }
 
 function imageSeoActive(editor) {

@@ -84,7 +84,9 @@ test('product-focused editor explains optional caption and saves an empty string
   h.context.productImageState.results[0].seo.optional_fields = ['caption'];
   await h.run('openImageSeoEditor(1)');
   assert.match(h.context.modal, /Bijschrift \(optioneel\)/);
-  assert.match(h.context.modal, /geen decor of sfeer/);
+  assert.match(h.context.modal, /functie, toepassing en relevante eigenschappen/);
+  assert.match(h.context.modal, /ook als die niet zichtbaar zijn/);
+  assert.match(h.context.modal, /bij deze fotoset is opgeslagen/);
   assert.doesNotMatch(h.context.modal, /gekozen bereidingswijze in alle vijf/);
   assert.equal(h.get('image-seo-caption').value, '');
   assert.match(h.get('image-seo-status').textContent, /opgeslagen/);
