@@ -9,6 +9,18 @@ use RuntimeException;
 class ProductImageStyleLibrary
 {
     private const REFERENCES = [
+        'keuken_pan_warm' => ['file' => 'keuken-pan-warm.png', 'label' => 'Warm modern · Pan'],
+        'keuken_pan_landelijk' => ['file' => 'keuken-pan-landelijk.png', 'label' => 'Landelijk · Pan'],
+        'keuken_pan_donker' => ['file' => 'keuken-pan-donker.png', 'label' => 'Donker eigentijds · Pan'],
+        'keuken_pan_mediterraan' => ['file' => 'keuken-pan-mediterraan.png', 'label' => 'Mediterraan huiselijk · Pan'],
+        'keuken_oven_warm' => ['file' => 'keuken-oven-warm.png', 'label' => 'Warm modern · Oven'],
+        'keuken_oven_landelijk' => ['file' => 'keuken-oven-landelijk.png', 'label' => 'Landelijk · Oven'],
+        'keuken_oven_donker' => ['file' => 'keuken-oven-donker.png', 'label' => 'Donker eigentijds · Oven'],
+        'keuken_oven_mediterraan' => ['file' => 'keuken-oven-mediterraan.png', 'label' => 'Mediterraan huiselijk · Oven'],
+        'keuken_airfryer_warm' => ['file' => 'keuken-airfryer-warm.png', 'label' => 'Warm modern · Airfryer'],
+        'keuken_airfryer_landelijk' => ['file' => 'keuken-airfryer-landelijk.png', 'label' => 'Landelijk · Airfryer'],
+        'keuken_airfryer_donker' => ['file' => 'keuken-airfryer-donker.png', 'label' => 'Donker eigentijds · Airfryer'],
+        'keuken_airfryer_mediterraan' => ['file' => 'keuken-airfryer-mediterraan.png', 'label' => 'Mediterraan huiselijk · Airfryer'],
         'keuken_pan_02' => ['file' => 'keuken-pan-02.png', 'label' => 'Pan op inductie in lichte keuken'],
         'keuken_pan_03' => ['file' => 'keuken-pan-03.png', 'label' => 'Pan op gasfornuis in lichte keuken'],
         'keuken_pan_04' => ['file' => 'keuken-pan-04.png', 'label' => 'Pan met lichte keukenachtergrond'],
@@ -67,6 +79,16 @@ class ProductImageStyleLibrary
     /** Fixed allowlist: never turn request input into a filesystem path. */
     public function kitchenIds(string $group): array
     {
+        if (! in_array($group, ['pan', 'oven', 'airfryer'], true)) {
+            return [];
+        }
+
+        return ['keuken_'.$group, ...array_map(fn ($style) => 'keuken_'.$group.'_'.$style, ['warm', 'landelijk', 'donker', 'mediterraan'])];
+    }
+
+    /** Keep references in saved/queued jobs readable without rotating through the old near-duplicates. */
+    private function legacyKitchenIds(string $group): array
+    {
         return match ($group) {
             'pan' => ['keuken_pan', 'keuken_pan_02', 'keuken_pan_03', 'keuken_pan_04'],
             'oven' => ['keuken_oven', 'keuken_oven_02', 'keuken_oven_03', 'keuken_oven_04', 'keuken_oven_05'],
@@ -82,13 +104,16 @@ class ProductImageStyleLibrary
             return null;
         }
         $index = array_search($previous, $ids, true);
+        if ($index === false && in_array($previous, $this->legacyKitchenIds($group), true)) {
+            $index = 0;
+        }
 
         return $ids[$index === false ? 0 : ($index + 1) % count($ids)];
     }
 
     public function kitchenId(string $group, mixed $selected): string
     {
-        return in_array($selected, $this->kitchenIds($group), true) ? $selected : 'keuken_'.$group;
+        return in_array($selected, [...$this->kitchenIds($group), ...$this->legacyKitchenIds($group)], true) ? $selected : 'keuken_'.$group;
     }
 
     /** @return array{id: string, path: string, filename: string, label: string}|null */

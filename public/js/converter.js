@@ -30,9 +30,9 @@ function productImageRecoveryId(search = window.location.search) {
 const PRODUCT_IMAGE_VARIANTS = [
   { id: 'raw', name: 'Rauwe variant', count: 2, detail: 'De twee bestaande rauwe settings' },
   { id: 'bbq', name: 'BBQ', count: 2, detail: 'Buiten-BBQ en donkere serveersetting' },
-  { id: 'pan', name: 'Pan', count: 1, detail: 'Lichte keuken met pan en fornuis' },
-  { id: 'oven', name: 'Oven', count: 1, detail: 'Lichte keuken met huishoudelijke oven' },
-  { id: 'airfryer', name: 'Airfryer', count: 1, detail: 'Lichte keuken met airfryer' },
+  { id: 'pan', name: 'Pan', count: 1, detail: 'Pan en fornuis · 5 afwisselende keukenstijlen' },
+  { id: 'oven', name: 'Oven', count: 1, detail: 'Huishoudelijke oven · 5 afwisselende keukenstijlen' },
+  { id: 'airfryer', name: 'Airfryer', count: 1, detail: 'Airfryer · 5 afwisselende keukenstijlen' },
 ];
 
 // Nederlandse stopwoorden voor bestandsnamen en titels
@@ -106,7 +106,7 @@ function renderConverter() {
             ${PRODUCT_IMAGE_VARIANTS.map(v => `<label><input type="checkbox" value="${v.id}" ${productImageState.variantGroups.includes(v.id) ? 'checked' : ''} onchange="setProductImageVariant('${v.id}', this.checked)"><span><strong>${v.name} <small>${v.count} foto${v.count === 1 ? '' : '’s'}</small></strong><span>${v.detail}</span></span></label>`).join('')}
           </div>
           <p id="product-image-variant-summary" role="status" aria-live="polite">5 foto’s geselecteerd. Meer varianten betekent meer verwerkingstijd en API-kosten.</p>
-          <small>De keukenachtergrond wisselt per nieuwe fotoset: 4 Pan-, 5 Oven- en 4 Airfryer-stijlen. De apparaten bepalen de setting; controleer zelf of de bereidingswijze geschikt is voor het product.</small>
+          <small>Per nieuwe fotoset wisselt de keukenstijl: licht modern, warm modern, landelijk, donker eigentijds en mediterraan huiselijk. Pan, Oven en Airfryer hebben elk 5 stijlen; je ontvangt 1 foto per gekozen apparaat. De apparaten bepalen de setting; controleer zelf of de bereidingswijze geschikt is voor het product.</small>
         </fieldset>
         <div class="product-image-fields">
           <div class="form-group"><label for="product-image-name">Productnaam *</label><input id="product-image-name" type="text" maxlength="160" placeholder="Bijvoorbeeld Black Angus picanha" oninput="updateProductImageForm()"></div>

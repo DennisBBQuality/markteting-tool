@@ -143,6 +143,8 @@ class ProductImageController extends Controller
         }
         if (isset($validated['variant_groups'])) {
             $context['variant_groups'] = array_values($validated['variant_groups']);
+            // Persist the image-led SEO policy for new kitchen sets; never rewrite old metadata.
+            $context['kitchen_style_version'] = 2;
             $library = app(ProductImageStyleLibrary::class);
             foreach (array_intersect(['pan', 'oven', 'airfryer'], $context['variant_groups']) as $group) {
                 $previous = ProductImageRequest::query()

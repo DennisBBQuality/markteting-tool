@@ -101,6 +101,34 @@ class ProductImageSeoTest extends TestCase
         Http::assertSentCount(24);
     }
 
+    public function test_new_kitchen_seo_uses_actual_pixels_and_full_source_without_forced_style_keywords(): void
+    {
+        config(['services.product_images.driver' => 'openai', 'services.product_images.openai.api_key' => 'test-key']);
+        Http::preventStrayRequests();
+        Http::fake(['*' => Http::response(['output_text' => json_encode($this->fields())])]);
+        $source = str_repeat('TEST productinformatie. ', 2000).'LAATSTE BRONFEIT.';
+        foreach (['pan', 'oven', 'airfryer'] as $group) {
+            $fields = app(ProductImageSeoAnalyzer::class)->analyze('TEST actuele pixels', [
+                'product_type' => 'meat', 'product_name' => 'TEST product', 'notes' => $source,
+                'kitchen_style_version' => 2,
+            ], ['status' => 'bereid', 'style_id' => 'keuken_'.$group.'_stoof']);
+            $this->assertSame($this->fields()['alt'], $fields['alt']);
+            $sent = Http::recorded()->last()[0];
+            $prompt = $sent['input'][0]['content'];
+            $this->assertStringContainsString('KEUKENSETTING:', $prompt);
+            $this->assertStringContainsString('volg dan het actuele beeld', $prompt);
+            $this->assertStringContainsString('geen producteigenschappen', $prompt);
+            $this->assertStringNotContainsString('verplicht in ALLE vijf velden', $prompt);
+            $this->assertStringNotContainsString('Vermeld de gekozen bereidingswijze indien van toepassing', $prompt);
+            $payload = $sent['input'][1]['content'];
+            $this->assertSame($source, json_decode($payload[0]['text'], true)['producttekst']);
+            $this->assertSame('data:image/png;base64,'.base64_encode('TEST actuele pixels'), $payload[1]['image_url']);
+        }
+        $legacy = app(ProductImageSeoAnalyzer::class)->instructions([], ['status' => 'bereid', 'style_id' => 'keuken_pan_steak']);
+        $this->assertStringContainsString('verplicht in ALLE vijf velden', $legacy);
+        Http::assertSentCount(3);
+    }
+
     public function test_provider_text_capacity_failure_preserves_source_photo_and_previous_seo(): void
     {
         [$request, $asset, $url] = $this->photos('sauce', 'TEST saus', 'TEST producttekst');

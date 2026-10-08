@@ -3,6 +3,9 @@ const IMAGE_SEO_FIELDS = [['filename', 'Bestandsnaam'], ['alt', 'Alt-tekst'], ['
 let imageSeoEditor = null;
 
 function imageSeoGuidance(seo) {
+  if (seo?.visible_kitchen_scene) {
+    return 'De alt-tekst beschrijft de relevante zichtbare presentatie. Titel, bijschrift en beschrijving gebruiken ook functie, toepassing en relevante eigenschappen uit je producttekst. De keukenstijl is geen producteigenschap: we voegen geen verplichte stijlnamen of decorlijst toe. Een apparaat op de achtergrond bewijst niet dat het product daarin is bereid. Bijgerechten zijn serveersuggesties. SEO opnieuw maken gebruikt de producttekst die bij deze fotoset is opgeslagen en de actuele foto.';
+  }
   return seo?.optional_fields?.includes('caption')
     ? 'Productgerichte SEO voor sauzen, rubs en accessoires: de alt-tekst beschrijft de foto. Titel, bijschrift en beschrijving gebruiken de functie, toepassing en relevante eigenschappen uit je producttekst, ook als die niet zichtbaar zijn. Laat het bijschrift alleen leeg als bron en foto niets nuttigs toevoegen. Decor bewijst geen ingrediënten of geschiktheid. SEO opnieuw maken gebruikt de producttekst die bij deze fotoset is opgeslagen.'
     : 'De alt-tekst beschrijft de foto; bijschrift en beschrijving gebruiken ook functie, toepassing en relevante eigenschappen uit je producttekst. Bijgerechten zijn serveersuggesties. Bij de bereide vlees- en visvarianten BBQ, Pan, Oven en Airfryer wordt de gekozen bereidingswijze in alle vijf velden opgenomen. Rauwe varianten krijgen geen bereidingswijze. SEO opnieuw maken gebruikt de producttekst die bij deze fotoset is opgeslagen.';
