@@ -55,6 +55,23 @@ class ProductImagePreparationSeoTest extends TestCase
         $this->assertStringEndsWith('-pan.webp', $completed['filename']);
     }
 
+    public function test_new_kitchen_scenes_do_not_append_unseen_methods_or_appliances(): void
+    {
+        foreach (['meat', 'fish'] as $type) {
+            foreach (['pan', 'oven', 'airfryer'] as $group) {
+                $context = ['product_type' => $type, 'kitchen_style_version' => 2, 'variant_groups' => [$group]];
+                $plan = app(ProductImagePromptBuilder::class)->plans($context)[0];
+                $this->assertSame($this->fields(), ProductImageSeo::normalizeForImage($this->fields(), $context, $plan));
+                $fallback = app(ProductImageDelivery::class)->metadata($context, $plan, 1);
+                $this->assertStringNotContainsString(ProductImagePreparationSeo::phrase($group), $fallback['alt']);
+                unset($context['kitchen_style_version']);
+                $this->assertStringContainsString(ProductImagePreparationSeo::phrase($group), ProductImageSeo::normalizeForImage($this->fields(), $context, $plan)['alt']);
+            }
+        }
+        $bbq = ProductImageSeo::normalizeForImage($this->fields(), ['kitchen_style_version' => 2], ['status' => 'bereid', 'style_id' => 'bbq_buiten_steak']);
+        $this->assertStringContainsString('bereid op de BBQ', $bbq['alt']);
+    }
+
     public function test_unknown_legacy_kitchens_raw_and_non_food_products_do_not_get_a_method(): void
     {
         foreach ([

@@ -41,7 +41,10 @@ class ProductImageVariantsTest extends TestCase
         $id = $response->assertAccepted()->assertJsonPath('expected_count', $count)->json('request_id');
         $this->assertSame($groups, ProductImageRequest::find($id)->generation_context['variant_groups']);
         (new GenerateProductImages($id))->handle(new FakeProductImageGenerator);
-        $this->getJson('/api/images/requests/'.$id)->assertOk()->assertJsonPath('image_status', 'completed')->assertJsonPath('status', 'processing_seo')->assertJsonCount($count, 'results');
+        $payload = $this->getJson('/api/images/requests/'.$id)->assertOk()->assertJsonPath('image_status', 'completed')->assertJsonPath('status', 'processing_seo')->assertJsonCount($count, 'results');
+        foreach ($payload->json('results') as $result) {
+            $this->assertSame(str_starts_with($result['style_id'], 'keuken_'), $result['seo']['visible_kitchen_scene']);
+        }
         Queue::assertPushed(GenerateProductImageSeo::class, $count);
     }
 

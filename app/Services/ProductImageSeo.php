@@ -115,11 +115,14 @@ class ProductImageSeo
         }
 
         $storageReady = Schema::hasTable('product_image_download_names');
-        $context = (array) ProductImageRequest::findOrFail($asset->product_image_request_id)->generation_context;
+        $request = ProductImageRequest::findOrFail($asset->product_image_request_id);
+        $context = (array) $request->generation_context;
+        $result = collect($request->results)->firstWhere('filename', $asset->filename) ?? [];
 
         return ['status' => $row?->status ?? 'idle', 'source' => $row?->source ?? 'none',
             'ready' => $row?->status === 'completed' && self::completeFields($row?->fields, $context) && $asset->refinement_status === 'idle',
             'optional_fields' => self::productFocused($context) ? ['caption'] : [],
+            'visible_kitchen_scene' => ProductImagePreparationSeo::usesVisibleKitchenScene($context, $result),
             'storage_ready' => $storageReady,
             'revision' => $row?->revision ?? 0, 'error' => $storageReady ? $row?->error : self::STORAGE_ERROR, 'image_version' => $asset->version];
     }

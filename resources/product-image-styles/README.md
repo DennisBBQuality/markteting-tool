@@ -29,6 +29,8 @@ Voor sucade/sukade en expliciet genoemde stoof-/sudderproducten bestaan de stijl
 Alleen setting, apparaat, compositie en licht/kleur mogen worden overgenomen. Het voorbeeldgerecht, de kipstukken in de airfryer, aantallen, garing, korst en voedselstructuur mogen nooit een ander product bepalen of toevoegen. De daadwerkelijke productreferenties blijven leidend. Nieuwe stijl-ID's `keuken_{pan|oven|airfryer}_{productfamilie}` scheiden goedgekeurde kwaliteitsankers van elkaar en van de eerdere generieke keukenstijl. Deze uitbreiding wijzigt de bestaande rauwe en BBQ-voorbeelden niet.
 # Uitbreiding keukenachtergronden — 17 september 2026
 
+Historische reeks; sinds 8 oktober vervangen voor nieuwe aanvragen door de vijf stijlen hieronder. Deze bestanden blijven nodig voor bestaande/queued aanvragen.
+
 Tien aanvullende screenshots van Dennis, ongewijzigd opgenomen. Samen met de drie eerdere beelden zijn er vier Pan-, vijf Oven- en vier Airfryer-achtergronden. Opeenvolgende aanvragen van dezelfde gebruiker doorlopen per groep de reeks; tussentijdse opdrachten zonder die groep veranderen de reeks niet. Gelijktijdig ingestuurde aanvragen kunnen dezelfde stand lezen. De gekozen referentie-ID wordt vóór generatie in de opdrachtcontext vastgelegd. Oude opdrachten zonder zo'n ID behouden hun oorspronkelijke referentie.
 
 Bronmapping (screenshot-ID → lokaal bestand):
@@ -37,3 +39,11 @@ Bronmapping (screenshot-ID → lokaal bestand):
 - Airfryer: `61653fc8-b81f-4fbf-a21f-062d6917e646` → `keuken-airfryer-02.png`; `b6a27050-40e9-4cae-9e1e-9c132673259c` → `keuken-airfryer-03.png`; `5ef50e97-8c01-4864-b3ca-31ed6c8366a9` → `keuken-airfryer-04.png`.
 
 Alleen setting, licht, kleur en compositie: geen kopie van het voorbeeldgerecht, hoeveelheid, garing, logo's/displayteksten of screenshotranden. Het hoofdproduct kan in de pan, op de bakplaat of in de mand worden gepresenteerd, mits passend; nooit dezelfde portie nogmaals ernaast. Bij stoofvlees blijven jus en zachte structuur leidend. Een passend goedgekeurd productvoorbeeld mag de afwisselende keukenachtergrond niet vervangen. Deze wijziging bewerkt geen bronpixels en is nog geen visuele goedkeuring van echte gegenereerde resultaten.
+
+## Vijf keukenstijlen per apparaat — 8 oktober 2026
+
+Actief: `keuken-{pan|oven|airfryer}.png` (bestaand) plus `keuken-{pan|oven|airfryer}-{warm|landelijk|donker|mediterraan}.png`. De twaalf nieuwe PNG's zijn ongewijzigde AI-gegenereerde stijlreferenties van 1448 × 1086, geen foto's van echte BBQuality-producten. Dennis keurde de vier visuele richtingen goed vóór implementatie.
+
+De vier goedgekeurde originele previews zijn behouden: airfryer-warm, oven-landelijk, pan-donker en airfryer-mediterraan. Acht bijpassende apparaatvarianten zijn daaruit gemaakt en visueel gecontroleerd. Herkomst en generatiebrief staan in [het wijzigingsverslag](../../docs/kitchen-styles-2026-10-08.md).
+
+Het voorbeeldeten (drie kipstukken) mag nooit de productsoort of hoeveelheid van een gebruikersopdracht bepalen. Alleen keuken, apparaat, compositie en licht zijn richtinggevend. Productbron en opgegeven hoeveelheid blijven leidend, inclusief vis- en stoofregels. De grotere PNG's zijn provider-inputs en veranderen niets aan de bestaande gecomprimeerde WEBP-download op kwaliteitsstand 85.

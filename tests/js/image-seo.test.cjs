@@ -108,3 +108,14 @@ test('fresh server policy updates guidance without replacing dirty caption', asy
   assert.match(h.get('image-seo-guidance').textContent, /Productgerichte SEO/);
   assert.equal(h.get('image-seo-caption').value, 'Mijn eigen bijschrift');
 });
+
+test('new kitchen policy explains visible presentation without forced appliance or style keywords', async () => {
+  const h = harness();
+  h.context.productImageState.results[0].seo.visible_kitchen_scene = true;
+  h.context.response.seo.visible_kitchen_scene = true;
+  await h.run('openImageSeoEditor(1)');
+  assert.match(h.context.modal, /geen verplichte stijlnamen/);
+  assert.match(h.context.modal, /achtergrond bewijst niet/);
+  assert.doesNotMatch(h.context.modal, /gekozen bereidingswijze in alle vijf/);
+  assert.match(h.get('image-seo-guidance').textContent, /actuele foto/);
+});

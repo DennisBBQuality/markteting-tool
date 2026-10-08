@@ -29,10 +29,16 @@ class ProductImagePreparationSeo
         return $method === 'bbq' ? 'bereid op de BBQ' : 'bereid in de '.$method;
     }
 
+    public static function usesVisibleKitchenScene(array $context, array $result): bool
+    {
+        return ($context['kitchen_style_version'] ?? 0) >= 2
+            && in_array(self::method($context, $result), ['pan', 'oven', 'airfryer'], true);
+    }
+
     public static function complete(array $fields, array $context, array $result): array
     {
         $method = self::method($context, $result);
-        if ($method === null) {
+        if ($method === null || self::usesVisibleKitchenScene($context, $result)) {
             return $fields;
         }
         $base = substr($fields['filename'], 0, -5);
