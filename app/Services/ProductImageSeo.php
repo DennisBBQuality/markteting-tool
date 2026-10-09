@@ -107,10 +107,11 @@ class ProductImageSeo
     public function payload(ProductImageAsset $asset): array
     {
         $row = $this->record($asset);
-        if ($row && in_array($row->status, ['queued', 'processing']) && $row->updated_at->lt(now()->subMinutes($row->status === 'queued' ? 30 : 4))) {
-            ProductImageMetadata::whereKey($row->id)->where('job_token', $row->job_token)->update([
-                'status' => 'failed', 'error' => 'De SEO-analyse duurde te lang. De foto en vorige SEO zijn bewaard. Probeer opnieuw.', 'job_token' => null,
-            ]);
+        if ($row && in_array($row->status, ['queued', 'processing']) && $row->updated_at->lt(now()->subMinutes($row->status === 'queued' ? 10 : 4))) {
+            ProductImageMetadata::whereKey($row->id)->where('job_token', $row->job_token)
+                ->where('status', $row->status)->where('updated_at', $row->getRawOriginal('updated_at'))->update([
+                    'status' => 'failed', 'error' => 'De SEO-analyse duurde te lang. De foto en vorige SEO zijn bewaard. Probeer opnieuw.', 'job_token' => null,
+                ]);
             $row->refresh();
         }
 
@@ -129,8 +130,26 @@ class ProductImageSeo
 
     public function queue(ProductImageAsset $asset, ?int $expectedRevision = null, bool $replaceManual = false, bool $alreadyBackground = false): void
     {
+        $job = $this->prepareJob($asset, $expectedRevision, $replaceManual);
+        if ($job === null) {
+            return;
+        }
+        try {
+            $connection = (string) config('services.product_images.queue_connection', 'deferred');
+            if ($alreadyBackground && $connection === 'deferred') {
+                dispatch_sync($job);
+            } else {
+                dispatch($job->onConnection($connection));
+            }
+        } catch (Throwable $error) {
+            $job->failed($error);
+        }
+    }
+
+    private function prepareJob(ProductImageAsset $asset, ?int $expectedRevision = null, bool $replaceManual = false): ?GenerateProductImageSeo
+    {
         $token = DB::transaction(function () use ($asset, $expectedRevision, $replaceManual) {
-            $locked = ProductImageAsset::whereKey($asset->id)->lockForUpdate()->firstOrFail();
+            $locked = ProductImageAsset::whereKey($asset->id)->lockForUpdate()->firstOrFail(['id', 'version', 'refinement_status']);
             abort_if($locked->version !== $asset->version || $locked->refinement_status !== 'idle', 409, 'De foto is gewijzigd of wordt aangepast. Open de actuele versie.');
             $row = ProductImageMetadata::firstOrCreate(['product_image_asset_id' => $asset->id, 'image_version' => $asset->version]);
             abort_if($expectedRevision !== null && $row->revision !== $expectedRevision, 409, 'De SEO is intussen gewijzigd. Open de actuele velden.');
@@ -143,21 +162,69 @@ class ProductImageSeo
 
             return $token;
         });
-        if ($token !== null) {
+
+        return $token === null ? null : new GenerateProductImageSeo($asset->id, $asset->version, $token);
+    }
+
+    /** Register all photos before announcing image completion, including those in later waves. */
+    public function prepareAutomaticJobs(iterable $assets): array
+    {
+        $jobs = [];
+        foreach ($assets as $asset) {
             try {
-                $connection = (string) config('services.product_images.queue_connection', 'deferred');
-                // Laravel's deferred collection does not drain callbacks added while it runs.
-                // We are already after the HTTP response in this case; execute the isolated
-                // text job here instead of registering a nested callback that may never run.
-                if ($alreadyBackground && $connection === 'deferred') {
-                    GenerateProductImageSeo::dispatchSync($asset->id, $asset->version, $token);
-                } else {
-                    GenerateProductImageSeo::dispatch($asset->id, $asset->version, $token)->onConnection($connection);
+                $record = $this->record($asset);
+                if ($record?->status === 'completed' || $record?->source === 'manual') {
+                    continue;
+                }
+                if ($job = $this->prepareJob($asset)) {
+                    $jobs[$asset->id] = $job;
                 }
             } catch (Throwable) {
-                ProductImageMetadata::where('job_token', $token)->update(['status' => 'failed', 'job_token' => null,
-                    'error' => 'De SEO-analyse kon niet starten. De foto en vorige SEO zijn bewaard.']);
+                Log::warning('Automatic image SEO could not be scheduled.', ['asset_id' => $asset->id, 'version' => $asset->version]);
             }
+        }
+
+        return $jobs;
+    }
+
+    public function runAutomaticJobs(array $jobs): void
+    {
+        $connection = (string) config('services.product_images.queue_connection', 'deferred');
+        if ($connection !== 'deferred') {
+            foreach ($jobs as $job) {
+                try {
+                    dispatch($job->onConnection($connection));
+                } catch (Throwable $error) {
+                    $job->failed($error);
+                }
+            }
+
+            return;
+        }
+
+        // Already in deferred background work: nesting deferred callbacks can lose jobs.
+        // Three simultaneous analyses, saved as responses arrive, instead of seven serial waits.
+        foreach (array_chunk($jobs, 3, true) as $wave) {
+            $inputs = [];
+            foreach ($wave as $id => $job) {
+                if ($input = $job->prepare()) {
+                    $inputs[$id] = $input;
+                }
+            }
+            if ($inputs === []) {
+                continue;
+            }
+            $started = microtime(true);
+            try {
+                app(ProductImageSeoAnalyzer::class)->analyzeBatch($inputs, function ($id, $result) use ($wave) {
+                    $result instanceof Throwable ? $wave[$id]->failed($result) : $wave[$id]->complete($result);
+                });
+            } catch (Throwable $error) {
+                foreach ($wave as $job) {
+                    $job->failed($error);
+                }
+            }
+            Log::info('Image SEO wave finished', ['asset_ids' => array_keys($inputs), 'duration_ms' => (int) round((microtime(true) - $started) * 1000)]);
         }
     }
 

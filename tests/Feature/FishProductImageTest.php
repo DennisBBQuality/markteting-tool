@@ -85,7 +85,7 @@ class FishProductImageTest extends TestCase
         $this->assertSame(['Vis bereid', 'Vis bereid', 'Vis rauw', 'Vis rauw', 'Vis bereid · Keuken'], array_column($results, 'label'));
         $this->assertSame([1, 2, 1, 2, 3], array_column($results, 'variant'));
         foreach ($results as $result) {
-            $this->getJson($result['download_url'])->assertUnprocessable(); // Wait for image-specific SEO; no numbered fallback.
+            $this->get($result['download_url'])->assertOk()->assertHeader('X-Image-SEO-Ready', 'false');
         }
         $this->assertSame(5, ProductImageAsset::where('product_image_request_id', $request->id)->count());
     }

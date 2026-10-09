@@ -67,7 +67,7 @@ class ProductImageDeliveryTest extends TestCase
         $this->assertSame('testproduct-op-tafel.webp', app(ProductImageSeo::class)->record($asset)->fields['filename']);
     }
 
-    public function test_new_source_version_uses_new_cache_and_requires_its_own_seo(): void
+    public function test_new_source_version_uses_new_cache_and_a_recovery_name_until_its_own_seo_is_ready(): void
     {
         [$request, $asset] = $this->photo();
         $this->saveSeo($asset);
@@ -81,7 +81,8 @@ class ProductImageDeliveryTest extends TestCase
         imagedestroy($image);
         $asset->update(['version' => 2, 'contents_base64' => base64_encode($updated)]);
         $payload = $this->getJson('/api/images/requests/'.$request->id)->json('results.0');
-        $this->getJson($payload['download_url'])->assertUnprocessable();
+        $this->get($payload['download_url'])->assertOk()->assertDownload('foto-zonder-seo-'.$asset->id.'.webp')->assertHeader('X-Image-SEO-Ready', 'false');
+        $this->assertNull(app(ProductImageSeo::class)->record($asset));
         $this->saveSeo($asset);
         $second = $this->get($payload['download_url'])->assertOk()->streamedContent();
         $this->assertNotSame($first, $second);
@@ -89,11 +90,12 @@ class ProductImageDeliveryTest extends TestCase
         $this->assertSame($updated, $this->get($payload['original_download_url'])->getContent());
     }
 
-    public function test_both_downloads_stay_private_and_webp_requires_seo(): void
+    public function test_both_downloads_stay_private_but_do_not_require_seo(): void
     {
         [$request] = $this->photo();
         $payload = $this->getJson('/api/images/requests/'.$request->id)->json('results.0');
-        $this->getJson($payload['download_url'])->assertUnprocessable();
+        $this->get($payload['download_url'])->assertOk()->assertHeader('X-Image-SEO-Ready', 'false');
+        $this->get($payload['original_download_url'])->assertOk();
         $this->actingAsUser();
         foreach (['download_url', 'original_download_url'] as $key) {
             $this->getJson($payload[$key])->assertNotFound();

@@ -121,7 +121,7 @@ test('recovery links only accept a photoset UUID and do not start generation', (
   assert.equal(h.run('productImageState.generating'), false);
 });
 
-test('both photo download buttons use SEO and sauce label review guards', () => {
+test('both photo downloads remain available without SEO but preserve sauce label review', () => {
   const source = fs.readFileSync('public/js/converter.js', 'utf8');
   for (const field of ['download_url', 'original_download_url']) {
     assert.ok(source.includes('href="${escHtml(result.' + field + ')}" onclick="return prepareProductImageDownload(event, ${Number(result.asset_id)})"'));
@@ -133,10 +133,10 @@ test('both photo download buttons use SEO and sauce label review guards', () => 
   for (const filename of ['', 'saus-op-tafel-2.webp']) {
     h.context.filename = filename;
     h.run('productImageState.results = [{asset_id: 1, metadata: {filename}}]');
-    assert.equal(h.run('prepareProductImageDownload(event, 1)'), false);
-    assert.equal(h.context.event.prevented, true);
+    assert.equal(h.run('prepareProductImageDownload(event, 1)'), true);
+    assert.equal(h.context.event.prevented, undefined);
   }
-  assert.deepEqual(opened, [1, 1]);
+  assert.deepEqual(opened, []);
   h.run('productImageState.results = [{asset_id: 1, seo: {ready: true}, metadata: {filename: "saus-op-houten-tafel.webp"}}]');
   assert.equal(h.run('prepareProductImageDownload(event, 1)'), true);
   h.run('productImageState.results[0].needs_label_review = true');

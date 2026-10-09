@@ -105,6 +105,7 @@ class ProductImageTest extends TestCase
 
     public function test_generation_is_queued_instead_of_waiting_for_openai(): void
     {
+        config(['services.product_images.queue_connection' => 'deferred']);
         Storage::fake('local');
         Queue::fake();
         $this->actingAsUser();
@@ -172,7 +173,7 @@ class ProductImageTest extends TestCase
                 ->assertHeader('Content-Type', 'image/png')
                 ->assertHeader('X-Content-Type-Options', 'nosniff');
 
-            $this->getJson($result['download_url'])->assertUnprocessable();
+            $this->get($result['download_url'])->assertOk()->assertHeader('X-Image-SEO-Ready', 'false');
             $name = ['test-vlees-buiten', 'test-vlees-tafel', 'test-vlees-rauw-donker', 'test-vlees-rauw-licht', 'test-vlees-keuken'][$index].'.webp';
             $stored = ProductImageAsset::findOrFail($result['asset_id']);
             app(ProductImageSeo::class)->save($stored, [...$result['metadata'], 'filename' => $name], 0);

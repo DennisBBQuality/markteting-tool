@@ -2,7 +2,11 @@
 
 namespace App\Services;
 
+use Illuminate\Http\Client\Pool;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class ProductImageSeoAnalyzer
 {
@@ -10,35 +14,113 @@ class ProductImageSeoAnalyzer
 
     public function analyze(string $png, array $context, array $result): array
     {
+        $started = microtime(true);
+        try {
+            $response = Http::withToken($this->apiKey())->acceptJson()->connectTimeout(15)->timeout(120)
+                ->post(config('services.product_content.endpoint'), $this->payload($png, $context, $result));
+
+            return $this->parse($response, $context, $result);
+        } finally {
+            Log::info('Image SEO analysis finished', ['duration_ms' => (int) round((microtime(true) - $started) * 1000)]);
+        }
+    }
+
+    /** A bounded wave of independent photos; a failed response never discards its neighbours. */
+    public function analyzeBatch(array $inputs, callable $settled): void
+    {
+        $delivered = [];
+        try {
+            $key = $this->apiKey();
+            $responses = Http::pool(function (Pool $pool) use ($inputs, $key, $settled, &$delivered) {
+                foreach ($inputs as $id => $input) {
+                    $pool->as((string) $id)->withToken($key)->acceptJson()->connectTimeout(15)->timeout(120)
+                        ->afterResponse(function (Response $response) use ($id, $input, $settled, &$delivered) {
+                            try {
+                                $fields = $this->parse($response, $input['context'], $input['result']);
+                            } catch (Throwable $error) {
+                                $fields = $error;
+                            }
+                            $settled($id, $fields);
+                            $delivered[$id] = true;
+
+                            return $response;
+                        })
+                        ->post(config('services.product_content.endpoint'), $this->payload(...$input));
+                }
+            }, 3);
+        } catch (Throwable $error) {
+            foreach ($inputs as $id => $input) {
+                if (! isset($delivered[$id])) {
+                    $settled($id, $error);
+                }
+            }
+
+            return;
+        }
+        foreach ($inputs as $id => $input) {
+            if (isset($delivered[$id])) {
+                continue;
+            }
+            try {
+                $response = $responses[$id] ?? null;
+                if ($response instanceof Throwable) {
+                    throw $response;
+                }
+                if (! $response instanceof Response) {
+                    throw new ProductImageSeoException('De SEO-beeldanalyse gaf geen antwoord. De foto is bewaard. Probeer alleen de SEO opnieuw.');
+                }
+                $fields = $this->parse($response, $input['context'], $input['result']);
+            } catch (Throwable $error) {
+                $settled($id, $error);
+
+                continue;
+            }
+            $settled($id, $fields);
+        }
+    }
+
+    private function apiKey(): string
+    {
         $key = $this->credentials->openAiApiKey();
         if (! $key) {
             throw new ProductImageSeoException('Voorbeeldmodus: geen AI-beeldanalyse uitgevoerd. Vul de SEO handmatig in of stel de AI-koppeling in.');
         }
+
+        return $key;
+    }
+
+    private function payload(string $png, array $context, array $result): array
+    {
         $schema = ['type' => 'object', 'additionalProperties' => false,
             'required' => [...ProductImageSeo::FIELDS, 'filename_alternatives'],
             'properties' => [...array_fill_keys(ProductImageSeo::FIELDS, ['type' => 'string']),
                 'filename_alternatives' => ['type' => 'array', 'items' => ['type' => 'string'], 'minItems' => 2, 'maxItems' => 5]],
         ];
-        $response = Http::withToken($key)->acceptJson()->connectTimeout(15)->timeout(120)
-            ->post(config('services.product_content.endpoint'), [
-                'model' => config('services.product_content.model'), 'store' => false,
-                'input' => [
-                    ['role' => 'system', 'content' => $this->instructions($context, $result)],
-                    ['role' => 'user', 'content' => [
-                        ['type' => 'input_text', 'text' => json_encode([
-                            'productnaam' => $context['product_name'] ?? 'Product',
-                            // Keep the complete source, including facts at the end of long texts.
-                            'producttekst' => (string) ($context['notes'] ?? ''),
-                            'producttype' => $context['product_type'] ?? 'meat',
-                            'variant' => $result['status'] ?? 'product',
-                            'bereidingswijze' => ProductImagePreparationSeo::method($context, $result),
-                        ], JSON_UNESCAPED_UNICODE)],
-                        ['type' => 'input_image', 'image_url' => 'data:image/png;base64,'.base64_encode($png), 'detail' => 'high'],
-                    ]],
-                ],
-                'text' => ['format' => ['type' => 'json_schema', 'name' => 'image_seo', 'strict' => true, 'schema' => $schema]],
-            ]);
+
+        return [
+            'model' => config('services.product_content.model'), 'store' => false,
+            'input' => [
+                ['role' => 'system', 'content' => $this->instructions($context, $result)],
+                ['role' => 'user', 'content' => [
+                    ['type' => 'input_text', 'text' => json_encode([
+                        'productnaam' => $context['product_name'] ?? 'Product',
+                        // Keep the complete source, including facts at the end of long texts.
+                        'producttekst' => (string) ($context['notes'] ?? ''),
+                        'producttype' => $context['product_type'] ?? 'meat',
+                        'variant' => $result['status'] ?? 'product',
+                        'bereidingswijze' => ProductImagePreparationSeo::method($context, $result),
+                    ], JSON_UNESCAPED_UNICODE)],
+                    ['type' => 'input_image', 'image_url' => 'data:image/png;base64,'.base64_encode($png), 'detail' => 'high'],
+                ]],
+            ],
+            'text' => ['format' => ['type' => 'json_schema', 'name' => 'image_seo', 'strict' => true, 'schema' => $schema]],
+        ];
+    }
+
+    private function parse(Response $response, array $context, array $result): array
+    {
         if (! $response->successful()) {
+            Log::warning('Image SEO provider rejected request', ['http_status' => $response->status()]);
             if ($response->status() === 413 || in_array($response->json('error.code'), ['context_length_exceeded', 'string_above_max_length', 'request_too_large'], true)) {
                 throw new ProductImageSeoException('De producttekst en foto passen niet binnen de technische verwerkingsruimte van de AI. Er is niets stilzwijgend ingekort; de foto, producttekst en vorige SEO zijn bewaard. Vul de SEO handmatig in of gebruik een kortere producttekst bij een nieuwe opdracht.');
             }
