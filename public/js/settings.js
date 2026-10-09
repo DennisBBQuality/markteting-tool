@@ -15,6 +15,7 @@ async function renderSettings() {
     </div>
 
     <div class="settings-section" id="trunkrs-settings"></div>
+    <div class="settings-section" id="wordpress-settings"></div>
 
     <div class="settings-section">
       <h3>AI-koppelingen</h3>
@@ -111,6 +112,7 @@ async function renderSettings() {
   `;
   ImageModelPicker.load('settings');
   TrunkrsSettings.load();
+  WordPressMedia.settings();
 }
 
 async function saveOpenAiKey() {

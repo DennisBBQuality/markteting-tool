@@ -26,10 +26,11 @@ class AssetCacheTest extends TestCase
         $this->assertStringNotContainsString('id="view-notifications"', $appShell);
         $this->assertStringContainsString('/js/notification-mail.js?v=20260924-1', $appShell);
         $this->assertStringContainsString('/js/image-models.js?v=20260911-1', $appShell);
-        $this->assertStringContainsString('/js/converter.js?v=20261009-stop', $appShell);
+        $this->assertStringContainsString('/js/converter.js?v=20261009-bridge', $appShell);
+        $this->assertStringContainsString('/js/wordpress-media.js?v=20261009-bridge', $appShell);
         $this->assertStringContainsString('/js/image-seo.js?v=20261009-stop', $appShell);
         $this->assertStringContainsString('/js/product-dossiers.js?v=20260925-1', $appShell);
-        $this->assertStringContainsString('/js/settings.js?v=20260925-1', $appShell);
+        $this->assertStringContainsString('/js/settings.js?v=20261009-bridge', $appShell);
         $this->assertStringContainsString('/js/trunkrs-settings.js?v=20260930-1', $appShell);
         $this->assertStringContainsString('/js/trunkrs.js?v=20260930-1', $appShell);
         $this->assertStringContainsString('/css/trunkrs.css?v=20260923-1', $appShell);
