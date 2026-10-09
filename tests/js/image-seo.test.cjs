@@ -8,7 +8,7 @@ function harness() {
   const get = id => { if (!fields.has(id)) fields.set(id, { value: '', textContent: '', disabled: false, classList: {toggle() {}} }); return fields.get(id); };
   const calls = [], timers = [];
   const metadata = { filename: 'test.webp', alt: 'Testfoto', title: 'Test', caption: 'Serveersuggestie.', description: 'Testbeschrijving.' };
-  const context = { document: { getElementById: get }, escHtml: x => String(x), openModal: (title, html) => { context.modal = html; }, closeModal: () => {},
+  const context = { document: { getElementById: get }, escHtml: x => String(x), openModal: (title, html) => { context.modal = html; }, closeModal: () => { context.closed = true; }, toast: (message, type) => { context.notice = {message, type}; },
     productImageState: { completedRequestId: 'request', results: [{asset_id: 1, version: 1, metadata, seo: {revision: 0}}] },
     setTimeout: f => timers.push(f), confirm: () => true, navigator: {clipboard: {writeText: async text => { context.copied = text; }}},
     api: async (url, options = {}) => { calls.push([url, options]); return context.response; },
@@ -28,7 +28,10 @@ test('editor saves five fields with image version and optimistic revision; copie
   assert.equal(h.calls[1][1].body.revision, 0);
   assert.equal(h.calls[1][1].body.fields.filename, 'eigen-foto.webp');
   assert.equal(Object.keys(h.calls[1][1].body.fields).length, 5);
-  assert.equal(h.run('imageSeoEditor.dirty'), false);
+  assert.equal(h.run('imageSeoEditor'), null);
+  assert.equal(h.context.closed, true);
+  assert.equal(h.context.notice.message, 'SEO opgeslagen ✓');
+  await h.run('openImageSeoEditor(1)');
   await h.run('copyImageSeo("all")');
   assert.match(h.context.copied, /Bestandsnaam: eigen-foto.webp/);
   assert.match(h.context.copied, /Bijschrift:/);
@@ -110,8 +113,56 @@ test('product-focused editor explains optional caption and saves an empty string
   assert.doesNotMatch(h.get('image-seo-status').textContent, /alle vijf/i);
   await h.run('saveImageSeo()');
   assert.equal(h.calls[1][1].body.fields.caption, '');
+  await h.run('openImageSeoEditor(1)');
   await h.run('copyImageSeo("all")');
   assert.match(h.context.copied, /Bijschrift: \n/);
+});
+
+test('save shows progress, blocks double submissions and protects fields until acknowledgement', async () => {
+  const h = harness(); await h.run('openImageSeoEditor(1)');
+  h.get('image-seo-alt').value = 'Mijn correctie'; h.run('imageSeoEditor.dirty = true');
+  let resolve, submissions = 0;
+  h.context.api = () => { submissions++; return new Promise(r => { resolve = r; }); };
+  const pending = h.run('saveImageSeo()');
+  assert.equal(h.get('image-seo-save').textContent, 'Bezig met opslaan…');
+  assert.equal(h.get('image-seo-alt').disabled, true);
+  assert.notEqual(h.context.closed, true);
+  await h.run('saveImageSeo()'); assert.equal(submissions, 1);
+  resolve({...h.context.response, seo: {revision:1, status:'completed', source:'manual'}}); await pending;
+  assert.equal(h.context.closed, true);
+  assert.equal(h.context.notice.type, 'success');
+});
+
+test('failed or throwing save keeps editor open and restores controls without success', async () => {
+  for (const throwing of [false, true]) {
+    const h = harness(); await h.run('openImageSeoEditor(1)');
+    h.get('image-seo-alt').value = 'Mijn correctie'; h.run('imageSeoEditor.dirty = true');
+    h.context.api = async (url, options) => {
+      if (throwing) throw new Error('network');
+      options.onError('Deze bestandsnaam is al in gebruik'); return null;
+    };
+    await h.run('saveImageSeo()');
+    assert.notEqual(h.context.closed, true);
+    assert.equal(h.get('image-seo-alt').value, 'Mijn correctie');
+    assert.equal(h.get('image-seo-alt').disabled, false);
+    assert.equal(h.get('image-seo-save').textContent, 'SEO opslaan');
+    assert.equal(h.run('imageSeoEditor.dirty'), true);
+    assert.equal(h.context.notice.type, 'error');
+  }
+});
+
+test('late save does not close a different editor or show a misleading success', async () => {
+  const h = harness(); await h.run('openImageSeoEditor(1)');
+  let resolve;
+  h.context.api = () => new Promise(r => {resolve = r;});
+  const pending = h.run('saveImageSeo()');
+  h.run('closeImageSeo()'); h.context.closed = false;
+  h.context.api = async () => h.context.response;
+  await h.run('openImageSeoEditor(1)');
+  resolve(h.context.response); await pending;
+  assert.equal(h.context.closed, false);
+  assert.equal(h.context.notice, undefined);
+  assert.notEqual(h.run('imageSeoEditor'), null);
 });
 
 test('fresh server policy updates guidance without replacing dirty caption', async () => {
