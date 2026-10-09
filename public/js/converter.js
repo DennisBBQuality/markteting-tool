@@ -888,6 +888,7 @@ function renderProductImageResults() {
       </div>
       <span class="product-image-count"><i class="fas ${productImagesSeoReady() ? 'fa-check-circle' : 'fa-clock'}"></i> ${productImageState.results.length} afbeeldingen · SEO ${productImageState.results.filter(item => item.seo?.ready).length}/${productImageState.results.length} klaar</span>
       <button class="btn btn-outline btn-sm" type="button" onclick="linkImagesToDossier()">Koppel aan productdossier</button>
+      <button class="btn btn-outline btn-sm" type="button" onclick="WordPressMedia.uploadApproved(this)">Alle goedgekeurde foto's naar mediatheek</button>
     </div>
     <div class="product-image-grid">
       ${productImageState.results.map(result => `
@@ -912,6 +913,7 @@ function renderProductImageResults() {
           ${!result.seo?.ready ? '<p class="product-refine-error">Foto opgeslagen en downloadbaar. SEO nog niet afgerond: de WEBP krijgt tijdelijk een technische bestandsnaam. Rond de SEO af vóór publicatie.</p>' : ''}
           ${result.needs_label_review ? `<label class="product-label-warning"><input type="checkbox" id="product-label-approved-${Number(result.asset_id)}"><span><strong>Etiketcontrole verplicht.</strong> Ik heb iedere letter, het logo en de kleuren vergeleken met de echte referentiefoto.</span></label>` : ''}
           ${result.refinement_error ? `<div class="product-refine-error">${escHtml(result.refinement_error)}</div>` : ''}
+          <div class="product-refinement" id="wordpress-media-${Number(result.asset_id)}"></div>
           <div class="product-refinement hidden" id="product-refinement-${Number(result.asset_id)}">
             <label for="product-refinement-text-${Number(result.asset_id)}">Wat wil je alleen aan deze foto veranderen?</label>
             <textarea id="product-refinement-text-${Number(result.asset_id)}" rows="3" maxlength="1200" placeholder="Bijvoorbeeld: maak de steak medium en de korst krokanter"></textarea>
@@ -931,6 +933,7 @@ function renderProductImageResults() {
     if (draft.open) document.getElementById(`product-refinement-${id}`)?.classList.remove('hidden');
   });
   container.classList.remove('hidden');
+  if (typeof WordPressMedia !== 'undefined') WordPressMedia.refresh();
 }
 
 function openProductImageMetadata(assetId) {

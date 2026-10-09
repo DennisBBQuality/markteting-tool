@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\TrunkrsReportController;
 use App\Http\Controllers\Api\TrunkrsScheduledSyncController;
 use App\Http\Controllers\Api\TrunkrsSettingController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\WordPressMediaController;
 use App\Http\Middleware\EnsureCustomerServiceEnabled;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
@@ -86,6 +87,10 @@ Route::middleware('auth.custom')->group(function () {
     // Users
     Route::get('/api/users', [UserController::class, 'index']);
     Route::middleware('admin')->group(function () {
+        Route::get('/api/settings/wordpress', [WordPressMediaController::class, 'settings']);
+        Route::put('/api/settings/wordpress', [WordPressMediaController::class, 'saveSettings'])->middleware('throttle:10,1');
+        Route::post('/api/settings/wordpress/test', [WordPressMediaController::class, 'testConnection'])->middleware('throttle:10,1');
+        Route::delete('/api/settings/wordpress', [WordPressMediaController::class, 'disconnect']);
         Route::get('/api/settings/trunkrs', [TrunkrsSettingController::class, 'show']);
         Route::post('/api/settings/trunkrs/initialize', [TrunkrsSettingController::class, 'initialize'])->middleware('throttle:trunkrs-setup');
         Route::put('/api/settings/trunkrs', [TrunkrsSettingController::class, 'update'])->middleware('throttle:trunkrs-setup');
@@ -141,6 +146,9 @@ Route::middleware('auth.custom')->group(function () {
     Route::get('/api/convert/download/{filename}', [ConvertController::class, 'download']);
 
     // Product images
+    Route::get('/api/images/assets/{asset}/wordpress', [WordPressMediaController::class, 'status']);
+    Route::put('/api/images/assets/{asset}/wordpress/approval', [WordPressMediaController::class, 'approve']);
+    Route::post('/api/images/assets/{asset}/wordpress', [WordPressMediaController::class, 'upload'])->middleware('throttle:20,1');
     Route::get('/api/images/prompt', [ProductImageController::class, 'prompt'])->middleware('admin');
     Route::get('/api/images/models', [ProductImageController::class, 'models'])->middleware('throttle:image-models');
     Route::post('/api/images/models/refresh', [ProductImageController::class, 'refreshModels'])->middleware('throttle:image-model-refresh');
