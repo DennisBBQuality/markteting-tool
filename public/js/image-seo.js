@@ -93,7 +93,7 @@ async function refreshImageSeo(editor) {
   if (!imageSeoActive(editor)) return;
   const epoch = editor.stopEpoch || 0;
   const data = await api(editor.url, { silentError: true, onError: message => imageSeoMessage(editor, message) });
-  if (data && epoch === (editor.stopEpoch || 0)) applyImageSeo(editor, data);
+  if (data && !editor.saving && epoch === (editor.stopEpoch || 0)) applyImageSeo(editor, data);
 }
 
 async function stopImageSeo() {
@@ -119,16 +119,48 @@ async function stopImageSeo() {
 async function saveImageSeo() {
   const editor = imageSeoEditor;
   if (!editor || !imageSeoActive(editor) || editor.busy) return;
+  const fields = imageSeoValues();
   editor.busy = true;
-  document.getElementById('image-seo-save').disabled = true;
+  editor.saving = true;
+  const button = document.getElementById('image-seo-save');
+  button.disabled = true;
+  button.textContent = 'Bezig met opslaan…';
   document.getElementById('image-seo-generate').disabled = true;
-  const data = await api(editor.url, { method: 'PUT', body: { image_version: editor.version, revision: editor.revision, fields: imageSeoValues() },
-    silentError: true, onError: message => imageSeoMessage(editor, message) });
-  editor.busy = false;
-  if (!imageSeoActive(editor)) return;
-  document.getElementById('image-seo-save').disabled = false;
-  document.getElementById('image-seo-generate').disabled = false;
-  if (data) { editor.dirty = false; applyImageSeo(editor, data); imageSeoMessage(editor, 'SEO opgeslagen. De WEBP-download gebruikt deze bestandsnaam.'); }
+  IMAGE_SEO_FIELDS.forEach(([key]) => { document.getElementById(`image-seo-${key}`).disabled = true; });
+  imageSeoMessage(editor, 'Bezig met opslaan…');
+  let error = '';
+  try {
+    const data = await api(editor.url, { method: 'PUT', body: { image_version: editor.version, revision: editor.revision, fields },
+      silentError: true, onError: message => { error = message; } });
+    if (!imageSeoActive(editor)) return;
+    if (!data) {
+      imageSeoMessage(editor, error || 'Opslaan is niet bevestigd. Je invoer blijft staan. Probeer het opnieuw.');
+      toast(error || 'SEO opslaan is niet bevestigd. Je invoer blijft staan.', 'error');
+      return;
+    }
+    if (Number(data.version) !== editor.version || Number(data.seo?.revision) < editor.revision) {
+      imageSeoMessage(editor, 'De foto of SEO is intussen gewijzigd. Je invoer blijft staan; controleer de actuele versie.');
+      return;
+    }
+    editor.dirty = false;
+    applyImageSeo(editor, data);
+    closeImageSeo();
+    toast('SEO opgeslagen ✓', 'success');
+  } catch {
+    if (imageSeoActive(editor)) {
+      imageSeoMessage(editor, 'Opslaan is niet bevestigd. Je invoer blijft staan. Probeer het opnieuw.');
+      toast('SEO opslaan is niet bevestigd. Je invoer blijft staan.', 'error');
+    }
+  } finally {
+    editor.busy = false;
+    editor.saving = false;
+    if (imageSeoActive(editor)) {
+      button.disabled = false;
+      button.textContent = 'SEO opslaan';
+      document.getElementById('image-seo-generate').disabled = false;
+      IMAGE_SEO_FIELDS.forEach(([key]) => { document.getElementById(`image-seo-${key}`).disabled = false; });
+    }
+  }
 }
 
 async function generateImageSeo() {
