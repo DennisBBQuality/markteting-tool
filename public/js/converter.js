@@ -773,7 +773,7 @@ async function pollProductImageRequest(requestId) {
     }
     if (data.status === 'failed') {
       const message = data.error || 'Productfoto maken is mislukt. Probeer de opdracht opnieuw.';
-      finishProductImageRequest(false);
+      finishProductImageRequest(false, !!productImageState.results.length);
       showProductImageError(message);
       toast(message, 'error');
       return;
@@ -789,7 +789,7 @@ async function pollProductImageRequest(requestId) {
     }
 
     const message = error.message || 'De voortgang kon niet worden geladen. Probeer de opdracht opnieuw.';
-    finishProductImageRequest(false);
+    finishProductImageRequest(false, true);
     showProductImageError(message);
     toast(message, 'error');
   }
@@ -861,6 +861,7 @@ function renderProductImageResults() {
               ${result.original_download_url ? `<a class="btn btn-outline btn-sm" href="${escHtml(result.original_download_url)}" onclick="return prepareProductImageDownload(event, ${Number(result.asset_id)})">Origineel PNG</a>` : ''}
             </div>
           </div>
+          ${!result.seo?.ready ? '<p class="product-refine-error">Foto opgeslagen en downloadbaar. SEO nog niet afgerond: de WEBP krijgt tijdelijk een technische bestandsnaam. Rond de SEO af vóór publicatie.</p>' : ''}
           ${result.needs_label_review ? `<label class="product-label-warning"><input type="checkbox" id="product-label-approved-${Number(result.asset_id)}"><span><strong>Etiketcontrole verplicht.</strong> Ik heb iedere letter, het logo en de kleuren vergeleken met de echte referentiefoto.</span></label>` : ''}
           ${result.refinement_error ? `<div class="product-refine-error">${escHtml(result.refinement_error)}</div>` : ''}
           <div class="product-refinement hidden" id="product-refinement-${Number(result.asset_id)}">
@@ -890,10 +891,8 @@ function openProductImageMetadata(assetId) {
 
 function prepareProductImageDownload(event, assetId) {
   const result = productImageState.results.find(item => Number(item.asset_id) === Number(assetId));
-  if (!result?.seo?.ready || !result?.metadata?.filename || /[0-9]/.test(result.metadata.filename)) {
+  if (!result) {
     event.preventDefault();
-    toast('Maak of sla eerst de SEO op met een unieke beschrijvende bestandsnaam zonder cijfers.', 'error');
-    openImageSeoEditor(assetId);
     return false;
   }
   return result.needs_label_review ? confirmProductLabelReview(event, assetId) : true;

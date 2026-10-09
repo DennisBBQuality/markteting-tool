@@ -34,9 +34,23 @@ class GenerateProductImageSeo implements ShouldQueue
 
     public function handle(ProductImageSeoAnalyzer $analyzer): void
     {
+        $input = $this->prepare();
+        if ($input === null) {
+            return;
+        }
+        try {
+            $this->complete($analyzer->analyze(...$input));
+        } catch (Throwable $error) {
+            $this->failed($error);
+        }
+    }
+
+    /** Claim immediately before this photo's bounded network wave, not at set creation. */
+    public function prepare(): ?array
+    {
         $claimed = ProductImageMetadata::where('job_token', $this->token)->where('status', 'queued')->update(['status' => 'processing']);
         if (! $claimed) {
-            return;
+            return null;
         }
         try {
             app(ProductImageSeo::class)->ensureStorageReady(repair: true);
@@ -44,14 +58,28 @@ class GenerateProductImageSeo implements ShouldQueue
             if ($asset->version !== $this->version) {
                 $this->failed(null);
 
-                return;
+                return null;
             }
             $request = ProductImageRequest::findOrFail($asset->product_image_request_id);
             $result = collect($request->results)->firstWhere('filename', $asset->filename) ?? [];
-            $fields = $analyzer->analyze(base64_decode($asset->contents_base64), (array) $request->generation_context, $result);
+
+            return ['png' => base64_decode($asset->contents_base64), 'context' => (array) $request->generation_context, 'result' => $result];
+        } catch (Throwable $error) {
+            $this->failed($error);
+
+            return null;
+        }
+    }
+
+    public function complete(array $fields): void
+    {
+        try {
+            $asset = ProductImageAsset::findOrFail($this->assetId, ['id', 'product_image_request_id', 'filename', 'version', 'refinement_status']);
+            $request = ProductImageRequest::findOrFail($asset->product_image_request_id);
+            $result = collect($request->results)->firstWhere('filename', $asset->filename) ?? [];
             DB::transaction(function () use ($asset, $request, $result, $fields) {
                 ProductImageRequest::whereKey($request->id)->lockForUpdate()->firstOrFail();
-                $current = ProductImageAsset::whereKey($asset->id)->lockForUpdate()->firstOrFail();
+                $current = ProductImageAsset::whereKey($asset->id)->lockForUpdate()->firstOrFail(['id', 'product_image_request_id', 'filename', 'version', 'refinement_status']);
                 $row = ProductImageMetadata::where('job_token', $this->token)->lockForUpdate()->first();
                 if (! $row) {
                     return; // A manual edit or explicit cancellation won the race.
@@ -75,6 +103,7 @@ class GenerateProductImageSeo implements ShouldQueue
     {
         // Never persist provider payloads, credentials or untrusted exception text.
         $safe = match (true) {
+            $exception instanceof ValidationException => $exception->errors()['filename'][0] ?? 'De SEO-velden zijn ongeldig. De vorige gegevens zijn bewaard.',
             $exception instanceof ProductImageSeoException => $exception->getMessage(),
             $exception instanceof ConnectionException => 'De verbinding met de SEO-beeldanalyse is onderbroken of duurde te lang. De foto is bewaard. Probeer alleen de SEO opnieuw.',
             $exception instanceof QueryException => 'De SEO kon niet in de database worden opgeslagen. De foto is bewaard. Laat de beheerder de SEO-opslag controleren.',

@@ -376,17 +376,18 @@ class ProductImageController extends Controller
         $delivery = app(ProductImageDelivery::class);
         $result = collect($request->results)->firstWhere('filename', $filename) ?? [];
         $metadata = $delivery->metadata((array) $request->generation_context, $result, $version, $asset);
-        abort_unless($asset && app(ProductImageSeo::class)->payload($asset)['ready'], 422, 'De SEO is nog niet volledig afgerond en opgeslagen. De foto blijft bewaard.');
-        abort_if($metadata['filename'] === '' || preg_match('/[0-9]/', $metadata['filename']), 422,
-            'Maak of sla eerst de SEO op met een unieke beschrijvende bestandsnaam zonder cijfers. De foto blijft bewaard.');
+        $seoReady = $asset && app(ProductImageSeo::class)->payload($asset)['ready'];
+        // A recovery download is not SEO approval. Never save this technical name in metadata.
+        $downloadName = $seoReady ? $metadata['filename'] : 'foto-zonder-seo-'.($asset?->id ?? substr(hash('sha256', $filename), 0, 12)).'.webp';
         $path = 'product-images/'.$request->id.'/webp/'.ProductImageDelivery::WEBP_PROFILE.'-'.hash('sha256', $contents).'.webp';
         if (! Storage::disk('local')->exists($path)) {
             abort_unless(Storage::disk('local')->put($path, $delivery->webp($contents)), 503,
                 'De WEBP-download kon niet worden opgeslagen. Het origineel is bewaard. Probeer opnieuw.');
         }
 
-        return Storage::disk('local')->download($path, $metadata['filename'], [
+        return Storage::disk('local')->download($path, $downloadName, [
             'Content-Type' => 'image/webp', 'Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff',
+            'X-Image-SEO-Ready' => $seoReady ? 'true' : 'false',
         ]);
     }
 
@@ -425,9 +426,11 @@ class ProductImageController extends Controller
 
         $readyCount = $results->filter(fn ($result) => $result['seo']['ready'] ?? false)->count();
         $pendingCount = $results->filter(fn ($result) => in_array($result['seo']['status'] ?? 'idle', ['queued', 'processing'], true) || $result['refinement_status'] !== 'idle')->count();
-        $workflowStatus = $imageRequest->status;
-        $progress = max(0, min(100, (int) $imageRequest->progress));
-        $step = $imageRequest->progress_step;
+        // Also recover the display of pre-fix sets whose image job timed out during SEO.
+        $imagesStored = $results->isNotEmpty() && in_array($imageRequest->progress_step, ['processing_seo', 'completed', 'failed'], true);
+        $workflowStatus = $imagesStored ? 'completed' : $imageRequest->status;
+        $progress = $imagesStored ? 100 : max(0, min(100, (int) $imageRequest->progress));
+        $step = $imagesStored ? 'completed' : $imageRequest->progress_step;
         if ($workflowStatus === 'completed' && ($results->isEmpty() || $readyCount !== $results->count())) {
             $workflowStatus = $pendingCount > 0 ? 'processing_seo' : 'seo_failed';
             $progress = 90 + (int) floor(9 * $readyCount / max(1, $results->count()));
@@ -437,7 +440,7 @@ class ProductImageController extends Controller
         return [
             'request_id' => $imageRequest->id,
             'status' => $workflowStatus,
-            'image_status' => $imageRequest->status,
+            'image_status' => $imagesStored ? 'completed' : $imageRequest->status,
             'seo_summary' => ['ready' => $readyCount, 'total' => $results->count(), 'pending' => $pendingCount],
             'progress' => $progress,
             'progress_step' => $step,
@@ -448,12 +451,15 @@ class ProductImageController extends Controller
             'results' => $results,
             'context' => $imageRequest->generation_context,
             'expected_count' => $imageRequest->status === 'completed' ? count($imageRequest->results ?? []) : ($imageRequest->generation_context['photo_count'] ?? 4),
-            'error' => $imageRequest->error,
+            'error' => $imagesStored ? null : $imageRequest->error,
         ];
     }
 
     private function failIfStalled(ProductImageRequest $imageRequest): ProductImageRequest
     {
+        if (! empty($imageRequest->results)) {
+            return $imageRequest; // Image results exist: SEO has its own timeout and recovery.
+        }
         $queuedTooLong = $imageRequest->status === 'queued'
             && $imageRequest->created_at?->lt(now()->subMinutes(isset($imageRequest->generation_context['variant_groups']) ? 30 : 2));
         $processingTooLong = $imageRequest->status === 'processing'

@@ -39,7 +39,7 @@ async function openImageSeoEditor(assetId) {
         <textarea id="image-seo-${key}" rows="${key === 'description' ? 3 : 2}" maxlength="${key === 'description' ? 1600 : 400}" oninput="imageSeoEditor.dirty = true">${escHtml(result.metadata?.[key] || '')}</textarea>
         <button type="button" class="btn btn-outline btn-sm" onclick="copyImageSeo('${key}')">Kopiëren</button></div>`).join('')}
       <p>De opgeslagen bestandsnaam wordt ook bij de WEBP-download gebruikt. Versies blijven intern bewaard.</p>
-      <p>Gebruik een unieke beschrijvende bestandsnaam zonder cijfers. Bij een dubbele naam kies je een ander zichtbaar detail. De WEBP-download is beschikbaar zodra de verplichte SEO-velden voor deze fotoversie zijn opgeslagen. Een optioneel bijschrift mag leeg blijven.</p>
+      <p>Gebruik een unieke beschrijvende bestandsnaam zonder cijfers. Bij een dubbele naam kies je een ander zichtbaar detail. Je kunt de foto nu al downloaden; zonder complete SEO krijgt de WEBP tijdelijk een technische bestandsnaam. Rond de SEO af vóór publicatie. Een optioneel bijschrift mag leeg blijven.</p>
     </div>`, `<button class="btn btn-primary" id="image-seo-save" onclick="saveImageSeo()">SEO opslaan</button>
       <button class="btn btn-outline" id="image-seo-generate" onclick="generateImageSeo()">SEO opnieuw maken</button>
       <button class="btn btn-outline" onclick="copyImageSeo('all')">Alles kopiëren</button>
@@ -78,7 +78,7 @@ function applyImageSeo(editor, data) {
     editor.source = data.seo.source;
   }
   imageSeoMessage(editor, data.seo.error || (pending
-    ? 'AI analyseert deze foto. Je kunt de velden ook handmatig invullen en opslaan.'
+    ? (data.seo.status === 'queued' ? 'SEO staat klaar voor verwerking. De foto is al downloadbaar.' : 'AI analyseert deze foto en de volledige producttekst. Bij een time-out verschijnt hier een foutmelding; de foto blijft downloadbaar. Je kunt de velden ook handmatig invullen en opslaan.')
     : editor.dirty && Number(data.seo.revision) !== editor.revision
       ? 'Er is nieuwe SEO beschikbaar. Je invoer blijft staan; kopieer eventuele correcties en open dit venster opnieuw.'
       : data.seo.ready && data.seo.source === 'ai' ? 'De SEO voor deze foto is opgeslagen. Controleer de teksten vóór publicatie.'

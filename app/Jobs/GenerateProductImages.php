@@ -72,6 +72,7 @@ class GenerateProductImages implements ShouldQueue
             'progress_step' => 'saving',
         ]);
         $results = $this->storeValidatedResults($request, $generatedImages);
+        unset($generatedImages, $sources); // Do not retain the entire PNG set during SEO network waits.
 
         $request->update([
             'status' => 'processing',
@@ -82,11 +83,12 @@ class GenerateProductImages implements ShouldQueue
             'completed_at' => null,
         ]);
         $this->deleteSources($request);
-        foreach (ProductImageAsset::where('product_image_request_id', $request->id)->get() as $asset) {
-            app(ProductImageSeo::class)->queueAutomatically($asset);
-        }
+        $seo = app(ProductImageSeo::class);
+        $jobs = $seo->prepareAutomaticJobs(ProductImageAsset::where('product_image_request_id', $request->id)
+            ->get(['id', 'product_image_request_id', 'filename', 'version', 'refinement_status']));
         // This records image-job completion only. The API gates overall completion on every current SEO record.
         $request->update(['status' => 'completed', 'progress' => 100, 'progress_step' => 'completed', 'completed_at' => now()]);
+        $seo->runAutomaticJobs($jobs);
     }
 
     public function failed(?Throwable $exception): void
@@ -97,6 +99,12 @@ class GenerateProductImages implements ShouldQueue
         }
 
         $this->deleteSources($request);
+        if (! empty($request->results)) {
+            // A SEO/hosting timeout must never relabel stored images as a failed image generation.
+            $request->update(['status' => 'completed', 'progress' => 100, 'progress_step' => 'completed', 'error' => null, 'completed_at' => $request->completed_at ?? now()]);
+
+            return;
+        }
         $request->update([
             'status' => 'failed',
             'progress_step' => 'failed',

@@ -301,7 +301,7 @@ class ProductImageSeoTest extends TestCase
         $row->update(['fields' => [...$row->fields, 'description' => ' ']]);
         $response = $this->getJson($url)->assertJsonPath('status', 'seo_failed')->assertJsonPath('seo_summary.ready', 4);
         $photo = collect($response->json('results'))->firstWhere('asset_id', $asset->id);
-        $this->getJson($photo['download_url'])->assertUnprocessable();
+        $this->get($photo['download_url'])->assertOk()->assertHeader('X-Image-SEO-Ready', 'false');
         $this->assertDatabaseCount('product_image_assets', 5);
         app(ProductImageSeo::class)->save($asset, [...$this->fields(), 'filename' => 'varkenswangen-eigen-presentatie.webp'], 1);
         $this->getJson($url)->assertJsonPath('status', 'completed');
@@ -447,6 +447,87 @@ class ProductImageSeoTest extends TestCase
         $this->mock(ProductImageSeoAnalyzer::class)->shouldReceive('analyze')->once()->andReturn($this->fields());
         app(ProductImageSeo::class)->queue($asset, alreadyBackground: true);
         $this->assertSame('completed', app(ProductImageSeo::class)->record($asset)->status);
+    }
+
+    public function test_seven_deferred_analyses_run_in_bounded_waves_with_isolated_failures_and_saved_images(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+        Http::preventStrayRequests();
+        $this->actingAsUser();
+        $id = $this->post('/api/images/generate', [
+            'foto' => UploadedFile::fake()->image('test.png', 30, 30),
+            'product_type' => 'meat', 'product_name' => 'TEST product',
+            'variant_groups' => ['raw', 'bbq', 'pan', 'oven', 'airfryer'],
+            'notes' => 'Volledige TEST bron met laatste productfeit.',
+        ], ['Accept' => 'application/json'])->assertAccepted()->json('request_id');
+        config(['services.product_images.queue_connection' => 'deferred', 'services.product_images.driver' => 'openai', 'services.product_images.openai.api_key' => 'test-key']);
+        $sent = 0;
+        $names = ['licht', 'donker', 'hout', 'steen', 'bord', 'schaal', 'keuken'];
+        Http::fake(function ($request) use ($id, &$sent, $names) {
+            // Image completion is durable before the first slow/failed SEO request.
+            $this->assertSame('completed', ProductImageRequest::findOrFail($id)->status);
+            $this->assertDatabaseCount('product_image_assets', 7);
+            $this->assertDatabaseCount('product_image_metadata', 7);
+            $this->assertLessThanOrEqual(3, ProductImageMetadata::where('status', 'processing')->count());
+            $input = json_decode($request['input'][1]['content'][0]['text'], true);
+            $this->assertSame('Volledige TEST bron met laatste productfeit.', $input['producttekst']);
+            $index = $sent++;
+            if ($index === 0) {
+                return Http::failedConnection('PRIVATE provider timeout');
+            }
+            if ($index === 1) {
+                return Http::response(['error' => ['message' => 'PRIVATE rate limit']], 429);
+            }
+
+            return Http::response(['output_text' => json_encode([...$this->fields(), 'filename' => 'testproduct-'.$names[$index].'.webp'])]);
+        });
+        (new GenerateProductImages($id))->handle(new FakeProductImageGenerator);
+        Http::assertSentCount(6); // Laravel does not record failed connections as sent responses.
+        $this->assertSame(7, $sent); // No hidden retry or duplicate paid call.
+        $this->assertSame(5, ProductImageMetadata::where('status', 'completed')->count());
+        $this->assertSame(2, ProductImageMetadata::where('status', 'failed')->count());
+        $this->assertSame(0, ProductImageMetadata::whereIn('status', ['queued', 'processing'])->count());
+        $payload = $this->getJson('/api/images/requests/'.$id)->assertJsonPath('image_status', 'completed')
+            ->assertJsonPath('status', 'seo_failed')->assertJsonPath('seo_summary.ready', 5)->assertJsonPath('seo_summary.pending', 0);
+        $this->assertStringNotContainsString('PRIVATE', $payload->getContent());
+        $failed = collect($payload->json('results'))->firstWhere('seo.status', 'failed');
+        $this->get($failed['download_url'])->assertOk()->assertHeader('X-Image-SEO-Ready', 'false');
+    }
+
+    public function test_stored_images_survive_job_timeout_and_old_failed_sets_are_recoverable(): void
+    {
+        [$request, $asset] = $this->photos();
+        $source = $asset->contents_base64;
+        (new GenerateProductImages($request->id))->failed(new \RuntimeException('TEST timeout'));
+        $this->assertSame('completed', $request->fresh()->status);
+        $request->update(['status' => 'failed', 'progress_step' => 'failed', 'error' => 'De beeldservice reageerde te lang niet.']);
+        ProductImageMetadata::query()->update(['updated_at' => now()->subMinutes(11)]);
+        $response = $this->getJson('/api/images/requests/'.$request->id)->assertJsonPath('image_status', 'completed')
+            ->assertJsonPath('status', 'seo_failed')->assertJsonPath('error', null)->assertJsonPath('seo_summary.pending', 0);
+        $this->get($response->json('results.0.original_download_url'))->assertOk();
+        $this->assertSame($source, $asset->fresh()->contents_base64);
+        Http::assertNothingSent();
+    }
+
+    public function test_batch_cannot_overwrite_manual_edits_or_duplicate_a_claimed_analysis(): void
+    {
+        [$request, $asset, $url] = $this->photos();
+        $seo = app(ProductImageSeo::class);
+        $seo->record($asset)->delete();
+        $jobs = $seo->prepareAutomaticJobs([$asset]);
+        $this->assertCount(1, $jobs);
+        $this->assertSame([], $seo->prepareAutomaticJobs([$asset]));
+        config(['services.product_images.queue_connection' => 'deferred', 'services.product_images.driver' => 'openai', 'services.product_images.openai.api_key' => 'test-key']);
+        Http::fake(function () use ($url) {
+            $this->putJson($url, ['image_version' => 1, 'revision' => 0, 'fields' => $this->fields()])->assertOk();
+
+            return Http::response(['output_text' => json_encode([...$this->fields(), 'alt' => 'AI must not overwrite'])]);
+        });
+        $seo->runAutomaticJobs($jobs);
+        $seo->runAutomaticJobs($jobs);
+        Http::assertSentCount(1);
+        $this->getJson($url)->assertJsonPath('seo.source', 'manual')->assertJsonPath('metadata.alt', $this->fields()['alt']);
     }
 
     public function test_automatic_seo_does_not_fail_a_photo_when_refinement_has_already_started(): void
