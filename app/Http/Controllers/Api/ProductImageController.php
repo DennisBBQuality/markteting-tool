@@ -13,6 +13,7 @@ use App\Models\ProductImageRequest;
 use App\Models\ProductImageRevision;
 use App\Models\ProductImageStyleReference;
 use App\Services\AiCredentialStore;
+use App\Services\ProductImageCancellation;
 use App\Services\ProductImageDelivery;
 use App\Services\ProductImageModelCatalog;
 use App\Services\ProductImagePromptBuilder;
@@ -180,6 +181,24 @@ class ProductImageController extends Controller
         $imageRequest = $this->failIfStalled($imageRequest->refresh());
 
         return response()->json($this->requestPayload($imageRequest));
+    }
+
+    public function cancel(Request $request, ProductImageRequest $imageRequest, ProductImageCancellation $cancellation): JsonResponse
+    {
+        $this->ensureOwner($request, $imageRequest);
+        $cancellation->stop($imageRequest);
+
+        return response()->json($this->requestPayload($imageRequest->fresh()));
+    }
+
+    public function cancelSeo(Request $request, ProductImageRequest $imageRequest, ProductImageAsset $asset, ProductImageCancellation $cancellation, ProductImageSeo $seo): JsonResponse
+    {
+        $this->ensureOwner($request, $imageRequest);
+        $this->ensureAssetBelongsToRequest($imageRequest, $asset);
+        $data = $request->validate(['image_version' => ['required', 'integer', 'min:1'], 'revision' => ['required', 'integer', 'min:0']]);
+        $cancellation->stopSeo($asset, $data['image_version'], $data['revision']);
+
+        return response()->json($this->seoPayload($imageRequest, $asset->fresh(), $seo));
     }
 
     public function linkDossier(Request $request, ProductImageRequest $imageRequest): JsonResponse
@@ -436,10 +455,16 @@ class ProductImageController extends Controller
             $progress = 90 + (int) floor(9 * $readyCount / max(1, $results->count()));
             $step = $workflowStatus;
         }
+        if ($imageRequest->status === 'cancelled') {
+            $workflowStatus = $imageRequest->progress_step === 'cancelling' ? 'cancelling' : 'cancelled';
+            $step = $workflowStatus;
+            $progress = (int) $imageRequest->progress;
+        }
 
         return [
             'request_id' => $imageRequest->id,
             'status' => $workflowStatus,
+            'can_cancel' => in_array($imageRequest->status, ['queued', 'processing'], true) || $results->contains(fn ($result) => in_array($result['seo']['status'] ?? '', ['queued', 'processing'], true)),
             'image_status' => $imagesStored ? 'completed' : $imageRequest->status,
             'seo_summary' => ['ready' => $readyCount, 'total' => $results->count(), 'pending' => $pendingCount],
             'progress' => $progress,
@@ -457,6 +482,11 @@ class ProductImageController extends Controller
 
     private function failIfStalled(ProductImageRequest $imageRequest): ProductImageRequest
     {
+        if ($imageRequest->status === 'cancelled' && $imageRequest->progress_step === 'cancelling' && $imageRequest->updated_at->lt(now()->subMinutes(10))) {
+            ProductImageRequest::whereKey($imageRequest->id)->where('status', 'cancelled')->where('progress_step', 'cancelling')->update(['progress_step' => 'cancelled', 'completed_at' => now()]);
+
+            return $imageRequest->refresh();
+        }
         if (! empty($imageRequest->results)) {
             return $imageRequest; // Image results exist: SEO has its own timeout and recovery.
         }
@@ -498,6 +528,8 @@ class ProductImageController extends Controller
             'seo_failed' => 'Foto’s bewaard; SEO nog niet afgerond',
             'completed' => 'Alle productfoto’s en SEO zijn klaar',
             'failed' => 'Opdracht gestopt',
+            'cancelling' => 'Stop aangevraagd; wachten op de al verzonden foto-aanvragen. Er starten geen volgende groepen.',
+            'cancelled' => 'Handmatig gestopt. Beschikbare foto’s en SEO zijn bewaard.',
             default => 'Voortgang wordt bijgewerkt',
         };
     }

@@ -146,9 +146,13 @@ class ProductImageSeo
         }
     }
 
-    private function prepareJob(ProductImageAsset $asset, ?int $expectedRevision = null, bool $replaceManual = false): ?GenerateProductImageSeo
+    private function prepareJob(ProductImageAsset $asset, ?int $expectedRevision = null, bool $replaceManual = false, bool $automatic = false): ?GenerateProductImageSeo
     {
-        $token = DB::transaction(function () use ($asset, $expectedRevision, $replaceManual) {
+        $token = DB::transaction(function () use ($asset, $expectedRevision, $replaceManual, $automatic) {
+            $request = ProductImageRequest::whereKey($asset->product_image_request_id)->lockForUpdate()->firstOrFail();
+            if ($automatic && $request->status === 'cancelled') {
+                return null;
+            }
             $locked = ProductImageAsset::whereKey($asset->id)->lockForUpdate()->firstOrFail(['id', 'version', 'refinement_status']);
             abort_if($locked->version !== $asset->version || $locked->refinement_status !== 'idle', 409, 'De foto is gewijzigd of wordt aangepast. Open de actuele versie.');
             $row = ProductImageMetadata::firstOrCreate(['product_image_asset_id' => $asset->id, 'image_version' => $asset->version]);
@@ -176,7 +180,7 @@ class ProductImageSeo
                 if ($record?->status === 'completed' || $record?->source === 'manual') {
                     continue;
                 }
-                if ($job = $this->prepareJob($asset)) {
+                if ($job = $this->prepareJob($asset, automatic: true)) {
                     $jobs[$asset->id] = $job;
                 }
             } catch (Throwable) {

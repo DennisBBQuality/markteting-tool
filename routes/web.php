@@ -147,6 +147,8 @@ Route::middleware('auth.custom')->group(function () {
     Route::put('/api/images/prompt', [ProductImageController::class, 'updatePrompt'])->middleware('admin');
     Route::post('/api/images/generate', [ProductImageController::class, 'generate'])->middleware('throttle:image-generation');
     Route::get('/api/images/requests/{imageRequest}', [ProductImageController::class, 'status']);
+    Route::post('/api/images/requests/{imageRequest}/cancel', [ProductImageController::class, 'cancel']);
+    Route::post('/api/images/requests/{imageRequest}/assets/{asset}/seo/cancel', [ProductImageController::class, 'cancelSeo']);
     Route::get('/api/images/requests/{imageRequest}/assets/{asset}/seo', [ProductImageController::class, 'seo']);
     Route::put('/api/images/requests/{imageRequest}/assets/{asset}/seo', [ProductImageController::class, 'saveSeo']);
     Route::post('/api/images/requests/{imageRequest}/assets/{asset}/seo/generate', [ProductImageController::class, 'generateSeo'])->middleware('throttle:image-seo-generation');

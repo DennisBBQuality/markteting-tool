@@ -153,6 +153,7 @@ function renderConverter() {
           <i class="fas fa-wand-magic-sparkles"></i> Maak productfoto
         </button>
         <span class="product-image-action-hint" id="product-image-action-hint">Alleen de gekozen varianten worden gemaakt, met eigen SEO per foto. Je mag ondertussen verder werken.</span>
+        <button class="btn btn-outline hidden" id="product-image-stop-btn" type="button" onclick="stopProductImageGeneration()"><i class="fas fa-stop" aria-hidden="true"></i> Stoppen</button>
       </div>
 
       <div class="product-image-status hidden" id="product-image-status" role="status" aria-live="polite"></div>
@@ -627,6 +628,7 @@ async function startProductImageGeneration() {
     }
 
     productImageState.requestId = data.request_id;
+    productImageState.stopRequested = false;
     sessionStorage.setItem(PRODUCT_IMAGE_REQUEST_KEY, data.request_id);
     showProductImagePendingState(data);
     pollProductImageRequest(data.request_id);
@@ -648,6 +650,7 @@ function showProductImagePendingState(data = null) {
   if (!button || !status) return;
 
   productImageState.generating = true;
+  updateProductImageStop(data);
   updateProductImageForm();
   button.disabled = true;
   button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Productfoto\'s worden gemaakt...';
@@ -660,9 +663,42 @@ function showProductImagePendingState(data = null) {
   });
 }
 
+function updateProductImageStop(data = null) {
+  const button = document.getElementById('product-image-stop-btn');
+  if (!button) return;
+  const waiting = data?.status === 'cancelling' || productImageState.stopRequested;
+  const visible = !!productImageState.requestId && (data?.can_cancel !== false || waiting);
+  button.classList.toggle('hidden', !visible);
+  button.disabled = waiting || !!productImageState.stopping;
+  button.textContent = waiting ? 'Stop aangevraagd' : productImageState.stopping ? 'Stop aanvragen…' : 'Stoppen';
+}
+
+async function stopProductImageGeneration() {
+  const requestId = productImageState.requestId;
+  if (!requestId || productImageState.stopping || productImageState.stopRequested) return;
+  if (!confirm('Deze opdracht stoppen? Beschikbare foto’s en SEO blijven bewaard. Al verzonden AI-aanvragen kunnen nog worden verwerkt en kosten geven. Er starten geen volgende fotogroepen of automatische SEO-taken.')) return;
+  productImageState.stopping = true;
+  productImageState.pollEpoch = (productImageState.pollEpoch || 0) + 1;
+  if (productImageState.pollTimer) clearTimeout(productImageState.pollTimer);
+  updateProductImageStop();
+  const data = await api(`/api/images/requests/${encodeURIComponent(requestId)}/cancel`, { method: 'POST', body: {},
+    silentError: true, onError: message => toast(`Stoppen is niet bevestigd: ${message}`, 'error') });
+  if (productImageState.requestId !== requestId) return;
+  productImageState.stopping = false;
+  if (data && ['cancelled', 'cancelling'].includes(data.status)) productImageState.stopRequested = true;
+  updateProductImageStop(data);
+  // Read authoritative state again; never claim a stop after a failed POST.
+  pollProductImageRequest(requestId);
+}
+
 function renderProductImageProgress(data) {
   const status = document.getElementById('product-image-status');
   if (!status) return;
+  if (data.status === 'cancelling') {
+    status.classList.remove('hidden', 'is-error');
+    status.innerHTML = '<div role="status" aria-live="polite"><strong>Stop aangevraagd</strong><span>Er starten geen volgende fotogroepen of automatische SEO-taken. We wachten nog op de al verzonden foto-aanvragen; dit kan enkele minuten duren. Teruggekomen foto’s blijven bewaard. Een verzonden aanvraag kan nog kosten geven.</span></div>';
+    return;
+  }
 
   const steps = [
     { key: 'queued', label: 'Foto ontvangen' },
@@ -724,6 +760,7 @@ function showProductImageError(message) {
 
 async function pollProductImageRequest(requestId) {
   if (!requestId || productImageState.requestId !== requestId) return;
+  const epoch = productImageState.pollEpoch || 0;
 
   try {
     const response = await fetch(`/api/images/requests/${encodeURIComponent(requestId)}`, {
@@ -735,8 +772,9 @@ async function pollProductImageRequest(requestId) {
     }
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Status ophalen is mislukt.');
-    if (productImageState.requestId !== requestId) return;
+    if (productImageState.requestId !== requestId || epoch !== (productImageState.pollEpoch || 0)) return;
     productImageState.pollFailures = 0;
+    updateProductImageStop(data);
     if (!productImageState.context && data.context) {
       productImageState.context = data.context;
       productImageState.productType = data.context.product_type || productImageState.productType;
@@ -752,6 +790,13 @@ async function pollProductImageRequest(requestId) {
       productImageState.context = data.context || productImageState.context;
       productImageState.completedRequestId = requestId;
       renderProductImageResults();
+    }
+    if (data.status === 'cancelled') {
+      finishProductImageRequest(false, !!productImageState.results.length);
+      const status = document.getElementById('product-image-status');
+      status?.classList.remove('hidden', 'is-error');
+      if (status) status.innerHTML = '<div role="status"><strong>Opdracht handmatig gestopt</strong><span>Beschikbare foto’s en SEO zijn bewaard. Al verzonden AI-aanvragen kunnen nog kosten geven. Je kunt een nieuwe opdracht starten of ontbrekende SEO apart maken.</span></div>';
+      return;
     }
     if (data.status === 'completed' && productImagesSeoReady(data.results)) {
       const expected = Number(data.expected_count ?? data.context?.photo_count ?? (['dough', 'accessory'].includes(data.context?.product_type) ? 3 : ['meat', 'fish'].includes(data.context?.product_type ?? 'meat') ? 4 : 2));
@@ -782,6 +827,7 @@ async function pollProductImageRequest(requestId) {
     renderProductImageProgress(data);
     productImageState.pollTimer = setTimeout(() => pollProductImageRequest(requestId), 2500);
   } catch (error) {
+    if (productImageState.requestId !== requestId || epoch !== (productImageState.pollEpoch || 0)) return;
     productImageState.pollFailures += 1;
     if (productImageState.pollFailures <= 3) {
       productImageState.pollTimer = setTimeout(() => pollProductImageRequest(requestId), 5000);
@@ -800,6 +846,8 @@ function finishProductImageRequest(hideStatus = true, keepRecovery = false) {
   productImageState.pollTimer = null;
   productImageState.generating = false;
   productImageState.requestId = null;
+  productImageState.stopRequested = false;
+  updateProductImageStop({can_cancel: false});
   if (!keepRecovery) sessionStorage.removeItem(PRODUCT_IMAGE_REQUEST_KEY);
 
   const button = document.getElementById('product-image-generate-btn');

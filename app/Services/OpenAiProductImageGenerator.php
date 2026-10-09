@@ -92,16 +92,25 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
         }
 
         $model = $context['image_model'] ?? app(ProductImageModelCatalog::class)->selected();
-        $generatedImages = $this->requestConcurrently($requests, $apiKey, $model);
         $results = [];
-        foreach ($plans as $index => $plan) {
-            $results[] = [
-                'status' => $plan['status'],
-                'label' => $plan['label'],
-                'style_id' => $plan['style_id'],
-                'contents' => $generatedImages[$index],
-                'extension' => 'png',
-            ];
+        // Only submit the next pair after checking the persisted stop request.
+        // Requests already sent to the provider cannot be recalled.
+        foreach (array_chunk($requests, self::MAX_CONCURRENT_IMAGE_REQUESTS, true) as $wave) {
+            if ($reportProgress && $reportProgress('generating_product', 20 + (int) (65 * count($results) / count($plans))) === false) {
+                break;
+            }
+            $generatedImages = $this->requestConcurrently($wave, $apiKey, $model,
+                $reportProgress ? fn () => $reportProgress('generating_product', 20 + (int) (65 * count($results) / count($plans))) === false : null);
+            foreach ($generatedImages as $index => $contents) {
+                $plan = $plans[$index];
+                $results[] = [
+                    'status' => $plan['status'],
+                    'label' => $plan['label'],
+                    'style_id' => $plan['style_id'],
+                    'contents' => $contents,
+                    'extension' => 'png',
+                ];
+            }
         }
 
         return $results;
@@ -111,7 +120,7 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
      * @param  array<int, array{sources: list<string|array{contents: string, filename: string}>, prompt: string}>  $requests
      * @return array<int, string>
      */
-    private function requestConcurrently(array $requests, string $apiKey, string $model): array
+    private function requestConcurrently(array $requests, string $apiKey, string $model, ?callable $isStopped = null): array
     {
         $responses = Http::pool(function (Pool $pool) use ($requests, $apiKey, $model): void {
             foreach ($requests as $index => $request) {
@@ -137,13 +146,23 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
         }, self::MAX_CONCURRENT_IMAGE_REQUESTS);
 
         $images = [];
+        $stopped = $isStopped && $isStopped();
         foreach (array_keys($requests) as $index) {
             $response = $responses[(string) $index] ?? null;
             if (! $response instanceof Response) {
+                if ($stopped) {
+                    continue;
+                }
                 throw new ProductImageGenerationException('De beeldservice is momenteel niet bereikbaar.');
             }
 
-            $images[$index] = $this->contentsFromSingleResponse($response);
+            try {
+                $images[$index] = $this->contentsFromSingleResponse($response);
+            } catch (ProductImageGenerationException $error) {
+                if (! $stopped) {
+                    throw $error;
+                }
+            }
         }
 
         return $images;
@@ -181,10 +200,12 @@ class OpenAiProductImageGenerator implements ProductImageGenerator, ProductImage
 
         foreach (self::VARIANT_PROMPTS as $status => $variantPrompt) {
             if ($reportProgress) {
-                $reportProgress(
+                if ($reportProgress(
                     $status === 'bereid' ? 'generating_prepared' : 'generating_raw',
                     $status === 'bereid' ? 30 : 60,
-                );
+                ) === false) {
+                    return $results;
+                }
             }
 
             foreach ($this->requestVariants($normalizedSource, trim($basePrompt)."\n\n".$variantPrompt, $apiKey, $model) as $contents) {

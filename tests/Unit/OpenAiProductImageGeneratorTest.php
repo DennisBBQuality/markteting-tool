@@ -172,7 +172,7 @@ class OpenAiProductImageGeneratorTest extends TestCase
             ));
         }
         Http::shouldReceive('pool')
-            ->once()
+            ->times(3)
             ->withArgs(fn ($callback, $concurrency) => is_callable($callback) && $concurrency === 2)
             ->andReturn($responses);
 

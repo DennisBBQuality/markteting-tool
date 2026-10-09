@@ -5,7 +5,7 @@ const fs = require('node:fs');
 
 function harness() {
   const fields = new Map();
-  const get = id => { if (!fields.has(id)) fields.set(id, { value: '', textContent: '', disabled: false }); return fields.get(id); };
+  const get = id => { if (!fields.has(id)) fields.set(id, { value: '', textContent: '', disabled: false, classList: {toggle() {}} }); return fields.get(id); };
   const calls = [], timers = [];
   const metadata = { filename: 'test.webp', alt: 'Testfoto', title: 'Test', caption: 'Serveersuggestie.', description: 'Testbeschrijving.' };
   const context = { document: { getElementById: get }, escHtml: x => String(x), openModal: (title, html) => { context.modal = html; }, closeModal: () => {},
@@ -32,6 +32,23 @@ test('editor saves five fields with image version and optimistic revision; copie
   await h.run('copyImageSeo("all")');
   assert.match(h.context.copied, /Bestandsnaam: eigen-foto.webp/);
   assert.match(h.context.copied, /Bijschrift:/);
+});
+
+test('SEO stop retains dirty input and blocks late pre-stop polling', async () => {
+  const h = harness(); h.context.response.seo.status = 'processing';
+  await h.run('openImageSeoEditor(1)');
+  h.get('image-seo-alt').value = 'Mijn bewaarde invoer'; h.run('imageSeoEditor.dirty = true');
+  let resolveOld;
+  h.context.api = () => new Promise(resolve => {resolveOld = resolve;});
+  const old = h.run('refreshImageSeo(imageSeoEditor)');
+  h.context.api = async (url, options) => {h.calls.push([url, options]); return {...h.context.response, seo:{status:'cancelled', revision:1, source:'none', error:'SEO handmatig gestopt'}};};
+  await h.run('stopImageSeo()');
+  assert.match(h.calls.at(-1)[0], /\/seo\/cancel$/);
+  assert.equal(h.calls.at(-1)[1].body.revision, 0);
+  assert.equal(h.get('image-seo-alt').value, 'Mijn bewaarde invoer');
+  assert.equal(h.run('imageSeoEditor.revision'), 1);
+  resolveOld({...h.context.response, seo:{status:'processing', revision:0}}); await old;
+  assert.match(h.get('image-seo-status').textContent, /gestopt/);
 });
 
 test('late polling never overwrites dirty fields and stale image versions disable saving', async () => {
@@ -107,6 +124,18 @@ test('fresh server policy updates guidance without replacing dirty caption', asy
   assert.equal(h.get('image-seo-label-caption').textContent, 'Bijschrift (optioneel)');
   assert.match(h.get('image-seo-guidance').textContent, /Productgerichte SEO/);
   assert.equal(h.get('image-seo-caption').value, 'Mijn eigen bijschrift');
+});
+
+test('completion racing with stop retains stale-edit protection for dirty text', async () => {
+  const h = harness(); await h.run('openImageSeoEditor(1)');
+  const revision = h.run('imageSeoEditor.revision');
+  h.get('image-seo-alt').value = 'Eigen invoer';
+  h.run('imageSeoEditor.dirty = true');
+  h.context.response.seo = {revision: revision + 1, status: 'completed', ready: true, source: 'ai'};
+  await h.run('stopImageSeo()');
+  assert.equal(h.run('imageSeoEditor.revision'), revision);
+  assert.equal(h.get('image-seo-alt').value, 'Eigen invoer');
+  assert.match(h.get('image-seo-status').textContent, /nieuwe SEO beschikbaar/);
 });
 
 test('new kitchen policy explains visible presentation without forced appliance or style keywords', async () => {
