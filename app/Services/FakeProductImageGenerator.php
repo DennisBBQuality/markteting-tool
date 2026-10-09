@@ -44,7 +44,9 @@ class FakeProductImageGenerator implements ProductImageGenerator, ProductImageRe
         $results = [];
         foreach ($plans as $index => $plan) {
             if ($reportProgress) {
-                $reportProgress('generating_product', 25 + ($index * 20));
+                if ($reportProgress('generating_product', 25 + ($index * 20)) === false) {
+                    break;
+                }
             }
             $results[] = [
                 'status' => $plan['status'],

@@ -32,6 +32,41 @@ const file = (name = 'test.png', type = 'image/png', size = 8) => new File([new 
 const item = (type = 'image/png', size = 8) => ({ types: [type], getType: async () => new Blob([new Uint8Array(size)], { type }) });
 const pasteEvent = (files, editable = false) => ({ clipboardData: { files }, target: { closest: () => editable }, preventDefault() { this.prevented = true; } });
 
+test('stop requires confirmation, posts once and waits for authoritative cancellation', async () => {
+  const h = harness(); const calls = [], timers = [];
+  Object.assign(h.context, {confirm: () => false, setTimeout: f => timers.push(f), clearTimeout() {},
+    api: async (url, options) => {calls.push([url, options]); return {status:'cancelling', can_cancel:false};},
+    fetch: async () => ({ok:true, json:async () => ({status:'cancelling', can_cancel:false, results:[]})})});
+  h.run("productImageState.requestId = 'test-request'; productImageState.generating = true;");
+  await h.run('stopProductImageGeneration()'); assert.equal(calls.length, 0);
+  h.context.confirm = () => true;
+  await h.run('stopProductImageGeneration()'); await new Promise(resolve => setImmediate(resolve));
+  assert.equal(calls.length, 1); assert.equal(calls[0][0], '/api/images/requests/test-request/cancel');
+  assert.equal(calls[0][1].method, 'POST'); assert.equal(h.run('productImageState.generating'), true);
+  assert.match(h.field('product-image-status').innerHTML, /Stop aangevraagd/);
+  await h.run('stopProductImageGeneration()'); assert.equal(calls.length, 1);
+  h.context.fetch = async () => ({ok:true, json:async () => ({status:'cancelled', can_cancel:false, results:[]})});
+  await h.run("pollProductImageRequest('test-request')");
+  assert.equal(h.run('productImageState.generating'), false);
+  assert.match(h.field('product-image-status').innerHTML, /handmatig gestopt/);
+});
+
+test('failed stop is not presented as cancellation and late pre-stop polling is ignored', async () => {
+  const h = harness(); const timers = [];
+  Object.assign(h.context, {confirm: () => true, clearTimeout() {}, setTimeout:f => timers.push(f)});
+  h.run("productImageState.requestId = 'test'; productImageState.generating = true;");
+  let resolveOld;
+  h.context.fetch = () => new Promise(resolve => {resolveOld = resolve;});
+  const old = h.run("pollProductImageRequest('test')");
+  h.context.api = async (url, options) => { options.onError('Netwerkfout'); return null; };
+  h.context.fetch = async () => ({ok:true, json:async () => ({status:'processing', can_cancel:true, results:[]})});
+  await h.run('stopProductImageGeneration()'); await new Promise(resolve => setImmediate(resolve));
+  assert.match(h.messages.at(-1), /niet bevestigd/);
+  assert.equal(h.run('!!productImageState.stopRequested'), false);
+  resolveOld({ok:true, json:async () => ({status:'cancelled', results:[]})}); await old;
+  assert.equal(h.run('productImageState.generating'), true);
+});
+
 test('product text has a larger accessible field with no character limit and is sent in full', async () => {
   const source = fs.readFileSync('public/js/converter.js', 'utf8');
   const textarea = source.match(/<textarea id="product-image-notes"[^>]*>/)[0];

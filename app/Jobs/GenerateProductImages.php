@@ -41,7 +41,11 @@ class GenerateProductImages implements ShouldQueue
     public function handle(ProductImageGenerator $generator): void
     {
         $request = ProductImageRequest::findOrFail($this->requestId);
-        if (in_array($request->status, ['completed', 'failed'], true)) {
+        if (in_array($request->status, ['completed', 'failed', 'cancelled'], true)) {
+            if ($request->status === 'cancelled') {
+                $this->deleteSources($request);
+            }
+
             return;
         }
 
@@ -49,32 +53,40 @@ class GenerateProductImages implements ShouldQueue
             set_time_limit(0);
         }
 
-        $request->update([
+        $claimed = ProductImageRequest::whereKey($request->id)->where('status', 'queued')->update([
             'status' => 'processing',
             'progress' => 10,
             'progress_step' => 'starting',
             'error' => null,
             'started_at' => $request->started_at ?? now(),
         ]);
+        if (! $claimed) {
+            return;
+        }
 
         $sources = $this->uploadedSources($request);
-        $progress = function (string $step, int $progress) use ($request): void {
-            $request->update([
+        $progress = function (string $step, int $progress) use ($request): bool {
+            ProductImageRequest::whereKey($request->id)->where('status', 'processing')->update([
                 'progress' => min(90, max(10, $progress)),
                 'progress_step' => $step,
             ]);
+
+            // MySQL may report zero changed rows for an identical progress update.
+            // That is not a stop: check the actual persisted state.
+            return ProductImageRequest::whereKey($request->id)->where('status', 'processing')->exists();
         };
         $generatedImages = $generator instanceof ProductImageWorkflowGenerator && is_array($request->generation_context)
             ? $generator->generateForProduct($sources, $request->prompt, $request->generation_context, $progress)
             : $generator->generate($sources[0], $request->prompt, $progress);
-        $request->update([
+        ProductImageRequest::whereKey($request->id)->where('status', 'processing')->update([
             'progress' => 90,
             'progress_step' => 'saving',
         ]);
-        $results = $this->storeValidatedResults($request, $generatedImages);
+        $request->refresh();
+        $results = $this->storeValidatedResults($request, $generatedImages, $request->status === 'cancelled');
         unset($generatedImages, $sources); // Do not retain the entire PNG set during SEO network waits.
 
-        $request->update([
+        ProductImageRequest::whereKey($request->id)->where('status', 'processing')->update([
             'status' => 'processing',
             'progress' => 90,
             'progress_step' => 'processing_seo',
@@ -83,12 +95,19 @@ class GenerateProductImages implements ShouldQueue
             'completed_at' => null,
         ]);
         $this->deleteSources($request);
+        if ($request->fresh()->status === 'cancelled') {
+            ProductImageRequest::whereKey($request->id)->update(['progress_step' => 'cancelled', 'completed_at' => now()]);
+
+            return;
+        }
         $seo = app(ProductImageSeo::class);
         $jobs = $seo->prepareAutomaticJobs(ProductImageAsset::where('product_image_request_id', $request->id)
             ->get(['id', 'product_image_request_id', 'filename', 'version', 'refinement_status']));
         // This records image-job completion only. The API gates overall completion on every current SEO record.
-        $request->update(['status' => 'completed', 'progress' => 100, 'progress_step' => 'completed', 'completed_at' => now()]);
+        ProductImageRequest::whereKey($request->id)->where('status', 'processing')->update(['status' => 'completed', 'progress' => 100, 'progress_step' => 'completed', 'completed_at' => now()]);
         $seo->runAutomaticJobs($jobs);
+        ProductImageRequest::whereKey($request->id)->where('status', 'cancelled')->where('progress_step', 'cancelling')
+            ->update(['progress_step' => 'cancelled', 'completed_at' => now()]);
     }
 
     public function failed(?Throwable $exception): void
@@ -99,13 +118,18 @@ class GenerateProductImages implements ShouldQueue
         }
 
         $this->deleteSources($request);
-        if (! empty($request->results)) {
-            // A SEO/hosting timeout must never relabel stored images as a failed image generation.
-            $request->update(['status' => 'completed', 'progress' => 100, 'progress_step' => 'completed', 'error' => null, 'completed_at' => $request->completed_at ?? now()]);
+        if ($request->status === 'cancelled') {
+            $request->update(['progress_step' => 'cancelled', 'completed_at' => now()]);
 
             return;
         }
-        $request->update([
+        if (! empty($request->results)) {
+            // A SEO/hosting timeout must never relabel stored images as a failed image generation.
+            ProductImageRequest::whereKey($request->id)->where('status', '!=', 'cancelled')->update(['status' => 'completed', 'progress' => 100, 'progress_step' => 'completed', 'error' => null, 'completed_at' => $request->completed_at ?? now()]);
+
+            return;
+        }
+        ProductImageRequest::whereKey($request->id)->where('status', '!=', 'cancelled')->update([
             'status' => 'failed',
             'progress_step' => 'failed',
             'error' => $exception instanceof ProductImageGenerationException
@@ -116,13 +140,13 @@ class GenerateProductImages implements ShouldQueue
     }
 
     /** @param mixed $images */
-    private function storeValidatedResults(ProductImageRequest $request, $images): array
+    private function storeValidatedResults(ProductImageRequest $request, $images, bool $partial = false): array
     {
         $expectedStatuses = is_array($request->generation_context)
             ? array_column(app(ProductImagePromptBuilder::class)->plans($request->generation_context), 'status')
             : ['bereid', 'bereid', 'rauw', 'rauw'];
         $expected = count($expectedStatuses);
-        if (! is_array($images) || count($images) !== $expected) {
+        if (! is_array($images) || ($partial ? count($images) > $expected : count($images) !== $expected)) {
             throw new RuntimeException("De beeldservice leverde niet exact {$expected} afbeeldingen op.");
         }
 
@@ -157,11 +181,12 @@ class GenerateProductImages implements ShouldQueue
         $expectedCounts = array_count_values($expectedStatuses);
         ksort($counts);
         ksort($expectedCounts);
-        if ($counts !== $expectedCounts) {
+        if ((! $partial && $counts !== $expectedCounts) || collect($counts)->contains(fn ($count, $status) => $count > ($expectedCounts[$status] ?? 0))) {
             throw new RuntimeException('De beeldservice leverde niet het juiste aantal bereide en rauwe afbeeldingen op.');
         }
 
-        DB::transaction(function () use ($request, $assets): void {
+        DB::transaction(function () use ($request, $assets, $results): void {
+            $locked = ProductImageRequest::whereKey($request->id)->lockForUpdate()->firstOrFail();
             ProductImageAsset::where('product_image_request_id', $request->id)->delete();
 
             foreach ($assets as $asset) {
@@ -173,6 +198,8 @@ class GenerateProductImages implements ShouldQueue
                     'contents_base64' => $asset['contents_base64'],
                 ]);
             }
+            // Keep the subset returned by an in-flight wave even when stop won the race.
+            $locked->update(['results' => $results]);
         });
 
         return $results;

@@ -42,6 +42,7 @@ async function openImageSeoEditor(assetId) {
       <p>Gebruik een unieke beschrijvende bestandsnaam zonder cijfers. Bij een dubbele naam kies je een ander zichtbaar detail. Je kunt de foto nu al downloaden; zonder complete SEO krijgt de WEBP tijdelijk een technische bestandsnaam. Rond de SEO af vóór publicatie. Een optioneel bijschrift mag leeg blijven.</p>
     </div>`, `<button class="btn btn-primary" id="image-seo-save" onclick="saveImageSeo()">SEO opslaan</button>
       <button class="btn btn-outline" id="image-seo-generate" onclick="generateImageSeo()">SEO opnieuw maken</button>
+      <button class="btn btn-outline hidden" id="image-seo-stop" onclick="stopImageSeo()">SEO stoppen</button>
       <button class="btn btn-outline" onclick="copyImageSeo('all')">Alles kopiëren</button>
       <button class="btn btn-outline" onclick="closeImageSeo()">Sluiten</button>`);
   await refreshImageSeo(editor);
@@ -71,6 +72,8 @@ function applyImageSeo(editor, data) {
     if (typeof finishProductImageRequest === 'function') finishProductImageRequest();
   }
   const pending = ['queued', 'processing'].includes(data.seo.status);
+  const stop = document.getElementById('image-seo-stop');
+  if (stop) { stop.classList.toggle('hidden', !pending); stop.disabled = editor.busy; }
   document.getElementById('image-seo-generate').disabled = pending || editor.busy;
   if (!editor.dirty) {
     IMAGE_SEO_FIELDS.forEach(([key]) => { document.getElementById(`image-seo-${key}`).value = data.metadata[key] || ''; });
@@ -88,8 +91,29 @@ function applyImageSeo(editor, data) {
 
 async function refreshImageSeo(editor) {
   if (!imageSeoActive(editor)) return;
+  const epoch = editor.stopEpoch || 0;
   const data = await api(editor.url, { silentError: true, onError: message => imageSeoMessage(editor, message) });
-  if (data) applyImageSeo(editor, data);
+  if (data && epoch === (editor.stopEpoch || 0)) applyImageSeo(editor, data);
+}
+
+async function stopImageSeo() {
+  const editor = imageSeoEditor;
+  if (!editor || !imageSeoActive(editor) || editor.busy) return;
+  if (!confirm('SEO voor deze foto stoppen? De foto, opgeslagen teksten en je invoer blijven bewaard. Een al verzonden AI-aanvraag kan nog kosten geven.')) return;
+  editor.busy = true;
+  editor.stopEpoch = (editor.stopEpoch || 0) + 1;
+  document.getElementById('image-seo-stop').disabled = true;
+  const data = await api(`${editor.url}/cancel`, {method: 'POST', body: {image_version: editor.version, revision: editor.revision},
+    silentError: true, onError: message => imageSeoMessage(editor, `Stoppen is niet bevestigd: ${message}`)});
+  editor.busy = false;
+  if (!imageSeoActive(editor)) return;
+  document.getElementById('image-seo-stop').disabled = false;
+  if (data) {
+    // Only an acknowledged cancellation changes state without changing text.
+    // If completion won the race, keep stale-edit protection for unsaved input.
+    if (data.seo.status === 'cancelled') editor.revision = Number(data.seo.revision);
+    applyImageSeo(editor, data);
+  }
 }
 
 async function saveImageSeo() {
