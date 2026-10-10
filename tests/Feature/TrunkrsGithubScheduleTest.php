@@ -7,11 +7,14 @@ use App\Models\TrunkrsConnection;
 use App\Models\TrunkrsReport;
 use App\Models\TrunkrsSetting;
 use App\Services\Trunkrs\TrunkrsCheckStatus;
+use App\Services\Trunkrs\TrunkrsImporter;
 use App\Services\Trunkrs\TrunkrsSync;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class TrunkrsGithubScheduleTest extends TestCase
@@ -147,6 +150,7 @@ class TrunkrsGithubScheduleTest extends TestCase
         $this->assertSame('completed', $result['state']);
         $this->assertTrue($result['mailbox_completed']);
         $this->assertTrue($result['report_current']);
+        $this->assertSame('current', $result['report_status']);
         $this->assertSame('2026-09-25', $result['report_date']);
         $this->assertSame('queued', $status->get($other)['state']);
         $this->assertArrayNotHasKey('shipments', $result);
@@ -169,6 +173,67 @@ class TrunkrsGithubScheduleTest extends TestCase
         $this->report(null, '2026-09-26T04:10:00Z');
         $status->finished($id, 'ok');
         $this->assertFalse($status->get($id)['report_current']);
+    }
+
+    public static function reportEvidenceCases(): array
+    {
+        return [
+            'missing' => ['2026-10-05T08:00:00Z', null, null, '2026-10-04', 'missing'],
+            'empty today' => ['2026-10-05T08:00:00Z', null, '2026-10-05T04:02:00Z', '2026-10-04', 'empty_undated'],
+            'empty yesterday' => ['2026-10-05T08:00:00Z', null, '2026-10-04T04:02:00Z', '2026-10-04', 'not_received_today'],
+            'wrong delivery day' => ['2026-10-05T08:00:00Z', '2026-10-03', '2026-10-05T04:02:00Z', '2026-10-04', 'unexpected_delivery_date'],
+            'current' => ['2026-10-05T08:00:00Z', '2026-10-04', '2026-10-05T04:02:00Z', '2026-10-04', 'current'],
+            'Dutch midnight' => ['2026-10-04T22:17:00Z', '2026-10-04', '2026-10-04T22:01:00Z', '2026-10-04', 'current'],
+            'before Dutch midnight' => ['2026-10-04T22:17:00Z', '2026-10-04', '2026-10-04T21:59:00Z', '2026-10-04', 'not_received_today'],
+            'spring DST' => ['2026-03-29T04:17:00Z', '2026-03-28', '2026-03-28T23:01:00Z', '2026-03-28', 'current'],
+            'autumn DST' => ['2026-10-25T05:17:00Z', '2026-10-24', '2026-10-24T22:01:00Z', '2026-10-24', 'current'],
+        ];
+    }
+
+    #[DataProvider('reportEvidenceCases')]
+    public function test_report_evidence_keeps_empty_missing_and_unexpected_dates_separate(
+        string $now, ?string $day, ?string $received, string $expected, string $reportStatus
+    ): void {
+        $this->travelTo(CarbonImmutable::parse($now));
+        if ($received !== null) {
+            $this->report($day, $received);
+        }
+        TrunkrsConnection::create(['id' => 1, 'last_checked_at' => now()]);
+        $status = app(TrunkrsCheckStatus::class);
+        $id = $status->create();
+        $status->started($id);
+        $status->finished($id, 'ok');
+        $result = $status->get($id);
+        $this->assertTrue($result['mailbox_completed']);
+        $this->assertSame($reportStatus, $result['report_status']);
+        $this->assertSame($reportStatus === 'current', $result['report_current']);
+        $this->assertSame($expected, $result['expected_delivery_date']);
+        $this->assertSame($day, $result['report_date']);
+    }
+
+    public function test_real_empty_import_and_duplicate_check_preserve_unknown_delivery_date(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-10-05T08:00:00Z'));
+        $message = [
+            'id' => 'synthetic-empty-report', 'receivedDateTime' => '2026-10-05T04:02:00Z',
+            'from' => ['emailAddress' => ['address' => config('trunkrs.sender')]],
+            'subject' => config('trunkrs.subject'),
+        ];
+        $csv = ",Date Date,Merchant Name,Trunkrs Nr,Barcode,Status,Reason Code\n";
+        $importer = app(TrunkrsImporter::class);
+        $this->assertTrue($importer->import($message, $csv, 'report.csv'));
+        $this->assertFalse($importer->import($message, $csv, 'report.csv'));
+        $this->assertDatabaseCount('trunkrs_reports', 1);
+        TrunkrsConnection::create(['id' => 1, 'last_checked_at' => now()]);
+        $status = app(TrunkrsCheckStatus::class);
+        $id = $status->create();
+        $status->started($id);
+        $status->finished($id, 'ok');
+        $this->withHeader('Authorization', 'Bearer '.$this->token())->getJson(self::URL.'/'.$id)
+            ->assertOk()->assertJsonPath('mailbox_completed', true)
+            ->assertJsonPath('report_status', 'empty_undated')->assertJsonPath('report_current', false)
+            ->assertJsonPath('report_date', null)->assertJsonMissingPath('shipments')
+            ->assertJsonMissingPath('shipment_count')->assertJsonMissingPath('message_hash');
     }
 
     public function test_failures_and_overlapping_checks_never_reuse_old_success(): void

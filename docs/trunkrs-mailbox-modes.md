@@ -50,6 +50,23 @@ De start-API geeft een unieke `check_id`. De achtergrondtaak bewaart per opdrach
 
 `scripts/trunkrs-cloud-check.py` draait uitsluitend op de GitHub-runner en wacht maximaal circa zeven minuten op die specifieke opdracht. Een nieuwe GitHub-identiteit per peiling voorkomt tokenverloop. Groen vereist een voltooide mailboxscan én het nieuwste opgeslagen rapport met ontvangst op de aangevraagde lokale dag en de verwachte bezorgdag (één dag eerder), met controle van de tijdstempels. Een leeg rapport zonder bezorgdatum blijft uitdrukkelijk onbevestigd. Oude successen, alleen HTTP 202, een verdwenen status of een gestopte worker falen gesloten. Een onzekere POST wordt niet onmiddellijk herhaald. Volgende geplande uitvoeringen gebruiken de bestaande importlock, ontdubbeling en provider-wachttijd.
 
+### Afzonderlijke rapportdiagnose (lokaal voorbereid, 5 oktober 2026)
+
+De status geeft naast `mailbox_completed` en `report_current` een vaste `report_status` terug:
+
+| Status | Betekenis |
+| --- | --- |
+| `missing` | Er is geen opgeslagen rapport. Dit bewijst niet dat er geen mail in de bron staat. |
+| `not_received_today` | Het nieuwste opgeslagen rapport is niet ontvangen op de aangevraagde Nederlandse dag. |
+| `empty_undated` | Het rapport van die dag heeft nul regels en geen bezorgdatum. |
+| `date_unconfirmed` | De bezorgdatum ontbreekt, zonder bewijs van een leeg rapport. |
+| `unexpected_delivery_date` | Het rapport van die dag noemt een andere bezorgdatum dan verwacht. |
+| `current` | Ontvangstdag en bezorgdatum voldoen aan de bestaande controle. |
+
+Deze rapportstatus staat los van het slagen van de scan. Bij een importfout blijft de opdracht mislukt, ook als er een eerder geldig rapport staat. De runner meldt de geslaagde mailboxcontrole pas na verificatie van de bijbehorende tijdstempels. Daarna vermeldt hij uitsluitend gecontroleerde ontvangst-/importtijden en een vaste specifieke foutreden. Geen mail-ID's, klantregels, aantallen, configuratie of vrij serverantwoord in de logs. Een geldig leeg bestand wordt niet langer met een ontbrekend rapport in één fouttekst samengevoegd, maar blijft **onbevestigd en niet groen** voor de vereiste bezorgdag. Er wordt geen datum afgeleid uit onderwerp, bestandsnaam of ontvangsttijd.
+
+Geen migratie, herimport, configuratiewijziging of extra cronregel nodig voor deze diagnosewijziging. Een gemengde uitrol met de oude server blijft gesloten; bestaande groene rapporten zonder het nieuwe statusveld blijven controleerbaar. Zie [lokale controle en open cloudstappen](trunkrs-report-evidence-2026-10-05.md).
+
 Fouten krijgen een GitHub-foutmelding; de bestaande Pitboard-waarschuwing houdt een ontbrekend/oud rapport zichtbaar. GitHub-e-mailnotificaties hangen af van de bestaande accountvoorkeuren en zijn hiermee niet opnieuw ingesteld of bewezen. Een groen handmatig `workflow_dispatch` bewijst alleen de import- en verificatieketen; voor automatisch herstel blijft een echte `schedule`-run nodig. Zie [GitHubs eigen beperkingen van schedule-events](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule).
 
 Onderstaande oorspronkelijke inrichting blijft achtergrondinformatie; voor planning en eindcontrole gaat deze sectie vóór de eerdere tijden en alleen-heartbeatcontrole.
