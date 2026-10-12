@@ -45,9 +45,14 @@ class TrunkrsCheckStatus
         $connection = TrunkrsConnection::find(1);
         // Match the dashboard's latest received report, not just any old successful import.
         $report = TrunkrsReport::orderByDesc('received_at')->orderByDesc('created_at')->first();
-        $current = $report
-            && $report->received_at->setTimezone(config('trunkrs.timezone'))->toDateString() === $check['mail_date']
-            && $report->report_date?->toDateString() === $check['expected_delivery_date'];
+        $reportStatus = match (true) {
+            $report === null => 'missing',
+            $report->received_at->setTimezone(config('trunkrs.timezone'))->toDateString() !== $check['mail_date'] => 'not_received_today',
+            $report->report_date === null && $report->shipment_count === 0 => 'empty_undated',
+            $report->report_date === null => 'date_unconfirmed',
+            $report->report_date->toDateString() !== $check['expected_delivery_date'] => 'unexpected_delivery_date',
+            default => 'current',
+        };
         $this->update($id, [
             'state' => $result === 'ok' ? 'completed' : 'failed',
             'result' => $result,
@@ -55,7 +60,9 @@ class TrunkrsCheckStatus
             'mailbox_completed' => $result === 'ok',
             'last_checked_at' => $connection?->last_checked_at?->toIso8601String(),
             'retry_at' => $connection?->retry_at?->toIso8601String(),
-            'report_current' => (bool) $current,
+            // Report evidence is independent of scan success. Empty does not prove a delivery day.
+            'report_status' => $reportStatus,
+            'report_current' => $reportStatus === 'current',
             'report_date' => $report?->report_date?->toDateString(),
             'report_received_at' => $report?->received_at?->toIso8601String(),
             'report_imported_at' => $report?->created_at?->toIso8601String(),
