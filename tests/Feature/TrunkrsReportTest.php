@@ -392,6 +392,28 @@ class TrunkrsReportTest extends TestCase
         $this->assertStringContainsString('nieuwer rapport ontbreekt', implode(' ', app(TrunkrsDashboard::class)->summary()['warnings']));
     }
 
+    public function test_dashboard_does_not_expect_a_new_report_on_sunday_or_monday(): void
+    {
+        $this->setupReader();
+        app(TrunkrsImporter::class)->import($this->message('saturday', '2026-10-10T04:02:00Z'), $this->csv('2026-10-09'), 'report.csv');
+        foreach ([
+            ['2026-10-10T22:00:00Z', false], // Already Sunday in Amsterdam.
+            ['2026-10-11T08:00:00Z', false],
+            ['2026-10-12T08:00:00Z', false],
+            ['2026-10-13T04:29:00Z', false],
+            ['2026-10-13T04:30:00Z', true],
+        ] as [$instant, $missing]) {
+            $this->travelTo(CarbonImmutable::parse($instant));
+            $summary = app(TrunkrsDashboard::class)->summary();
+            $this->assertSame($missing, str_contains(implode(' ', $summary['warnings']), 'nieuwer rapport ontbreekt'), $instant);
+            $this->assertSame('2026-10-09', $summary['report']['report_date']);
+        }
+        // Missing Saturday's report still matters on a skipped day.
+        TrunkrsReport::firstOrFail()->update(['report_date' => '2026-10-08']);
+        $this->travelTo(CarbonImmutable::parse('2026-10-11T08:00:00Z'));
+        $this->assertStringContainsString('nieuwer rapport ontbreekt', implode(' ', app(TrunkrsDashboard::class)->summary()['warnings']));
+    }
+
     public function test_recent_delivery_days_are_selectable_without_exposing_older_history_in_the_dropdown(): void
     {
         $this->setupReader();

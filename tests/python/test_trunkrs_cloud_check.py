@@ -1,9 +1,11 @@
 import contextlib
+import datetime as dt
 import importlib.util
 import io
 import pathlib
 import unittest
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 path = pathlib.Path(__file__).parents[2] / "scripts" / "trunkrs-cloud-check.py"
 spec = importlib.util.spec_from_file_location("cloud_check", path)
@@ -24,6 +26,50 @@ def completed(**changes):
 
 
 class CloudCheckTest(unittest.TestCase):
+    def test_scheduled_skips_do_not_request_identity_import_or_report_verification(self):
+        for stamp in [
+            "2026-10-11T08:00:00+00:00", "2026-10-12T08:00:00+00:00",
+            "2026-10-10T22:00:00+00:00",  # Saturday UTC, Sunday in Amsterdam.
+            "2026-12-26T23:00:00+00:00",  # Winter midnight boundary.
+            "2026-03-29T01:00:00+00:00", "2026-10-25T01:00:00+00:00",  # DST Sundays.
+            "2026-10-12T22:00:00+00:00",  # Tuesday locally, but before 06:00.
+            "2026-12-29T04:59:00+00:00",
+        ]:
+            now = dt.datetime.fromisoformat(stamp).astimezone(ZoneInfo("Europe/Amsterdam"))
+            with self.subTest(stamp=stamp), patch.dict(cloud.os.environ, {"GITHUB_EVENT_NAME": "schedule"}), \
+                    patch.object(cloud.dt, "datetime", wraps=dt.datetime) as clock, \
+                    patch.object(cloud, "identity_token") as identity, \
+                    patch.object(cloud, "request_json") as request, \
+                    patch.object(cloud, "verify_report") as verify, contextlib.redirect_stdout(io.StringIO()) as output:
+                clock.now.return_value = now
+                cloud.run()
+                clock.now.assert_called_once_with(ZoneInfo("Europe/Amsterdam"))
+                identity.assert_not_called()
+                request.assert_not_called()
+                verify.assert_not_called()
+                self.assertIn("no mailbox check requested", output.getvalue())
+                self.assertNotIn("::error::", output.getvalue())
+                self.assertNotIn("Mailbox completed", output.getvalue())
+
+    def test_allowed_days_and_manual_recovery_still_import_and_verify(self):
+        cases = [("schedule", day, "06:17") for day in [
+            "2026-10-06", "2026-10-07", "2026-10-08", "2026-10-09", "2026-10-10",
+            "2026-12-29", "2026-03-31", "2026-10-27",
+        ]] + [("workflow_dispatch", day, "00:17") for day in ["2026-10-11", "2026-10-12"]]
+        for event, day, hour in cases:
+            now = dt.datetime.fromisoformat(day + "T" + hour).replace(tzinfo=ZoneInfo("Europe/Amsterdam"))
+            with self.subTest(event=event, day=day), patch.dict(cloud.os.environ, {"GITHUB_EVENT_NAME": event}), \
+                    patch.object(cloud.dt, "datetime", wraps=dt.datetime) as clock, \
+                    patch.object(cloud, "identity_token", return_value="synthetic-token"), \
+                    patch.object(cloud, "request_json", side_effect=[(202, {"check_id": CHECK}), (200, {"check_id": CHECK})]) as request, \
+                    patch.object(cloud, "verify_report", return_value=True) as verify, \
+                    patch.object(cloud.time, "sleep"), contextlib.redirect_stdout(io.StringIO()):
+                clock.now.return_value = now
+                cloud.run()
+                self.assertEqual((cloud.ENDPOINT, "synthetic-token", "POST"), request.call_args_list[0].args)
+                self.assertEqual(2, request.call_count)
+                verify.assert_called_once_with({"check_id": CHECK}, CHECK)
+
     def test_current_report_with_fresh_mailbox_scan_is_required(self):
         with contextlib.redirect_stdout(io.StringIO()) as output:
             self.assertTrue(cloud.verify_report(completed(shipments=["private"]), CHECK))
