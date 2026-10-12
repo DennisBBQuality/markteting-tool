@@ -89,9 +89,15 @@ def verify_report(data, check_id):
 
 def run():
     now = dt.datetime.now(ZoneInfo("Europe/Amsterdam"))
-    if os.environ.get("GITHUB_EVENT_NAME") == "schedule" and now.hour < 6:
-        print("Before Dutch morning window; no mailbox check requested")
-        return
+    if os.environ.get("GITHUB_EVENT_NAME") == "schedule":
+        # Check actual local time too: GitHub can delay a scheduled start into another day.
+        # Manual workflow_dispatch remains available for explicit recovery checks.
+        if now.weekday() not in range(1, 6):
+            print("Sunday or Monday in Europe/Amsterdam; automatic import skipped; no mailbox check requested")
+            return
+        if now.hour < 6:
+            print("Before Dutch morning window; no mailbox check requested")
+            return
     print("Trigger: " + ("schedule" if os.environ.get("GITHUB_EVENT_NAME") == "schedule" else "manual verification"))
     code, data = request_json(ENDPOINT, identity_token(), "POST")
     check_id = data.get("check_id")

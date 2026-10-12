@@ -40,7 +40,13 @@ Verifieer na activatie een **werkelijke geplande uitvoering**, de geslaagde mail
 
 ## Inrichting via GitHub en Pitboard (22 september 2026)
 
-### Verifieerbare cloudcontrole (26 september 2026)
+### Actuele importdagen (12 oktober 2026)
+
+Dennis heeft bevestigd dat de automatische import uitsluitend dinsdag tot en met zaterdag moet draaien. Deze regel gaat vóór de historische dagelijkse planningen hieronder. GitHub gebruikt `17,27,37,47,57 4-9 * * 2-6` en `17 10-20 * * 2-6` (UTC); de runner controleert bovendien de actuele Europe/Amsterdam-dag en slaat zondag, maandag en tijden vóór 06:00 over vóór enige mailboxaanroep of rapportverificatie. De optionele Laravel-planning gebruikt `15,25,35,45,55 6-9 * * 2-6` in Europe/Amsterdam. De bestaande tijdstippen zijn behouden. Het dashboard blijft op zondag/maandag het laatst verwachte vrijdagrapport gebruiken en verwacht dinsdag vanaf de bestaande 06:30-deadline een nieuw rapport. Werkelijk oudere of ongedateerde rapporten houden hun eigen waarschuwing.
+
+Handmatige web-/CLI-controle en `workflow_dispatch` blijven beschikbaar voor expliciet herstel; een handmatige controle moet nog steeds echte import-/rapportgegevens aantonen. Een overgeslagen automatische start is geen geslaagde import. Geen mail naar Kimberley nodig. Zie [wijziging, tests en publicatiegrens](trunkrs-import-days-2026-10-12.md). Deze broncodewijziging alleen bewijst geen actieve productieplanning.
+
+### Verifieerbare cloudcontrole (26 september 2026, historische planning)
 
 De controle om 10:07 Nederlandse tijd vond geen `schedule`-run van 26 september. De workflow stond wel `active`. De laatste echte automatische run was [36133275406](https://github.com/DennisBBQuality/markteting-tool/actions/runs/36133275406) op 25 september om 14:08:53 Nederlandse tijd. De logs daarvan bewijzen alleen ontvangst van de startopdracht. De precieze oorzaak van de ontbrekende GitHub-start is niet vastgesteld; tijdzoneondersteuning is volgens GitHub geldig en mag niet als bewezen oorzaak worden aangewezen.
 

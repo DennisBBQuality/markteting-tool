@@ -3,11 +3,12 @@ name: Trunkrs report check
 on:
   schedule:
     # Cloud-only: no laptop or open Pitboard browser is required.
-    # Plain UTC covers summer AND winter; the client skips starts before 06:00 NL.
+    # Tuesday–Saturday only. These UTC hours fall on the same Dutch calendar day.
+    # The client also checks the actual Dutch day after delayed starts and skips before 06:00 NL.
     # Retry through the morning and catch up later if GitHub delays/drops starts.
     # This mitigates delays; GitHub cron is not an on-time delivery guarantee.
-    - cron: '17,27,37,47,57 4-9 * * *'
-    - cron: '17 10-20 * * *'
+    - cron: '17,27,37,47,57 4-9 * * 2-6'
+    - cron: '17 10-20 * * 2-6'
   workflow_dispatch:
 
 permissions:

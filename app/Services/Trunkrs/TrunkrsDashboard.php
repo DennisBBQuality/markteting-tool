@@ -37,7 +37,13 @@ class TrunkrsDashboard
         }
         $report = $selectedReportId && $available->contains('id', $selectedReportId)
             ? TrunkrsReport::find($selectedReportId) : $latest;
-        $expectedDate = $now->subDays($now->format('H:i') < config('trunkrs.expected_by') ? 2 : 1)->toDateString();
+        $expectedMailDay = $now->subDays($now->format('H:i') < config('trunkrs.expected_by') ? 1 : 0);
+        // No automatic reports are expected on Sunday or Monday. Keep the last due report
+        // until the next Tuesday–Saturday deadline; this does not date an empty report.
+        while (! in_array($expectedMailDay->dayOfWeekIso, [2, 3, 4, 5, 6], true)) {
+            $expectedMailDay = $expectedMailDay->subDay();
+        }
+        $expectedDate = $expectedMailDay->subDay()->toDateString();
         $warnings = [];
         if (! $configured) {
             $warnings[] = 'De online Microsoft-koppeling is nog niet ingesteld.';
