@@ -4,6 +4,10 @@ use App\Http\Controllers\Api\AiSettingController;
 use App\Http\Controllers\Api\AttachmentController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CalendarController;
+use App\Http\Controllers\Api\ContentConnectionController;
+use App\Http\Controllers\Api\ContentController;
+use App\Http\Controllers\Api\ContentMediaController;
+use App\Http\Controllers\Api\ContentPublicationController;
 use App\Http\Controllers\Api\ConvertController;
 use App\Http\Controllers\Api\CustomerService\TicketActivityController;
 use App\Http\Controllers\Api\CustomerService\TicketClaimController;
@@ -42,6 +46,8 @@ Route::post('/api/trunkrs/scheduled-sync', TrunkrsScheduledSyncController::class
 Route::get('/api/trunkrs/scheduled-sync/{checkId}', [TrunkrsScheduledSyncController::class, 'status'])->whereUuid('checkId')->middleware('throttle:trunkrs-scheduled');
 
 // ========== AUTHENTICATED ROUTES ==========
+Route::get('/content-media/{delivery}/{media}', [ContentMediaController::class, 'shared'])
+    ->whereUuid('delivery')->whereUuid('media')->middleware(['signed', 'throttle:120,1'])->name('content.media.share');
 Route::middleware('auth.custom')->group(function () {
 
     // Auth
@@ -101,6 +107,32 @@ Route::middleware('auth.custom')->group(function () {
         Route::put('/api/settings/ai/openai', [AiSettingController::class, 'update'])->middleware('throttle:5,1');
         Route::post('/api/settings/ai/openai/test', [AiSettingController::class, 'test'])->middleware('throttle:10,1');
         Route::delete('/api/settings/ai/openai', [AiSettingController::class, 'destroy']);
+    });
+
+    Route::prefix('/api/content')->group(function () {
+        Route::get('/targets', [ContentPublicationController::class, 'targets']);
+        Route::middleware(['admin', 'throttle:20,1'])->prefix('connections')->group(function () {
+            Route::get('/', [ContentConnectionController::class, 'index']);
+            Route::put('/{provider}', [ContentConnectionController::class, 'save'])->whereIn('provider', ['meta', 'youtube']);
+            Route::post('/{provider}/start', [ContentConnectionController::class, 'start'])->whereIn('provider', ['meta', 'youtube']);
+            Route::post('/{provider}/verify', [ContentConnectionController::class, 'verify'])->whereIn('provider', ['meta', 'youtube']);
+            Route::put('/{provider}/activate', [ContentConnectionController::class, 'activate'])->whereIn('provider', ['meta', 'youtube']);
+            Route::get('/{provider}/callback', [ContentConnectionController::class, 'callback'])->whereIn('provider', ['meta', 'youtube'])->name('content.oauth.callback');
+        });
+        $controller = ContentController::class;
+        Route::get('/posts', [$controller, 'index']);
+        Route::post('/posts', [$controller, 'save']);
+        Route::get('/posts/{id}', [$controller, 'show'])->whereUuid('id');
+        Route::put('/posts/{id}', [$controller, 'save'])->whereUuid('id');
+        Route::post('/posts/{id}/review', [$controller, 'review'])->whereUuid('id');
+        Route::post('/posts/{id}/comments', [$controller, 'comment'])->whereUuid('id');
+        Route::post('/posts/{id}/duplicate', [$controller, 'duplicate'])->whereUuid('id');
+        Route::post('/posts/{id}/schedule', [ContentPublicationController::class, 'schedule'])->whereUuid('id')->middleware('manager_or_admin');
+        Route::post('/posts/{id}/cancel', [ContentPublicationController::class, 'cancel'])->whereUuid('id')->middleware('manager_or_admin');
+        Route::post('/posts/{id}/refresh', [ContentPublicationController::class, 'refresh'])->whereUuid('id')->middleware(['manager_or_admin', 'throttle:10,1']);
+        Route::get('/media', [ContentMediaController::class, 'index']);
+        Route::post('/media', [ContentMediaController::class, 'store'])->middleware('throttle:20,1');
+        Route::get('/media/{id}', [ContentMediaController::class, 'show'])->whereUuid('id');
     });
 
     // Projects

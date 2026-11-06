@@ -253,6 +253,7 @@ function navigateTo(view) {
     if (productDossierState.pendingLabels.length && !confirm('Je etiketfoto’s zijn nog niet opgeslagen. Toch deze pagina verlaten?')) return;
     rememberDossierBrowserDraft(); clearTimeout(productDossierState.pollTimer);
   }
+  if (App.currentView === 'content' && view !== 'content' && typeof Content !== 'undefined' && !Content.leave()) return;
   if (typeof Dashboard !== 'undefined') Dashboard.dispose();
   App.currentView = view;
   document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
@@ -264,6 +265,7 @@ function navigateTo(view) {
     case 'dashboard': renderDashboard(); break;
     case 'projects': renderProjects(); break;
     case 'tasks': renderTasks(); break;
+    case 'content': renderContent(); break;
     case 'calendar': renderCalendar(); break;
     case 'notes': renderNotes(); break;
     case 'converter': renderConverter(); break;

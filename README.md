@@ -15,6 +15,10 @@ Een uitgebreide marketing team samenwerkingstool gebouwd met Laravel 12 en een v
 
 Klantenservice is op verzoek van Dennis voorlopig uit het Pitboard gehaald (11 september 2026). De navigatie, het scherm en het laden van de module zijn verwijderd; de ticket-API is standaard uitgeschakeld. Bestaande ticketgegevens en de onderliggende code blijven behouden. Zie [pauzeren van Klantenservice](docs/customer-service-paused-2026-09-11.md).
 
+## Contentplanning en publicatie
+
+**Content** voegt een aparte kalender, kanaalversies, privémedia, feedback en revisiegebonden goedkeuring toe. Directe Meta- en YouTube-publicatie is voorbereid en standaard uitgeschakeld; TikTok is voorlopig alleen voor planning. Activering vereist aangemaakte platformapps, gecontroleerde bedrijfsaccounts en een aantoonbaar draaiende serveruitvoerder. Zie [scope, inrichting en beperkte publicatieproef](docs/contentplatform-implementatieplan.md).
+
 ## Meldingen bij toewijzingen
 
 Nieuwe taaktoewijzingen en projectleden krijgen een persoonlijke melding via **Meldingen** bovenaan het dashboard, naast Nieuwe taak en Dashboard aanpassen. De knop toont een belletje en het exacte aantal ongeopende meldingen (ook nul). Een klik opent een pop-up met standaard alleen ongeopende meldingen; Alles toont ook eerdere meldingen. De teller daalt pas na het succesvol openen van de bijbehorende taak of het project, niet bij het openen van de pop-up. De controle loopt iedere 30 seconden zolang het tabblad zichtbaar is. Geen aparte zijbalkoptie of dashboardtegel; bestaande overige dashboardindelingen blijven behouden. Geen dubbele melding bij ongewijzigd opslaan of voor een eigen toewijzing.
