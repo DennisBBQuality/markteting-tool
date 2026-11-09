@@ -311,6 +311,52 @@ class ContentPublicationTest extends TestCase
         Http::assertSentCount(2);
     }
 
+    public function test_meta_setup_reports_safe_failure_stage_and_rolls_back_partial_credentials(): void
+    {
+        $this->actingAsUser(['rol' => 'admin']);
+        $c = $this->connection();
+        $permissions = array_map(fn ($permission) => ['permission' => $permission, 'status' => 'granted'], ['pages_show_list', 'pages_read_engagement', 'pages_manage_posts', 'instagram_basic', 'instagram_content_publish']);
+        Http::fake([
+            '*oauth/access_token*' => Http::response(['access_token' => 'NEW_PRIVATE_TOKEN', 'expires_in' => 3600]),
+            '*me/permissions*' => Http::response(['data' => $permissions]),
+            '*me/accounts*' => Http::response(['error' => ['code' => 190, 'message' => 'PRIVATE_PROVIDER_MESSAGE NEW_PRIVATE_TOKEN', 'error_user_msg' => '<script>PRIVATE</script>']], 400),
+        ]);
+        $url = $this->postJson('/api/content/connections/meta/start')->assertOk()->json('url');
+        parse_str(parse_url($url, PHP_URL_QUERY), $params);
+        $response = $this->get('/api/content/connections/meta/callback?code=PRIVATE_CODE&state='.$params['state']);
+        $response->assertUnprocessable()->assertSee('gekoppelde Instagram-account konden niet worden opgehaald')
+            ->assertSee('HTTP 400')->assertSee('platformcode 190')->assertDontSee('PRIVATE')->assertDontSee('FAKE_SECRET')
+            ->assertHeader('Cache-Control', 'no-store, private')->assertHeader('Referrer-Policy', 'no-referrer')
+            ->assertHeader('Content-Type', 'text/plain; charset=UTF-8');
+        $this->assertSame('FAKE_TOKEN', $c->fresh()->access_token);
+        $this->get('/api/content/connections/meta/callback?code=PRIVATE_CODE&state='.$params['state'])->assertForbidden();
+        Http::assertSentCount(4);
+    }
+
+    public function test_setup_network_exception_and_malformed_provider_code_never_escape(): void
+    {
+        $this->actingAsUser(['rol' => 'admin']);
+        $this->connection();
+        Http::fake(fn () => throw new ConnectionException('PRIVATE_SECRET in request URL'));
+        $url = $this->postJson('/api/content/connections/meta/start')->json('url');
+        parse_str(parse_url($url, PHP_URL_QUERY), $params);
+        $this->get('/api/content/connections/meta/callback?code=PRIVATE_CODE&state='.$params['state'])
+            ->assertUnprocessable()->assertSee('Meta kon de aanmelding niet omzetten')->assertDontSee('PRIVATE');
+        Http::fake(['*' => Http::response(['error' => ['code' => 'PRIVATE_SECRET', 'message' => 'PRIVATE_MESSAGE']], 400)]);
+        $this->postJson('/api/content/connections/meta/verify')->assertUnprocessable()
+            ->assertSee('Meta-rechten konden niet worden bevestigd')->assertDontSee('PRIVATE')->assertDontSee('platformcode');
+    }
+
+    public function test_setup_missing_permissions_and_empty_accounts_have_distinct_safe_messages(): void
+    {
+        $this->actingAsUser(['rol' => 'admin']);
+        $this->connection();
+        $this->connection('youtube');
+        Http::fake(['*me/permissions*' => Http::response(['data' => []]), '*youtube/v3/channels*' => Http::response(['items' => []])]);
+        $this->postJson('/api/content/connections/meta/verify')->assertUnprocessable()->assertSee('Meta-rechten konden niet worden bevestigd');
+        $this->postJson('/api/content/connections/youtube/verify')->assertUnprocessable()->assertSee('Geen toegankelijk publicatieaccount');
+    }
+
     public function test_reauthorization_cannot_redirect_pending_deliveries_to_a_new_account(): void
     {
         $this->production();
@@ -376,8 +422,8 @@ class ContentPublicationTest extends TestCase
         $d = $this->delivery('youtube', 'processing');
         $d->update(['provider_request_id' => 'FAKE_VIDEO']);
         Http::fake(['*youtube/v3/videos?part=*' => Http::response(['items' => [['id' => 'FAKE_VIDEO', 'snippet' => ['channelId' => 'UC_TEST'], 'status' => ['uploadStatus' => 'processed', 'privacyStatus' => 'public'], 'processingDetails' => ['processingStatus' => 'succeeded']]]])]);
-        app(ContentPublisher::class)->run($d->id,false);
-        $this->assertSame('unknown',$d->fresh()->status);
+        app(ContentPublisher::class)->run($d->id, false);
+        $this->assertSame('unknown', $d->fresh()->status);
         $this->assertNull($d->fresh()->published_url);
         Http::assertSentCount(1);
     }

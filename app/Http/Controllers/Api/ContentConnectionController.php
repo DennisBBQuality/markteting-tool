@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ContentConnection;
 use App\Models\ContentDelivery;
+use App\Services\Content\ConnectionSetupException;
 use App\Services\Content\ContentStorage;
 use App\Services\Content\SocialAuth;
 use Illuminate\Http\Request;
@@ -98,8 +99,10 @@ class ContentConnectionController extends Controller
                 $c = ContentConnection::where('provider', $provider)->lockForUpdate()->firstOrFail();
                 $auth->exchange($c, (string) $r->query('code'), $state['redirect']);
             });
-        } catch (\Throwable) {
-            return response('De koppeling kon niet worden bevestigd. Open Pitboard → Content → Kanalen en controleer de appgegevens en rechten.', 422)->header('Cache-Control', 'no-store')->header('Referrer-Policy', 'no-referrer');
+        } catch (\Throwable $e) {
+            $message = $e instanceof ConnectionSetupException ? $e->getMessage() : 'De koppeling kon niet worden bevestigd. Open Pitboard → Content → Kanalen en controleer de appgegevens en rechten.';
+
+            return response($message, 422)->header('Content-Type', 'text/plain; charset=UTF-8')->header('Cache-Control', 'no-store')->header('Referrer-Policy', 'no-referrer');
         }
 
         return redirect('/?content_connection=ready')->header('Referrer-Policy', 'no-referrer');
@@ -112,8 +115,8 @@ class ContentConnectionController extends Controller
                 $this->connection($provider);
                 $auth->discover(ContentConnection::where('provider', $provider)->lockForUpdate()->firstOrFail());
             });
-        } catch (\Throwable) {
-            abort(422, 'De accountcontrole is niet gelukt. Meld opnieuw aan en controleer de rechten.');
+        } catch (\Throwable $e) {
+            abort(422, $e instanceof ConnectionSetupException ? $e->getMessage() : 'De accountcontrole is niet gelukt. Meld opnieuw aan en controleer de rechten.');
         }
 
         return $this->index();
