@@ -247,6 +247,11 @@ Route::get('/api/{any}', fn () => response()->json([
     'error' => 'Deze API-route bestaat niet.',
 ], 404))->where('any', '.*');
 
+// Public application information. Internal API routes remain authenticated.
+Route::view('/over-pitboard', 'public.about');
+Route::view('/privacy', 'public.privacy');
+Route::view('/gebruiksvoorwaarden', 'public.terms');
+
 // SPA fallback - serve index.html for all non-API routes
 Route::get('/{any?}', function () {
     return response()->file(public_path('index.html'), [
