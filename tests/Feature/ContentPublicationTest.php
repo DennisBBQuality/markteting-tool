@@ -297,6 +297,16 @@ class ContentPublicationTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_meta_login_requests_business_portfolio_access_without_ad_or_messaging_permissions(): void
+    {
+        $this->actingAsUser(['rol' => 'admin']);
+        $this->connection();
+        $url = $this->postJson('/api/content/connections/meta/start')->assertOk()->json('url');
+        parse_str(parse_url($url, PHP_URL_QUERY), $params);
+        $this->assertEqualsCanonicalizing(['pages_show_list', 'pages_read_engagement', 'pages_manage_posts', 'instagram_basic', 'instagram_content_publish', 'business_management'], explode(',', $params['scope']));
+        Http::assertNothingSent();
+    }
+
     public function test_youtube_authorization_exchanges_code_and_discovers_account_without_exposing_credentials(): void
     {
         $this->actingAsUser(['rol' => 'admin']);

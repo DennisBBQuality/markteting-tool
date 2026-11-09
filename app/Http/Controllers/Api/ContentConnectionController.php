@@ -83,7 +83,7 @@ class ContentConnectionController extends Controller
             $params += ['scope' => 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly', 'access_type' => 'offline', 'prompt' => 'consent'];
         } else {
             $url = 'https://www.facebook.com/'.$c->api_version.'/dialog/oauth';
-            $params += ['scope' => 'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish'];
+            $params += ['scope' => 'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,business_management'];
         }
 
         return ['url' => $url.'?'.http_build_query($params)];
