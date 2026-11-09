@@ -88,3 +88,9 @@ Voor een release moeten tests, stijlcontrole en build slagen. Na uitrol zijn afz
 - Nieuwe tests controleren onder andere revisieconflicten, rollen, vervallen goedkeuring, accountbevestiging, annulering vóór claimen, onbekende verzenduitkomsten, eenmalige Instagram-publicatie, YouTube-verwerking/zichtbaarheid, OAuth-state, versleutelde geheimen en ondertekende media.
 - Browserproef met een uitsluitend lokale testdatabase: opslaan, beoordeling, goedkeuring, kalender en kanaalinstellingen gecontroleerd. Zonder koppelingen wordt inplannen tegengehouden.
 - Geen echte socialmedia-API aangeroepen of echte publicatie uitgevoerd. De live platformproeven en grotere videobestanden zijn nog niet gevalideerd.
+
+## Herstel van de inrichting — 9 november 2026
+
+De ingelogde livecontrole wees uit dat de contenttabellen nog ontbraken. Alleen frontendbestanden waren door de vorige release aantoonbaar geleverd. Daarom is de bestaande beperkte Composer-installatieroute uitgebreid met `pitboard:upgrade-content-storage`. Die opdracht mag uitsluitend de vaste contentmigration uitvoeren wanneer alle bijbehorende tabellen ontbreken en de migratiehistorie daarmee overeenkomt. Bij een gedeeltelijke structuur of ontbrekende kolommen stopt automatische inrichting; er worden geen bestaande tabellen vervangen.
+
+Content → Kanalen controleert nu alle vijf tabellen en de vereiste velden. Een beheerder kan dezelfde begrensde initialisatie ook vanuit dat scherm bevestigen. Twee lege, uitgeschakelde verbindingsslots maken de laatst geregistreerde start van de serveruitvoerder zichtbaar vóór het invoeren van appgegevens. Initialiseren, de instellingen bekijken of accountgegevens opslaan vult die starttijd niet in. De uitvoerder stopt zonder verzending als opslag ontbreekt. Dit herstel stelt geen cron in en bewijst op zichzelf niet dat de serverplanning draait.
