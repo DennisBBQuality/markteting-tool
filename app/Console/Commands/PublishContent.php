@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\ContentConnection;
 use App\Models\ContentDelivery;
 use App\Services\Content\ContentPublisher;
+use App\Services\Content\ContentStorage;
 use Illuminate\Console\Command;
 
 class PublishContent extends Command
@@ -19,6 +20,11 @@ class PublishContent extends Command
             $this->info('Publicatie staat uit in deze omgeving.');
 
             return self::SUCCESS;
+        }
+        if (! app(ContentStorage::class)->ready()) {
+            $this->error('Content storage is not ready; no publication started.');
+
+            return self::FAILURE;
         }
         ContentConnection::query()->update(['scheduler_seen_at' => now()]);
         ContentDelivery::whereIn('status', ['scheduled', 'processing', 'submitting', 'unknown'])

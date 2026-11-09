@@ -239,8 +239,12 @@ const Content = {
     if(App.currentUser.rol!=='admin'){node.innerHTML='<section class="content-panel"><h3>Publicatiekanalen</h3><p>Een beheerder kan Instagram, Facebook en YouTube koppelen. TikTok blijft voorlopig alleen beschikbaar voor planning.</p></section>';return;}
     const data=await api('/api/content/connections');if(ticket!==this.generation||App.currentView!=='content')return;
     if(!data){node.textContent='Kanaalinstellingen konden niet worden geladen.';return;}
+    if(data.storage_ready===false){
+      node.innerHTML='<section class="content-panel"><h3>Contentopslag voorbereiden</h3><p>De aparte contenttabellen ontbreken of zijn onvolledig. Deze controle voegt alleen ontbrekende contentopslag toe als dat veilig kan; bestaande taken, projecten, kalender en notities blijven behouden.</p><button class="btn btn-primary" id="content-initialize">Contentopslag voorbereiden</button><p id="content-setup-error" class="error-msg" role="alert"></p></section>';
+      document.getElementById('content-initialize').onclick=async e=>{if(!confirm('De aparte contentopslag veilig voorbereiden? Bestaande gegevens worden niet vervangen.'))return;e.target.disabled=true;const r=await api('/api/content/connections/initialize',{method:'POST',body:{confirmed:true},onError:m=>{document.getElementById('content-setup-error').textContent=m;}});if(r)this.connection();else e.target.disabled=false;};return;
+    }
     node.innerHTML=`<div class="content-notice">${data.live_allowed?'Koppel de juiste bedrijfsaccounts en controleer de automatische uitvoerder voordat je publicatie activeert.':'Lokale omgeving: echte publicatie staat uit. Je kunt wel content voorbereiden.'}</div>
-      <div class="content-editor">${['meta','youtube'].map(provider=>{
+      <p class="content-muted">Databasecontrole: alle vijf contenttabellen en vereiste velden zijn beschikbaar. Deze controle publiceert niets.</p><div class="content-editor">${['meta','youtube'].map(provider=>{
         const c=data.connections.find(c=>c.provider===provider)||{};
         const redirect=c.redirect_uri||location.origin+'/api/content/connections/'+provider+'/callback';
         const seen=c.scheduler_seen_at&&Date.now()-new Date(c.scheduler_seen_at).getTime()<180000;
@@ -254,7 +258,7 @@ const Content = {
           <button class="btn btn-secondary">Appgegevens bewaren</button></form>
           <div class="content-actions"><button class="btn btn-secondary" data-login ${!c.client_id?'disabled':''}>Aanmelden bij ${provider==='meta'?'Meta':'Google'}</button><button class="btn btn-secondary" data-verify ${!c.verified_at?'disabled':''}>Account opnieuw controleren</button></div>
           <form data-activate><label>Publicatieaccount<select name="account_id" required><option value="">Kies het bedrijfsaccount</option>${(c.accounts||[]).map(a=>`<option value="${escHtml(a.id)}" ${a.id===c.selected_account?'selected':''}>${escHtml(a.name)}${a.instagram?' · @'+escHtml(a.instagram):''}</option>`).join('')}</select></label>
-          <p class="content-muted">Automatische uitvoerder: ${seen?'recent actief':'nog niet aangetoond'}. De uitvoerder moet op de server blijven draaien.</p>
+          <p class="content-muted">Automatische uitvoerder: ${seen?'recent actief':'niet recent aangetoond'}${c.scheduler_seen_at?' · laatste start '+escHtml(this.amsterdam(c.scheduler_seen_at).replace('T',' '))+' (Amsterdam)':''}. De uitvoerder moet op de server blijven draaien.</p>
           <label><input type="checkbox" name="enabled" ${c.enabled?'checked':''} ${!data.live_allowed?'disabled':''}> Automatisch publiceren activeren</label>
           <label><input type="checkbox" name="confirmed" required> Ik heb het gekozen bedrijfsaccount gecontroleerd.</label>
           <button class="btn btn-primary" ${!c.accounts?.length?'disabled':''}>Accountkeuze bewaren</button></form><p class="error-msg" data-error role="alert"></p></section>`;

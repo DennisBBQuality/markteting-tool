@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\TrunkrsReportController;
 use App\Http\Controllers\Api\TrunkrsScheduledSyncController;
 use App\Http\Controllers\Api\TrunkrsSettingController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Middleware\EnsureContentStorage;
 use App\Http\Middleware\EnsureCustomerServiceEnabled;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
@@ -109,10 +110,11 @@ Route::middleware('auth.custom')->group(function () {
         Route::delete('/api/settings/ai/openai', [AiSettingController::class, 'destroy']);
     });
 
-    Route::prefix('/api/content')->group(function () {
+    Route::prefix('/api/content')->middleware(EnsureContentStorage::class)->group(function () {
         Route::get('/targets', [ContentPublicationController::class, 'targets']);
-        Route::middleware(['admin', 'throttle:20,1'])->prefix('connections')->group(function () {
-            Route::get('/', [ContentConnectionController::class, 'index']);
+        Route::middleware(['admin', 'throttle:20,1,content-connections'])->prefix('connections')->group(function () {
+            Route::get('/', [ContentConnectionController::class, 'index'])->withoutMiddleware(EnsureContentStorage::class);
+            Route::post('/initialize', [ContentConnectionController::class, 'initialize'])->withoutMiddleware(EnsureContentStorage::class)->middleware('throttle:3,1,content-initialize');
             Route::put('/{provider}', [ContentConnectionController::class, 'save'])->whereIn('provider', ['meta', 'youtube']);
             Route::post('/{provider}/start', [ContentConnectionController::class, 'start'])->whereIn('provider', ['meta', 'youtube']);
             Route::post('/{provider}/verify', [ContentConnectionController::class, 'verify'])->whereIn('provider', ['meta', 'youtube']);

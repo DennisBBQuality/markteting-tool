@@ -5,16 +5,35 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ContentConnection;
 use App\Models\ContentDelivery;
+use App\Services\Content\ContentStorage;
 use App\Services\Content\SocialAuth;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class ContentConnectionController extends Controller
 {
+    public function initialize(Request $request, ContentStorage $storage)
+    {
+        $request->validate(['confirmed' => 'accepted']);
+        try {
+            $exit = Artisan::call('pitboard:upgrade-content-storage');
+        } catch (\Throwable) {
+            $exit = 1;
+        }
+        abort_if($exit !== 0 || ! $storage->ready(), 503, 'De contentopslag kon niet veilig worden voorbereid. Laat de bestaande structuur controleren; er zijn geen tabellen vervangen.');
+
+        return $this->index();
+    }
+
     public function index()
     {
-        return ['connections' => ContentConnection::all()->map(fn ($c) => [
+        if (! app(ContentStorage::class)->ready()) {
+            return response()->json(['storage_ready' => false, 'connections' => [], 'live_allowed' => false, 'tiktok' => 'planning_only'])->header('Cache-Control', 'no-store');
+        }
+
+        return ['storage_ready' => true, 'connections' => ContentConnection::all()->map(fn ($c) => [
             'provider' => $c->provider, 'client_id' => $c->client_id, 'has_secret' => (bool) $c->client_secret, 'api_version' => $c->api_version,
             'enabled' => $c->enabled, 'verified_at' => $c->verified_at, 'scheduler_seen_at' => $c->scheduler_seen_at,
             'selected_account' => $c->selected_account, 'redirect_uri' => route('content.oauth.callback', ['provider' => $c->provider]),
