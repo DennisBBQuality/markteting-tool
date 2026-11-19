@@ -29,9 +29,35 @@
           <label>Wachtwoord</label>
           <input type="password" id="login-password" required placeholder="••••••••">
         </div>
+        <details id="mfa-invite-panel" class="form-group"><summary>Beheer voor het eerst activeren</summary>
+          <label for="mfa-invite">Persoonlijke activatiecode</label>
+          <input type="password" id="mfa-invite" autocomplete="off">
+        </details>
         <button type="submit" class="btn btn-primary btn-full">Inloggen</button>
         <p id="login-error" class="error-msg"></p>
       </form>
+      <form id="mfa-form" hidden>
+        <h2>Bevestig je aanmelding</h2>
+        <div id="mfa-setup" hidden>
+          <p>Voeg The Pitboard toe aan je authenticator-app. Scan de QR-code of gebruik de instelsleutel.</p>
+          <img id="mfa-qr" alt="Scan met je authenticator" width="225" height="225">
+          <details><summary>Instelsleutel tonen</summary><code id="mfa-secret"></code></details>
+        </div>
+        <div class="form-group"><label for="mfa-code">Authenticatorcode</label>
+          <input id="mfa-code" type="text" inputmode="numeric" autocomplete="one-time-code" required>
+        </div>
+        <label><input type="checkbox" id="mfa-trust"> Vertrouw deze browser 30 dagen</label>
+        <p id="mfa-error" class="error-msg" role="alert"></p>
+        <button type="submit" class="btn btn-primary btn-full">Bevestigen</button>
+        <button type="button" id="mfa-recover" class="btn btn-outline">Herstelcode gebruiken</button>
+        <button type="button" id="mfa-back" class="btn btn-outline">Terug naar inloggen</button>
+      </form>
+      <section id="mfa-backup" hidden>
+        <h2>Bewaar je herstelcodes</h2>
+        <p>Bewaar deze codes in je wachtwoordmanager. Bij verlies van je telefoon kun je met één code een nieuwe authenticator koppelen. Elke code werkt één keer.</p>
+        <pre id="mfa-codes"></pre>
+        <button id="mfa-done" class="btn btn-primary btn-full">Codes bewaard, open Pitboard</button>
+      </section>
       <p style="margin-top:20px;font-size:13px;text-align:center"><a href="/over-pitboard">Over Pitboard</a> · <a href="/privacy">Privacy</a> · <a href="/gebruiksvoorwaarden">Gebruiksvoorwaarden</a></p>
     </div>
   </div>
@@ -115,7 +141,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.js"></script>
-  <script src="/js/app.js?v=20261106-content"></script>
+  <script src="/js/app.js?v=20261119-mfa"></script>
   <script src="/js/notifications.js?v=20260925-1"></script>
   <script src="/js/notification-mail.js?v=20260924-1"></script>
   <script src="/js/trunkrs.js?v=20260930-1"></script>
@@ -131,6 +157,6 @@
 <script src="/js/image-seo.js?v=20261009-save-feedback"></script>
   <script src="/js/product-dossiers.js?v=20260925-1"></script>
   <script src="/js/trunkrs-settings.js?v=20260930-1"></script>
-  <script src="/js/settings.js?v=20260925-1"></script>
+  <script src="/js/settings.js?v=20261119-mfa"></script>
 </body>
 </html>

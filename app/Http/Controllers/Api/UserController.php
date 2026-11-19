@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\Auth\OwnerAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
@@ -11,10 +12,16 @@ class UserController extends Controller
 {
     public function index()
     {
+        $ownerId = OwnerAccess::record()->user_id;
+
         return response()->json(
             User::select('id', 'naam', 'email', 'rol', 'kleur', 'actief', 'created_at')
                 ->orderBy('naam')
-                ->get()
+                ->get()->each(function (User $user) use ($ownerId) {
+                    if ($user->rol === 'admin' && $user->id !== $ownerId) {
+                        $user->rol = 'manager';
+                    }
+                })
         );
     }
 
@@ -23,7 +30,8 @@ class UserController extends Controller
         $request->validate([
             'naam' => 'required|string',
             'email' => 'required|email|unique:users,email',
-            'wachtwoord' => 'required|string|min:3',
+            'wachtwoord' => 'required|string|min:12',
+            'rol' => 'sometimes|in:lid,manager',
         ]);
 
         try {
@@ -50,6 +58,13 @@ class UserController extends Controller
     public function update(Request $request, string $id)
     {
         $user = User::findOrFail($id);
+        $self = $request->session()->get('userId') === $user->id;
+        $request->validate([
+            'rol' => $self ? 'required|in:admin' : 'required|in:lid,manager',
+            'actief' => $self ? 'required|accepted' : 'required|boolean',
+            'wachtwoord' => 'nullable|string|min:12',
+            'naam' => 'required|string', 'email' => 'required|email',
+        ]);
         $data = [
             'naam' => $request->naam,
             'email' => $request->email,
@@ -63,6 +78,7 @@ class UserController extends Controller
         }
 
         $user->update($data);
+
         return response()->json(['ok' => true]);
     }
 
@@ -73,6 +89,7 @@ class UserController extends Controller
         }
 
         User::where('id', $id)->update(['actief' => false]);
+
         return response()->json(['ok' => true]);
     }
 }

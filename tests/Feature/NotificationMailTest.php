@@ -113,9 +113,10 @@ class NotificationMailTest extends TestCase
         $this->postJson('/api/notification-mail/start', ['revision' => $rev, 'consent' => true])->assertOk();
         $ownerSession = session()->getId();
         $this->withCredentials = false;
-        $this->actingAsUser(['rol' => 'admin']);
-        $this->getJson('/api/notification-mail')->assertJsonPath('pending', null);
-        $this->postJson('/api/notification-mail/poll', ['revision' => $rev])->assertConflict();
+        $other = User::factory()->create(['rol' => 'admin']);
+        $this->withSession(['userId' => $other->id, 'rol' => 'admin']);
+        $this->getJson('/api/notification-mail')->assertForbidden()->assertJsonMissingPath('pending');
+        $this->postJson('/api/notification-mail/poll', ['revision' => $rev])->assertForbidden();
         $this->withCredentials();
         $this->withCookie(config('session.cookie'), $ownerSession);
         $setting = PitboardMailSetting::find(1);
