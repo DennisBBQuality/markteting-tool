@@ -14,7 +14,7 @@ abstract class TestCase extends BaseTestCase
         $user = User::factory()->create($attributes);
 
         if ($user->rol === 'admin') {
-            DB::table('pitboard_owner_security')->where('id', 1)->update(['user_id' => $user->id]);
+            DB::table('pitboard_owner_security')->where('id', 1)->update(['user_id' => $user->id, 'secret' => encrypt('test-only')]);
             $owner = OwnerAccess::record();
             $this->withSession(['owner_proof' => ['stamp' => OwnerAccess::stamp($user, $owner), 'until' => now()->addDays(30)->timestamp]]);
         }
