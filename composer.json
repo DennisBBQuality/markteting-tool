@@ -7,9 +7,11 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "bacon/bacon-qr-code": "^3",
         "intervention/image-laravel": "^1.5",
         "laravel/framework": "^12.0",
-        "laravel/tinker": "^2.10.1"
+        "laravel/tinker": "^2.10.1",
+        "pragmarx/google2fa": "^9"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -64,7 +66,8 @@
             "@php artisan pitboard:upgrade-trunkrs-settings --no-interaction",
             "@php artisan pitboard:upgrade-notification-storage --no-interaction",
             "@php artisan pitboard:upgrade-notification-mail-storage --no-interaction",
-            "@php artisan pitboard:upgrade-content-storage --no-interaction"
+            "@php artisan pitboard:upgrade-content-storage --no-interaction",
+            "@php artisan pitboard:upgrade-owner-storage --no-interaction"
         ],
         "post-update-cmd": [
             "@php artisan vendor:publish --tag=laravel-assets --ansi --force"

@@ -2,7 +2,6 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
 
@@ -16,8 +15,7 @@ class RequireAdmin
             return response()->json(['error' => 'Niet ingelogd'], 401);
         }
 
-        $user = $request->attributes->get('authenticatedUser')
-            ?? User::select('id', 'actief', 'rol')->find($userId);
+        $user = $request->attributes->get('authenticatedUser');
 
         if (! $user || ! $user->actief) {
             $request->session()->invalidate();

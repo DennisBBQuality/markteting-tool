@@ -668,14 +668,82 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const email = document.getElementById('login-email').value;
   const wachtwoord = document.getElementById('login-password').value;
-  const user = await api('/api/auth/login', { method: 'POST', body: { email, wachtwoord } });
-  if (user) {
-    App.currentUser = user;
-    showApp();
-  } else {
-    document.getElementById('login-error').textContent = 'Ongeldige inloggegevens';
-  }
+  const invitation = document.getElementById('mfa-invite');
+  const error = document.getElementById('login-error');
+  error.textContent = '';
+  const user = await api('/api/auth/login', { method: 'POST', body: { email, wachtwoord, invitation: invitation.value.trim() },
+    onError: message => { error.textContent = message; } });
+  if (!user) return;
+  invitation.value = '';
+  document.getElementById('login-password').value = '';
+  if (user.step) return showMfa(user);
+  App.currentUser = user;
+  showApp();
 });
+
+function clearMfa() {
+  document.getElementById('mfa-secret').textContent = '';
+  document.getElementById('mfa-qr').removeAttribute('src');
+  document.getElementById('mfa-codes').textContent = '';
+  document.getElementById('mfa-form').reset();
+  document.getElementById('mfa-error').textContent = '';
+}
+
+function showMfa(data) {
+  clearMfa();
+  const enrol = data.step === 'enrol';
+  document.getElementById('login-form').hidden = true;
+  document.getElementById('mfa-form').hidden = false;
+  document.getElementById('mfa-setup').hidden = !enrol;
+  document.getElementById('mfa-recover').hidden = enrol;
+  document.querySelector('label[for="mfa-code"]').textContent = 'Authenticatorcode';
+  const input = document.getElementById('mfa-code');
+  input.inputMode = 'numeric';
+  if (enrol) {
+    document.getElementById('mfa-secret').textContent = data.secret;
+    const qr = document.getElementById('mfa-qr');
+    qr.hidden = !data.qr;
+    if (data.qr) qr.src = 'data:image/svg+xml;base64,' + data.qr;
+  }
+  input.focus();
+}
+
+document.getElementById('mfa-back').onclick = () => {
+  clearMfa();
+  document.getElementById('mfa-form').hidden = true;
+  document.getElementById('login-form').hidden = false;
+};
+document.getElementById('mfa-recover').onclick = () => {
+  document.querySelector('label[for="mfa-code"]').textContent = 'Eenmalige herstelcode';
+  const input = document.getElementById('mfa-code');
+  input.inputMode = 'text';
+  input.value = '';
+  input.focus();
+};
+document.getElementById('mfa-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const result = await api('/api/auth/mfa', { method: 'POST', body: {
+    code: document.getElementById('mfa-code').value.trim(), trust: document.getElementById('mfa-trust').checked
+  }, onError: message => { document.getElementById('mfa-error').textContent = message; } });
+  if (!result) return;
+  if (result.step) return showMfa(result);
+  clearMfa();
+  document.getElementById('mfa-form').hidden = true;
+  App.currentUser = result.user;
+  if (result.recovery.length) {
+    document.getElementById('mfa-backup').hidden = false;
+    document.getElementById('mfa-codes').textContent = result.recovery.join('\n');
+    return;
+  }
+  document.getElementById('login-form').hidden = false;
+  showApp();
+});
+document.getElementById('mfa-done').onclick = () => {
+  clearMfa();
+  document.getElementById('mfa-backup').hidden = true;
+  document.getElementById('login-form').hidden = false;
+  showApp();
+};
 
 document.getElementById('logout-btn').addEventListener('click', async () => {
   await api('/api/auth/logout', { method: 'POST' });

@@ -166,10 +166,10 @@ function openUserModal(user) {
     </div>
     <div class="form-group">
       <label>Rol</label>
-      <select id="user-rol">
+      <select id="user-rol" ${u.id === App.currentUser.id ? 'disabled' : ''}>
         <option value="lid" ${u.rol === 'lid' ? 'selected' : ''}>Lid</option>
         <option value="manager" ${u.rol === 'manager' ? 'selected' : ''}>Manager</option>
-        <option value="admin" ${u.rol === 'admin' ? 'selected' : ''}>Admin</option>
+        ${u.id === App.currentUser.id ? '<option value="admin" selected>Beheerder</option>' : ''}
       </select>
     </div>
     <div class="form-group">

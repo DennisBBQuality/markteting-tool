@@ -32,16 +32,29 @@ use App\Http\Controllers\Api\TrunkrsSettingController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Middleware\EnsureContentStorage;
 use App\Http\Middleware\EnsureCustomerServiceEnabled;
+use BaconQrCode\Writer;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use PragmaRX\Google2FA\Google2FA;
 
 // ========== AUTH (no middleware) ==========
 Route::get('/api/auth/csrf', function () {
-    return response()->noContent()->withHeaders([
+    $response = response()->noContent()->withHeaders([
         'Cache-Control' => 'no-store, no-cache, must-revalidate',
     ]);
+    if (request()->boolean('mfa_readiness')) {
+        $ready = class_exists(Google2FA::class) && class_exists(Writer::class)
+            && Schema::hasTable('pitboard_owner_security')
+            && DB::table('pitboard_owner_security')->where('id', 1)->exists();
+        $response->headers->set('X-Pitboard-MFA', $ready ? 'ready' : 'pending');
+    }
+
+    return $response;
 });
 Route::post('/api/auth/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+Route::post('/api/auth/mfa', [AuthController::class, 'verify'])->middleware('throttle:owner-mfa');
 Route::post('/api/auth/logout', [AuthController::class, 'logout']);
 Route::post('/api/trunkrs/scheduled-sync', TrunkrsScheduledSyncController::class)->middleware('throttle:trunkrs-scheduled');
 Route::get('/api/trunkrs/scheduled-sync/{checkId}', [TrunkrsScheduledSyncController::class, 'status'])->whereUuid('checkId')->middleware('throttle:trunkrs-scheduled');
