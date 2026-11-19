@@ -10,10 +10,8 @@ use BaconQrCode\Renderer\ImageRenderer;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
 use BaconQrCode\Writer;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use PragmaRX\Google2FA\Google2FA;
 
 class AuthController extends Controller
@@ -28,9 +26,7 @@ class AuthController extends Controller
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();
-        if (! Schema::hasTable('pitboard_owner_security')) {
-            abort_if(Artisan::call('pitboard:upgrade-owner-storage') !== 0, 503, 'De beveiligingsopslag is nog niet beschikbaar.');
-        }
+        OwnerAccess::ensureStorage();
         $owner = OwnerAccess::record();
         if ($request->filled('invitation')) {
             $digest = hash_hmac('sha256', strtolower($user->email), trim($request->invitation));
@@ -42,16 +38,22 @@ class AuthController extends Controller
             return $this->setup($request, $user, app(Google2FA::class));
         }
 
-        if ($owner->user_id === $user->id) {
+        $isOwner = $owner->user_id === $user->id;
+        if (! $isOwner && $user->rol === 'admin') {
+            $user->rol = 'manager';
+        }
+        $factor = $isOwner ? $owner : OwnerAccess::member($user->id)->first();
+        if ($factor) {
             $proof = json_decode($request->cookie(OwnerAccess::COOKIE) ?? '', true);
-            if (! OwnerAccess::valid($proof, $user, $owner)) {
-                $this->challenge($request, $user, $owner);
+            if (! $factor->secret || ! OwnerAccess::valid($proof, $user, $factor)) {
+                $this->challenge($request, $user, $factor, ! $isOwner);
+                if (! $factor->secret) {
+                    return $this->setup($request, $user, app(Google2FA::class));
+                }
 
                 return response()->json(['step' => 'verify'])->header('Cache-Control', 'no-store');
             }
             $request->session()->put('owner_proof', $proof);
-        } elseif ($user->rol === 'admin') {
-            $user->rol = 'manager';
         }
 
         OwnerAccess::admit($request, $user);
@@ -59,10 +61,10 @@ class AuthController extends Controller
         return response()->json(OwnerAccess::profile($user));
     }
 
-    private function challenge(Request $request, User $user, object $owner): void
+    private function challenge(Request $request, User $user, object $owner, bool $member = false): void
     {
         $request->session()->put('mfa_pending', [
-            'user' => $user->id, 'expires' => now()->addMinutes(10)->timestamp,
+            'user' => $user->id, 'member' => $member, 'expires' => now()->addMinutes(10)->timestamp,
             'stamp' => OwnerAccess::stamp($user, $owner),
         ]);
     }
@@ -86,16 +88,20 @@ class AuthController extends Controller
         abort_unless($pending && $pending['expires'] > now()->timestamp, 401, 'Log opnieuw in.');
 
         return DB::transaction(function () use ($request, $totp, $pending) {
-            $owner = OwnerAccess::record(true);
             $user = User::where('actief', true)->findOrFail($pending['user']);
-            abort_unless(hash_equals(OwnerAccess::stamp($user, $owner), $pending['stamp']), 401, 'Log opnieuw in.');
+            $member = $pending['member'] ?? false;
+            $record = $member ? OwnerAccess::member($user->id) : DB::table('pitboard_owner_security')->where('id', 1);
+            $factor = $record->lockForUpdate()->firstOrFail();
+            abort_unless(hash_equals(OwnerAccess::stamp($user, $factor), $pending['stamp']), 401, 'Log opnieuw in.');
             $enrol = isset($pending['secret']);
-            abort_unless($owner->user_id === $user->id || ($enrol && ! $owner->user_id && $user->rol === 'admin'), 403);
+            if ($member && $user->rol === 'admin') {
+                $user->rol = 'manager';
+            }
+            abort_unless($factor->user_id === $user->id || (! $member && $enrol && ! $factor->user_id && $user->rol === 'admin'), 403);
 
-            $record = DB::table('pitboard_owner_security')->where('id', 1);
             $code = strtoupper(trim($request->code));
             if (! $enrol && preg_match('/^[A-F0-9]{20}$/D', $code)) {
-                $hashes = json_decode($owner->recovery_hashes, true);
+                $hashes = json_decode($factor->recovery_hashes, true);
                 $index = array_search(hash('sha256', $code), $hashes, true);
                 abort_if($index === false, 422, 'Herstelcode niet geldig.');
                 unset($hashes[$index]);
@@ -104,9 +110,9 @@ class AuthController extends Controller
                 return $this->setup($request, $user, $totp);
             }
 
-            $secret = Crypt::decryptString($enrol ? $pending['secret'] : $owner->secret);
+            $secret = Crypt::decryptString($enrol ? $pending['secret'] : $factor->secret);
             $step = preg_match('/^\d{6}$/D', $code)
-                ? $totp->verifyKeyNewer($secret, $code, $enrol ? 0 : $owner->last_step, 1) : false;
+                ? $totp->verifyKeyNewer($secret, $code, $enrol ? 0 : $factor->last_step, 1) : false;
             abort_if($step === false, 422, 'Code ongeldig of al gebruikt. Probeer de volgende code.');
             $update = ['last_step' => $step];
             $codes = [];
@@ -114,12 +120,12 @@ class AuthController extends Controller
                 for ($i = 0; $i < 8; $i++) {
                     $codes[] = strtoupper(bin2hex(random_bytes(10)));
                 }
-                $owner->generation++;
-                $update += ['secret' => $pending['secret'], 'user_id' => $user->id, 'generation' => $owner->generation,
+                $factor->generation++;
+                $update += ['secret' => $pending['secret'], 'user_id' => $user->id, 'generation' => $factor->generation,
                     'recovery_hashes' => json_encode(array_map(fn ($value) => hash('sha256', $value), $codes))];
             }
             $record->update($update);
-            $proof = ['stamp' => OwnerAccess::stamp($user, $owner), 'until' => now()->addDays(30)->timestamp];
+            $proof = ['stamp' => OwnerAccess::stamp($user, $factor), 'until' => now()->addDays(30)->timestamp];
             $request->session()->forget('mfa_pending');
             $request->session()->put('owner_proof', $proof);
             OwnerAccess::admit($request, $user);

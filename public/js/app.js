@@ -116,6 +116,10 @@ async function api(url, options = {}) {
       res = await sendRequest();
     }
 
+    if (url === '/api/auth/me') {
+      const panel = document.getElementById('mfa-invite-panel');
+      if (panel) panel.hidden = res.headers.get('X-Pitboard-Owner-Setup') !== 'available';
+    }
     if (res.status === 401 && !url.includes('/auth/')) {
       showLogin();
       return null;
@@ -692,6 +696,7 @@ function clearMfa() {
 function showMfa(data) {
   clearMfa();
   const enrol = data.step === 'enrol';
+  document.getElementById('mfa-title').textContent = enrol ? 'Stel je authenticator-app in' : 'Bevestig je aanmelding';
   document.getElementById('login-form').hidden = true;
   document.getElementById('mfa-form').hidden = false;
   document.getElementById('mfa-setup').hidden = !enrol;

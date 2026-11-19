@@ -29,7 +29,7 @@
           <label>Wachtwoord</label>
           <input type="password" id="login-password" required placeholder="••••••••">
         </div>
-        <details id="mfa-invite-panel" class="form-group"><summary>Beheer voor het eerst activeren</summary>
+        <details id="mfa-invite-panel" hidden class="form-group"><summary>Beheer voor het eerst activeren</summary>
           <label for="mfa-invite">Persoonlijke activatiecode</label>
           <input type="password" id="mfa-invite" autocomplete="off">
         </details>
@@ -37,7 +37,7 @@
         <p id="login-error" class="error-msg"></p>
       </form>
       <form id="mfa-form" hidden>
-        <h2>Bevestig je aanmelding</h2>
+        <h2 id="mfa-title">Bevestig je aanmelding</h2>
         <div id="mfa-setup" hidden>
           <p>Voeg The Pitboard toe aan je authenticator-app. Scan de QR-code of gebruik de instelsleutel.</p>
           <img id="mfa-qr" alt="Scan met je authenticator" width="225" height="225">
@@ -141,7 +141,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.js"></script>
-  <script src="/js/app.js?v=20261119-mfa"></script>
+  <script src="/js/app.js?v=20261119-mfa-team"></script>
   <script src="/js/notifications.js?v=20260925-1"></script>
   <script src="/js/notification-mail.js?v=20260924-1"></script>
   <script src="/js/trunkrs.js?v=20260930-1"></script>
@@ -157,6 +157,6 @@
 <script src="/js/image-seo.js?v=20261009-save-feedback"></script>
   <script src="/js/product-dossiers.js?v=20260925-1"></script>
   <script src="/js/trunkrs-settings.js?v=20260930-1"></script>
-  <script src="/js/settings.js?v=20261119-mfa"></script>
+  <script src="/js/settings.js?v=20261119-mfa-team"></script>
 </body>
 </html>

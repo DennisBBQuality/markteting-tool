@@ -115,6 +115,7 @@ Route::middleware('auth.custom')->group(function () {
         Route::post('/api/settings/trunkrs/stop', [TrunkrsSettingController::class, 'stop'])->middleware('throttle:trunkrs-setup');
         Route::post('/api/settings/trunkrs/sync', [TrunkrsSettingController::class, 'sync'])->middleware('throttle:trunkrs-sync');
         Route::post('/api/users', [UserController::class, 'store']);
+        Route::put('/api/users/{id}/mfa', [UserController::class, 'requireMfa'])->whereUuid('id');
         Route::put('/api/users/{id}', [UserController::class, 'update']);
         Route::delete('/api/users/{id}', [UserController::class, 'destroy']);
         Route::get('/api/settings/ai/openai', [AiSettingController::class, 'show']);

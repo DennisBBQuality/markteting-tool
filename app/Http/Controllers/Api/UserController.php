@@ -6,23 +6,43 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\Auth\OwnerAccess;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $ownerId = OwnerAccess::record()->user_id;
+
+        $admin = $request->attributes->get('authenticatedUser')->id === $ownerId;
+        $statuses = $admin ? DB::table('pitboard_member_security')
+            ->selectRaw('user_id, CASE WHEN secret IS NULL THEN 0 ELSE 1 END AS enrolled')
+            ->pluck('enrolled', 'user_id') : collect();
 
         return response()->json(
             User::select('id', 'naam', 'email', 'rol', 'kleur', 'actief', 'created_at')
                 ->orderBy('naam')
-                ->get()->each(function (User $user) use ($ownerId) {
+                ->get()->each(function (User $user) use ($ownerId, $admin, $statuses) {
+                    if ($admin) {
+                        $user->mfa_status = $user->id === $ownerId || $statuses->get($user->id)
+                            ? 'active' : ($statuses->has($user->id) ? 'pending' : 'off');
+                    }
                     if ($user->rol === 'admin' && $user->id !== $ownerId) {
                         $user->rol = 'manager';
                     }
                 })
         );
+    }
+
+    public function requireMfa(string $id)
+    {
+        $user = User::where('actief', true)->findOrFail($id);
+        abort_if($user->id === OwnerAccess::record()->user_id, 422, 'De eigenaar heeft al MFA.');
+        OwnerAccess::member($id)->insertOrIgnore(['user_id' => $id]);
+        $factor = OwnerAccess::member($id)->firstOrFail();
+
+        return response()->json(['mfa_status' => $factor->secret ? 'active' : 'pending']);
     }
 
     public function store(Request $request)

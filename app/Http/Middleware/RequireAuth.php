@@ -15,7 +15,12 @@ class RequireAuth
         $userId = $request->session()->get('userId');
 
         if (! $userId) {
-            return response()->json(['error' => 'Niet ingelogd'], 401);
+            $response = response()->json(['error' => 'Niet ingelogd'], 401);
+            if ($request->is('api/auth/me') && (! Schema::hasTable('pitboard_owner_security') || ! OwnerAccess::record()->user_id)) {
+                $response->headers->set('X-Pitboard-Owner-Setup', 'available');
+            }
+
+            return $response;
         }
 
         $user = User::find($userId);
@@ -30,15 +35,19 @@ class RequireAuth
         if (! Schema::hasTable('pitboard_owner_security')) {
             return response()->json(['error' => 'Log opnieuw in om de beveiligingsupdate af te ronden.'], 401);
         }
+        OwnerAccess::ensureStorage();
         $owner = OwnerAccess::record();
-        if ($user->id === $owner->user_id) {
-            if (! OwnerAccess::valid($request->session()->get('owner_proof'), $user, $owner)) {
+        $isOwner = $user->id === $owner->user_id;
+        $factor = $isOwner ? $owner : OwnerAccess::member($user->id)->first();
+        if ($factor) {
+            if (! $factor->secret || ! OwnerAccess::valid($request->session()->get('owner_proof'), $user, $factor)) {
                 $request->session()->invalidate();
                 $request->session()->regenerateToken();
 
                 return response()->json(['error' => 'Meld je opnieuw aan met je authenticator.'], 401);
             }
-        } elseif ($user->rol === 'admin') {
+        }
+        if (! $isOwner && $user->rol === 'admin') {
             $user->rol = 'manager';
         }
 

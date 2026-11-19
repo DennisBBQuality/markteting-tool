@@ -82,6 +82,7 @@ async function renderSettings() {
             <th>Rol</th>
             <th>Kleur</th>
             <th>Status</th>
+            <th>Authenticator</th>
             <th>Acties</th>
           </tr>
         </thead>
@@ -99,6 +100,10 @@ async function renderSettings() {
               <td><div style="width:20px;height:20px;border-radius:50%;background:${u.kleur || '#3B82F6'}"></div></td>
               <td>${u.actief ? '<span style="color:var(--success)">Actief</span>' : '<span style="color:var(--text-light)">Inactief</span>'}</td>
               <td>
+                ${u.mfa_status === 'active' ? 'Gekoppeld' : u.mfa_status === 'pending' ? 'Instellen bij inloggen' :
+                  u.actief ? `<button class="btn btn-sm btn-outline" onclick="requireUserMfa('${u.id}', this)">MFA verplichten</button>` : 'Uit'}
+              </td>
+              <td>
                 <button class="btn btn-sm btn-outline" onclick='openUserModal(${escAttr(JSON.stringify(u))})'><i class="fas fa-pen"></i></button>
                 ${u.id !== App.currentUser.id ? `<button class="btn btn-sm btn-outline" onclick="toggleUserActive('${u.id}', ${u.actief ? 0 : 1})"><i class="fas fa-${u.actief ? 'ban' : 'check'}"></i></button>` : ''}
               </td>
@@ -111,6 +116,19 @@ async function renderSettings() {
   `;
   ImageModelPicker.load('settings');
   TrunkrsSettings.load();
+}
+
+async function requireUserMfa(id, button) {
+  button.disabled = true;
+  try {
+    const result = await api(`/api/users/${id}/mfa`, { method: 'PUT' });
+    if (result) {
+      button.parentElement.textContent = result.mfa_status === 'active' ? 'Gekoppeld' : 'Instellen bij inloggen';
+      toast('MFA is verplicht voor deze gebruiker.', 'success');
+    }
+  } finally {
+    button.disabled = false;
+  }
 }
 
 async function saveOpenAiKey() {
