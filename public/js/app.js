@@ -192,7 +192,7 @@ async function apiUpload(url, formData) {
 
 // ========== Auth ==========
 async function checkAuth() {
-  const user = await api('/api/auth/me');
+  const user = await api('/api/auth/me', { silentError: true });
   if (user) {
     App.currentUser = user;
     showApp();
@@ -215,6 +215,13 @@ function showLogin() {
 }
 
 function showApp() {
+  const user = App.currentUser;
+  if (!user?.id || typeof user.naam !== 'string' || !user.naam.trim() || !user.rol) {
+    showLogin();
+    document.getElementById('login-form').hidden = false;
+    document.getElementById('login-error').textContent = 'Vernieuw dit tabblad en log opnieuw in.';
+    return;
+  }
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('user-name').textContent = App.currentUser.naam;
@@ -675,12 +682,12 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
   const invitation = document.getElementById('mfa-invite');
   const error = document.getElementById('login-error');
   error.textContent = '';
-  const user = await api('/api/auth/login', { method: 'POST', body: { email, wachtwoord, invitation: invitation.value.trim() },
+  const user = await api('/api/auth/login', { method: 'POST', headers: { 'X-Pitboard-Auth': 'mfa-v1' }, body: { email, wachtwoord, invitation: invitation.value.trim() },
     onError: message => { error.textContent = message; } });
   if (!user) return;
   invitation.value = '';
   document.getElementById('login-password').value = '';
-  if (user.step) return showMfa(user);
+  if (user.step === 'enrol' || user.step === 'verify') return showMfa(user);
   App.currentUser = user;
   showApp();
 });
@@ -751,12 +758,8 @@ document.getElementById('mfa-done').onclick = () => {
 };
 
 document.getElementById('logout-btn').addEventListener('click', async () => {
-  await api('/api/auth/logout', { method: 'POST' });
-  App.currentUser = null;
-  if (typeof Dashboard !== 'undefined') { Dashboard.dispose(); Dashboard.date = null; }
-  App.taskUserFilter = '';
-  App.notesMineFilter = false;
-  showLogin();
+  const result = await api('/api/auth/logout', { method: 'POST' });
+  if (result?.ok) window.location.reload();
 });
 
 document.querySelectorAll('.nav-item[data-view]').forEach(el => {

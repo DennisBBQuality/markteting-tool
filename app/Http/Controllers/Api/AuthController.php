@@ -63,6 +63,11 @@ class AuthController extends Controller
 
     private function challenge(Request $request, User $user, object $owner, bool $member = false): void
     {
+        // The first MFA-aware browser release always sent the invitation field, even when empty.
+        // Earlier tabs interpret every successful login response as a complete user profile.
+        abort_unless($request->header('X-Pitboard-Auth') === 'mfa-v1' || $request->has('invitation'),
+            409, 'Je inlogscherm is verouderd. Vernieuw dit tabblad en log opnieuw in om je authenticator te gebruiken.');
+
         $request->session()->put('mfa_pending', [
             'user' => $user->id, 'member' => $member, 'expires' => now()->addMinutes(10)->timestamp,
             'stamp' => OwnerAccess::stamp($user, $owner),

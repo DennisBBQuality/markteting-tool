@@ -31,6 +31,14 @@ class MemberMfaTest extends TestCase
         $this->getJson('/api/users')->assertJsonMissingPath('0.mfa_status');
 
         $login = ['email' => $pilot->email, 'wachtwoord' => $password];
+        // An open tab from before MFA cannot display a challenge.
+        $this->postJson('/api/auth/login', $login)->assertStatus(409)
+            ->assertJsonPath('message', 'Je inlogscherm is verouderd. Vernieuw dit tabblad en log opnieuw in om je authenticator te gebruiken.')
+            ->assertSessionMissing('userId')->assertSessionMissing('mfa_pending')->assertJsonMissingPath('secret');
+        $this->withCookie(config('session.cookie'), session()->getId());
+        // The first MFA release sent an empty invitation for ordinary members.
+        $this->postJson('/api/auth/login', $login + ['invitation' => ''])->assertJsonPath('step', 'enrol');
+        $this->withHeader('X-Pitboard-Auth', 'mfa-v1');
         $setup = $this->postJson('/api/auth/login', $login)->assertOk()->assertJsonPath('step', 'enrol')->assertSessionMissing('userId');
         $this->withCookie(config('session.cookie'), session()->getId());
         $this->getJson('/api/auth/me')->assertUnauthorized();

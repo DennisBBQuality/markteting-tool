@@ -18,7 +18,7 @@ class OwnerMfaTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->withCredentials();
+        $this->withCredentials()->withHeader('X-Pitboard-Auth', 'mfa-v1');
         config(['owner.invitation' => hash_hmac('sha256', $this->credentials['email'], 'example-invite')]);
         User::factory()->create(['email' => $this->credentials['email'], 'rol' => 'admin',
             'wachtwoord_hash' => Hash::make($this->credentials['wachtwoord'])]);
