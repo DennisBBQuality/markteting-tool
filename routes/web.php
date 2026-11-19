@@ -45,10 +45,11 @@ Route::get('/api/auth/csrf', function () {
         'Cache-Control' => 'no-store, no-cache, must-revalidate',
     ]);
     if (request()->boolean('mfa_readiness')) {
-        $ready = class_exists(Google2FA::class) && class_exists(Writer::class)
-            && Schema::hasTable('pitboard_owner_security')
-            && DB::table('pitboard_owner_security')->where('id', 1)->exists();
-        $response->headers->set('X-Pitboard-MFA', $ready ? 'ready' : 'pending');
+        $runtime = class_exists(Google2FA::class) && class_exists(Writer::class);
+        $storage = Schema::hasTable('pitboard_owner_security') && DB::table('pitboard_owner_security')->where('id', 1)->exists();
+        $response->headers->set('X-Pitboard-MFA', $runtime && $storage ? 'ready' : 'pending');
+        $response->headers->set('X-Pitboard-Authenticator', $runtime ? 'ready' : 'unavailable');
+        $response->headers->set('X-Pitboard-Owner-Storage', $storage ? 'ready' : 'requires-login');
     }
 
     return $response;

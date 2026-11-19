@@ -3,11 +3,17 @@
 use App\Http\Middleware\RequireAdmin;
 use App\Http\Middleware\RequireAuth;
 use App\Http\Middleware\RequireManagerOrAdmin;
+use BaconQrCode\Writer;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\ThrottleRequests;
+use PragmaRX\Google2FA\Google2FA;
+
+if (! class_exists(Google2FA::class) || ! class_exists(Writer::class)) {
+    require __DIR__.'/../resources/mfa/autoload.php';
+}
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
